@@ -55,14 +55,14 @@ export class MoneyStalkerStack extends Stack {
     const domain = pool.addDomain('Login', { cognitoDomain: { domainPrefix: `money-stalker-${this.account}-${this.region}` } });
     const dlq = new sqs.Queue(this, 'DeadLetters', { retentionPeriod: Duration.days(14), encryption: sqs.QueueEncryption.SQS_MANAGED });
     const queue = new sqs.Queue(this, 'Work', { visibilityTimeout: Duration.minutes(6), retentionPeriod: Duration.days(4), encryption: sqs.QueueEncryption.SQS_MANAGED, deadLetterQueue: { queue: dlq, maxReceiveCount: 3 } });
-    const make = (id: string, handler: string, seconds: number, concurrency: number) => new NodejsFunction(this, id, {
+    const make = (id: string, handler: string, seconds: number) => new NodejsFunction(this, id, {
       entry: 'server/handlers.ts', handler, runtime: lambda.Runtime.NODEJS_22_X, architecture: lambda.Architecture.ARM_64,
-      memorySize: 512, timeout: Duration.seconds(seconds), reservedConcurrentExecutions: concurrency,
+      memorySize: 512, timeout: Duration.seconds(seconds),
       logGroup: new logs.LogGroup(this, `${id}Logs`, { retention: logs.RetentionDays.ONE_WEEK, removalPolicy: RemovalPolicy.DESTROY }),
       bundling: { minify: true, sourceMap: false, externalModules: [], target: 'node22' },
       environment: { LEDGER_TABLE: ledger.tableName, INTAKE_TABLE: intake.tableName, UPLOAD_BUCKET: uploads.bucketName, WORK_QUEUE_URL: queue.queueUrl },
     });
-    const http = make('API', 'http', 29, 2), worker = make('Worker', 'work', 60, 1), dispatcher = make('Dispatcher', 'dispatch', 30, 1), recovery = make('Recovery', 'recover', 60, 1);
+    const http = make('API', 'http', 29), worker = make('Worker', 'work', 60), dispatcher = make('Dispatcher', 'dispatch', 30), recovery = make('Recovery', 'recover', 60);
     for (const fn of [http, worker]) { ledger.grantReadWriteData(fn); intake.grantReadWriteData(fn); uploads.grantReadWrite(fn); }
     intake.grantReadData(recovery); queue.grantSendMessages(recovery); queue.grantSendMessages(dispatcher);
     dispatcher.addEventSource(new DynamoEventSource(intake, { startingPosition: lambda.StartingPosition.TRIM_HORIZON, batchSize: 10, retryAttempts: 3, bisectBatchOnError: true, reportBatchItemFailures: true,

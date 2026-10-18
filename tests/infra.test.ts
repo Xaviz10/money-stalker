@@ -13,6 +13,6 @@ describe('infrastructure safeguards', () => {
     t.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'ANY /{proxy+}', AuthorizationType: 'JWT', AuthorizationScopes: ['openid'] });
     t.hasResourceProperties('AWS::DynamoDB::Table', { BillingMode: 'PAY_PER_REQUEST', PointInTimeRecoverySpecification: Match.objectLike({ PointInTimeRecoveryEnabled: true }) });
     t.hasResourceProperties('AWS::Budgets::Budget', { Budget: Match.objectLike({ BudgetLimit: { Amount: 5, Unit: 'USD' } }), NotificationsWithSubscribers: Match.arrayWith([Match.objectLike({ Notification: Match.objectLike({ Threshold: 4 }) })]) });
-    expect(Object.values(t.findResources('AWS::Lambda::Function')).every((r: any) => r.Properties.ReservedConcurrentExecutions <= 2)).toBe(true);
+    expect(Object.values(t.findResources('AWS::Lambda::Function')).every((r: any) => r.Properties.ReservedConcurrentExecutions === undefined)).toBe(true);
   });
 });
