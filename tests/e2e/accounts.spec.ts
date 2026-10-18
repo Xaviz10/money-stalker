@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-const apiBase = "http://127.0.0.1:8787/api";
+const apiBase = `http://127.0.0.1:${process.env.E2E_API_PORT ?? "8787"}/api`;
 test.beforeEach(async ({ request }) => {
   expect((await request.post(`${apiBase}/test/reset`)).status()).toBe(204);
 });
@@ -40,7 +40,7 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   const bank = state.accounts.find((a: any) => a.kind === "bank"),
     credit = state.accounts.find((a: any) => a.kind === "credit");
   const instrument = page
-    .getByRole("heading", { name: "Tarjetas y alias de Wallet", exact: true })
+    .getByRole("heading", { name: "Tarjetas y alias de captura", exact: true })
     .locator("..");
   await instrument.getByLabel("Nombre de tarjeta").fill("Visa débito");
   await instrument.getByLabel("Cuenta asociada").selectOption(bank.id);
