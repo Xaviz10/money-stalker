@@ -1,0 +1,14 @@
+{
+  "device": { "model": "", "ios": "" },
+  "totalTransactions": 0,
+  "channels": {
+    "sms": { "eligible": 0, "automatic": 0, "falseMerges": 0, "incomplete": 0, "lockedPassed": false, "offlinePassed": false, "retryPassed": false, "locationDeniedPassed": false },
+    "wallet": { "eligible": 0, "automatic": 0, "falseMerges": 0, "incomplete": 0, "lockedPassed": false, "offlinePassed": false, "retryPassed": false, "locationDeniedPassed": false }
+  },
+  "bankProfilesVerified": false,
+  "fullPeriodReconciled": false,
+  "backupRestoreVerified": false,
+  "hostedAuthVerified": false,
+  "pwaVerified": false,
+  "dependencyAuditVerified": false
+}

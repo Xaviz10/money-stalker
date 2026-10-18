@@ -1,0 +1,276 @@
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+export type IconName =
+  | "eye"
+  | "overview"
+  | "arrows"
+  | "check"
+  | "upload"
+  | "wallet"
+  | "plus"
+  | "download"
+  | "arrow"
+  | "close"
+  | "search"
+  | "incoming"
+  | "outgoing"
+  | "source"
+  | "shield"
+  | "card"
+  | "bank"
+  | "chevron"
+  | "refresh"
+  | "calendar"
+  | "food"
+  | "home"
+  | "transport"
+  | "heart"
+  | "leisure"
+  | "other"
+  | "minus";
+export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  const paths: Record<IconName, ReactNode> = {
+    eye: (
+      <>
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    ),
+    overview: (
+      <>
+        <rect x="3" y="3" width="7" height="7" rx="2" />
+        <rect x="14" y="3" width="7" height="7" rx="2" />
+        <rect x="3" y="14" width="7" height="7" rx="2" />
+        <rect x="14" y="14" width="7" height="7" rx="2" />
+      </>
+    ),
+    arrows: <path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" />,
+    check: <path d="m5 12 4 4L19 6" />,
+    upload: <path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5" />,
+    wallet: (
+      <>
+        <rect x="3" y="5" width="18" height="15" rx="3" />
+        <path d="M3 8V4l14-2v3M21 11h-6v5h6" />
+      </>
+    ),
+    plus: <path d="M12 5v14M5 12h14" />,
+    minus: <path d="M5 12h14" />,
+    download: <path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4" />,
+    arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
+    close: <path d="m6 6 12 12M6 18 18 6" />,
+    search: (
+      <>
+        <circle cx="10" cy="10" r="6" />
+        <path d="m15 15 6 6" />
+      </>
+    ),
+    incoming: <path d="M18 6 6 18m0-8v8h8" />,
+    outgoing: <path d="M6 18 18 6m-8 0h8v8" />,
+    source: (
+      <>
+        <rect x="5" y="3" width="14" height="18" rx="3" />
+        <path d="M9 8h6M9 12h6M9 16h3" />
+      </>
+    ),
+    shield: (
+      <>
+        <path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z" />
+        <path d="m8 11 3 3 5-5" />
+      </>
+    ),
+    card: (
+      <>
+        <rect x="2" y="5" width="20" height="14" rx="3" />
+        <path d="M2 10h20M6 15h4" />
+      </>
+    ),
+    bank: (
+      <>
+        <path d="m3 9 9-6 9 6H3ZM4 21h16M6 12v5m6-5v5m6-5v5" />
+      </>
+    ),
+    chevron: <path d="m9 5 7 7-7 7" />,
+    refresh: (
+      <>
+        <path d="M20 7v5h-5M4 17v-5h5" />
+        <path d="M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1" />
+      </>
+    ),
+    calendar: (
+      <>
+        <rect x="3" y="5" width="18" height="16" rx="3" />
+        <path d="M7 3v4m10-4v4M3 11h18" />
+      </>
+    ),
+    food: (
+      <path d="M5 3v7m3-7v7M3 7h7m-4 3v11M17 3c-4 5-4 9 0 9h2V3h-2Zm2 9v9" />
+    ),
+    home: (
+      <>
+        <path d="m3 11 9-8 9 8M5 10v11h14V10M10 21v-7h4v7" />
+      </>
+    ),
+    transport: (
+      <>
+        <rect x="5" y="3" width="14" height="16" rx="4" />
+        <path d="M5 10h14M8 19v2m8-2v2M8 15h1m6 0h1" />
+      </>
+    ),
+    heart: <path d="M12 21 3 12C-3 5 7-1 12 6c5-7 15-1 9 6l-9 9Z" />,
+    leisure: (
+      <>
+        <path d="m7 7-3 2-2 9 3 2 5-5h4l5 5 3-2-2-9-3-2H7Z" />
+        <path d="M6 11v4m-2-2h4m7-2h1m2 3h1" />
+      </>
+    ),
+    other: (
+      <>
+        <circle cx="5" cy="12" r="1" />
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="19" cy="12" r="1" />
+      </>
+    ),
+  };
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {paths[name]}
+    </svg>
+  );
+}
+export function Eyes({
+  happy = false,
+  className = "",
+}: {
+  happy?: boolean;
+  className?: string;
+}) {
+  return (
+    <svg
+      className={`eyes ${className}`}
+      viewBox="0 0 120 78"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect x="2" y="4" width="116" height="70" rx="35" fill="currentColor" />
+      <ellipse cx="42" cy="37" rx="17" ry="23" fill="#fff" />
+      <ellipse cx="81" cy="37" rx="17" ry="23" fill="#fff" />
+      {happy ? (
+        <g stroke="#0c1730" strokeWidth="5" strokeLinecap="round">
+          <path d="m33 39 9-7 9 7M72 39l9-7 9 7" />
+        </g>
+      ) : (
+        <g fill="#0c1730">
+          <ellipse cx="47" cy="40" rx="7" ry="11" />
+          <ellipse cx="86" cy="40" rx="7" ry="11" />
+        </g>
+      )}
+    </svg>
+  );
+}
+export function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  tone?: "neutral" | "success" | "warning" | "danger" | "blue";
+}) {
+  return <span className={`ds-badge ds-badge--${tone}`}>{children}</span>;
+}
+export function Button({
+  children,
+  variant = "primary",
+  className = "",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "primary" | "secondary" | "quiet" | "danger";
+  children: ReactNode;
+}) {
+  return (
+    <button {...props} className={`button ${variant} ${className}`}>
+      {children}
+    </button>
+  );
+}
+export function Panel({
+  title,
+  action,
+  children,
+  className = "",
+}: {
+  title?: string;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`panel ${className}`}>
+      {title && (
+        <div className="section-heading">
+          <h2>{title}</h2>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+export function EmptyState({
+  title,
+  children,
+  action,
+  icon = "search",
+}: {
+  title: string;
+  children: ReactNode;
+  action?: ReactNode;
+  icon?: IconName;
+}) {
+  return (
+    <div className="ds-empty">
+      <span className="ds-empty-icon">
+        <Icon name={icon} size={28} />
+      </span>
+      <h3>{title}</h3>
+      <p>{children}</p>
+      {action}
+    </div>
+  );
+}
+export function SectionHeading({
+  title,
+  action,
+}: {
+  title: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="section-heading">
+      <h2>{title}</h2>
+      {action}
+    </div>
+  );
+}
+
+export function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}

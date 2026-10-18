@@ -1,0 +1,345 @@
+import { useState } from "react";
+import type { State, Observation, Transaction } from "../../domain/model";
+import { formatCOP } from "../../domain/money";
+import { api, post } from "../api";
+import { Icon as Glyph, Eyes as SidekickMark } from "../design-system/ui";
+function shortDate(value?: string) {
+  if (!value) return "Sin fecha";
+  return new Intl.DateTimeFormat("es-CO", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "America/Bogota",
+  }).format(new Date(value.length === 10 ? `${value}T12:00:00Z` : value));
+}
+function accountName(state: State, id?: string) {
+  return state.accounts.find((a) => a.id === id)?.name ?? "Sin cuenta";
+}
+function SourceTag({ source }: { source: Observation["source"] }) {
+  return (
+    <span className="trail-tag">
+      <Glyph name="source" size={15} />
+      {source === "statement"
+        ? "Extracto"
+        : source === "sms"
+          ? "SMS"
+          : "Wallet"}
+    </span>
+  );
+}
+function EvidenceMessage({ id }: { id: string }) {
+  const [text, setText] = useState(""),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  return (
+    <div>
+      <button
+        className="text-button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError("");
+          try {
+            const result = await api<{ message?: string }>(
+              `/observations/${id}/evidence`,
+            );
+            setText(result.message ?? "Sin mensaje original");
+          } catch {
+            setError("No pudimos cargar el mensaje. Intenta de nuevo.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Cargando mensaje…" : "Ver mensaje original"}
+      </button>
+      {text && <p className="evidence-message">{text}</p>}
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+export function ReviewDesk({
+  state,
+  act,
+  edit,
+  stale,
+}: {
+  state: State;
+  act: (fn: () => Promise<unknown>, message?: string) => Promise<void>;
+  edit: (o: Observation) => void;
+  stale: boolean;
+}) {
+  const pending = state.observations.filter((o) => o.status === "review");
+  const history = state.audit
+    .filter((a) => a.beforeObservation || a.beforeTransaction)
+    .slice(-10)
+    .reverse();
+  const [busy, setBusy] = useState<string>();
+  const run = async (
+    id: string,
+    fn: () => Promise<unknown>,
+    message: string,
+  ) => {
+    setBusy(id);
+    try {
+      await act(fn, message);
+    } finally {
+      setBusy(undefined);
+    }
+  };
+  return (
+    <>
+      <section
+        className={`review-brief ${!pending.length ? "review-complete" : ""}`}
+      >
+        <SidekickMark happy={!pending.length} />
+        <div>
+          <h2>
+            {pending.length
+              ? `${pending.length} ${pending.length === 1 ? "pista necesita" : "pistas necesitan"} tu ojo.`
+              : "Todo en su lugar"}
+          </h2>
+          <p>
+            {pending.length
+              ? "Yo acerco las pistas. Tú confirmas si cuentan la misma compra."
+              : "Sin evidencias pendientes. Cuando llegue otra pista, podrás revisarla aquí."}
+          </p>
+        </div>
+        <span className="review-count">
+          <Glyph name={pending.length ? "search" : "check"} />
+          {pending.length ? "Por revisar" : "Revisión al día"}
+        </span>
+      </section>
+      {stale && (
+        <p className="review-caution" role="status">
+          No se pudieron actualizar los datos. Actualiza antes de tomar una
+          decisión.
+        </p>
+      )}
+      {pending.length > 0 && (
+        <p className="review-guidance">
+          <Glyph name="shield" size={18} />
+          Las coincidencias son sugerencias. Une solo evidencias de la misma
+          compra; puedes deshacerlo desde el historial.
+        </p>
+      )}
+      <div className="clue-list">
+        {pending.map((o) => {
+          const candidates = o.candidates
+            .map((id) =>
+              state.transactions.find((t) => t.id === id && !t.voided),
+            )
+            .filter((t): t is Transaction => Boolean(t));
+          return (
+            <article className="clue" key={o.id}>
+              <div className="clue-header">
+                <SourceTag source={o.source} />
+                <span className="clue-state">Pendiente de tu revisión</span>
+              </div>
+              <div className="clue-comparison">
+                <div className="source-evidence">
+                  <h3>{o.merchant || "Movimiento sin comercio"}</h3>
+                  <strong className="evidence-amount">
+                    {o.amountMinor
+                      ? formatCOP(o.amountMinor)
+                      : "Falta el valor"}
+                  </strong>
+                  <p>
+                    {accountName(state, o.accountId)}
+                    <br />
+                    {shortDate(o.date)}
+                  </p>
+                  {o.reason && <p className="clue-reason">{o.reason}</p>}
+                  {o.source === "sms" && <EvidenceMessage id={o.id} />}
+                  <details className="evidence-details">
+                    <summary>Detalles de la evidencia</summary>
+                    <p>
+                      Recibida: {shortDate(o.receivedAt)}
+                      <br />
+                      Tipo:{" "}
+                      {
+                        {
+                          expense: "Gasto",
+                          income: "Ingreso",
+                          transfer: "Transferencia",
+                          refund: "Devolución",
+                        }[o.kind]
+                      }
+                    </p>
+                    {o.location && (
+                      <p>
+                        Ubicación: {o.location.latitude.toFixed(4)},{" "}
+                        {o.location.longitude.toFixed(4)} · precisión{" "}
+                        {Math.round(o.location.accuracy)} m. Puede ser posterior
+                        al pago.
+                      </p>
+                    )}
+                  </details>
+                </div>
+                <div className="evidence-connector">
+                  <Glyph name="arrow" size={22} />
+                </div>
+                <div className="candidate-evidence">
+                  <h4>
+                    {candidates.length
+                      ? "¿Es este el mismo movimiento?"
+                      : "Todavía falta una pieza."}
+                  </h4>
+                  {candidates.length ? (
+                    candidates.map((t) => (
+                      <div className="candidate" key={t.id}>
+                        <div className="candidate-heading">
+                          <strong>{t.merchant || "Movimiento"}</strong>
+                          <b>{formatCOP(t.amountMinor)}</b>
+                        </div>
+                        <p>
+                          {accountName(state, t.accountId)} ·{" "}
+                          {shortDate(t.date)}
+                        </p>
+                        <span
+                          className={`match-detail ${t.amountMinor !== o.amountMinor || t.date !== o.date || t.accountId !== o.accountId ? "different" : ""}`}
+                        >
+                          {t.amountMinor === o.amountMinor
+                            ? "Mismo valor"
+                            : "El valor es diferente"}{" "}
+                          ·{" "}
+                          {t.date === o.date
+                            ? "Misma fecha"
+                            : "Fecha diferente"}
+                        </span>
+                        {t.amountMinor !== o.amountMinor &&
+                          o.source === "statement" &&
+                          o.amountMinor && (
+                            <p className="amount-change">
+                              Al unir, el valor cambiará a{" "}
+                              {formatCOP(o.amountMinor)} según el extracto.
+                            </p>
+                          )}
+                        <button
+                          className="button primary"
+                          disabled={Boolean(busy) || stale}
+                          onClick={() =>
+                            void run(
+                              o.id,
+                              () =>
+                                post("/matches", {
+                                  observationId: o.id,
+                                  transactionId: t.id,
+                                }),
+                              "Pistas unidas. El movimiento quedó actualizado.",
+                            )
+                          }
+                        >
+                          <Glyph name="check" size={17} />
+                          {busy === o.id
+                            ? "Guardando…"
+                            : `Unir con ${t.merchant || "movimiento"}`}
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p>
+                      Completa los datos o registra este movimiento por
+                      separado. No lo uniremos automáticamente.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="clue-actions">
+                <button
+                  className="button secondary"
+                  disabled={Boolean(busy) || stale}
+                  onClick={() => edit(o)}
+                >
+                  {!o.amountMinor || !o.date || !o.accountId
+                    ? "Completar datos"
+                    : "Registrar por separado"}
+                </button>
+                <button
+                  className="text-button discard-clue"
+                  disabled={Boolean(busy) || stale}
+                  onClick={() =>
+                    void run(
+                      o.id,
+                      () =>
+                        post("/reviews", {
+                          observationId: o.id,
+                          action: "ignore",
+                        }),
+                      "Evidencia descartada. Puedes deshacerlo en el historial.",
+                    )
+                  }
+                >
+                  Descartar evidencia
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      {!pending.length && (
+        <div className="review-next">
+          <Glyph name="check" />
+          <p>
+            {history.length
+              ? "Una pista menos, una vista más clara."
+              : "Tu próxima pista aparecerá aquí."}
+          </p>
+          <a href="#/resumen" className="button secondary">
+            Volver a mi resumen <Glyph name="arrow" size={17} />
+          </a>
+        </div>
+      )}
+      <section className="correction-history">
+        <div className="section-heading">
+          <h2>Historial de correcciones</h2>
+          <span className="muted">Puedes volver atrás</span>
+        </div>
+        {history.length ? (
+          history.map((a) => (
+            <div className="audit-row" key={a.id}>
+              <div>
+                <strong>
+                  {(
+                    {
+                      merge: "Evidencias unidas",
+                      edit: "Movimiento editado",
+                      ignore: "Evidencia descartada",
+                      separate: "Movimiento separado",
+                    } as Record<string, string>
+                  )[a.action] ?? a.action}
+                </strong>
+                <small>{shortDate(a.at)}</small>
+              </div>
+              <button
+                className="text-button"
+                disabled={Boolean(busy) || Boolean(a.undone) || stale}
+                onClick={() =>
+                  void run(
+                    a.id,
+                    () => post("/undo", { auditId: a.id }),
+                    "Corrección deshecha. Recuperamos el estado anterior.",
+                  )
+                }
+              >
+                {a.undone
+                  ? "Deshecho"
+                  : busy === a.id
+                    ? "Deshaciendo…"
+                    : "Deshacer"}
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="history-empty">
+            Aquí quedará el rastro de tus correcciones.
+          </p>
+        )}
+      </section>
+    </>
+  );
+}

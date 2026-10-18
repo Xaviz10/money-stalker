@@ -1,0 +1,1527 @@
+{
+  "tool": "comp-spec",
+  "version": 1,
+  "createdAt": "2026-10-18T17:35:47.667Z",
+  "comp": ".impeccable/mocks/accounts-first.png",
+  "warnings": [
+    "region balance-panel: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region review-panel: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region heading-region: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)"
+  ],
+  "uncoveredInkCells": [
+    "C2",
+    "D2",
+    "E2"
+  ],
+  "compSize": {
+    "width": 1586,
+    "height": 992
+  },
+  "aspect": 1.5988,
+  "orientation": "landscape",
+  "palette": [
+    {
+      "hex": "#f7f7f7",
+      "coverage": 0.7902
+    },
+    {
+      "hex": "#122878",
+      "coverage": 0.1548
+    },
+    {
+      "hex": "#f8f881",
+      "coverage": 0.0276
+    },
+    {
+      "hex": "#122f6e",
+      "coverage": 0.0159
+    },
+    {
+      "hex": "#0a1229",
+      "coverage": 0.0115
+    }
+  ],
+  "bands": [
+    {
+      "y": 0.025,
+      "strength": 0.296
+    },
+    {
+      "y": 0.05,
+      "strength": 0.3993
+    },
+    {
+      "y": 0.075,
+      "strength": 0.4132
+    },
+    {
+      "y": 0.1625,
+      "strength": 0.3619
+    },
+    {
+      "y": 0.2,
+      "strength": 0.6478
+    },
+    {
+      "y": 0.25,
+      "strength": 0.2553
+    },
+    {
+      "y": 0.3625,
+      "strength": 0.2506
+    },
+    {
+      "y": 0.475,
+      "strength": 0.3607
+    },
+    {
+      "y": 0.5375,
+      "strength": 0.2429
+    },
+    {
+      "y": 0.675,
+      "strength": 0.2208
+    },
+    {
+      "y": 0.7125,
+      "strength": 0.2178
+    },
+    {
+      "y": 0.925,
+      "strength": 0.2509
+    }
+  ],
+  "regions": [
+    {
+      "id": "top-navigation",
+      "kind": "chrome",
+      "note": "White top navigation with brand and primary sections",
+      "grid": null,
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 0.0786
+      },
+      "px": {
+        "x": 0,
+        "y": 0,
+        "w": 1586,
+        "h": 78
+      },
+      "aspect": 20.3333,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.9232
+        },
+        {
+          "hex": "#1646c9",
+          "coverage": 0.0545
+        },
+        {
+          "hex": "#546080",
+          "coverage": 0.0106
+        },
+        {
+          "hex": "#08090c",
+          "coverage": 0.0078
+        },
+        {
+          "hex": "#e1f897",
+          "coverage": 0.0039
+        }
+      ],
+      "detail": {
+        "energy": 30.3137
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "accounts-rail",
+      "kind": "chrome",
+      "note": "Deep ultramarine account hierarchy and net worth rail",
+      "grid": null,
+      "box": {
+        "x": 0,
+        "y": 0.0786,
+        "w": 0.1923,
+        "h": 0.9214
+      },
+      "px": {
+        "x": 0,
+        "y": 78,
+        "w": 305,
+        "h": 914
+      },
+      "aspect": 0.3337,
+      "palette": [
+        {
+          "hex": "#122878",
+          "coverage": 0.8369
+        },
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.0768
+        },
+        {
+          "hex": "#11306f",
+          "coverage": 0.0736
+        },
+        {
+          "hex": "#596fa0",
+          "coverage": 0.0077
+        },
+        {
+          "hex": "#75b360",
+          "coverage": 0.0051
+        }
+      ],
+      "detail": {
+        "energy": 12.3494
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "headline",
+      "kind": "text",
+      "note": "Heavy geometric grotesk title Cada peso localizado",
+      "grid": null,
+      "box": {
+        "x": 0.2093,
+        "y": 0.1442,
+        "w": 0.4212,
+        "h": 0.0635
+      },
+      "px": {
+        "x": 332,
+        "y": 143,
+        "w": 668,
+        "h": 63
+      },
+      "aspect": 10.6032,
+      "palette": [
+        {
+          "hex": "#f7f7f7",
+          "coverage": 0.6649
+        },
+        {
+          "hex": "#09111c",
+          "coverage": 0.2949
+        },
+        {
+          "hex": "#b6b9bc",
+          "coverage": 0.019
+        },
+        {
+          "hex": "#333845",
+          "coverage": 0.0134
+        },
+        {
+          "hex": "#5c5e68",
+          "coverage": 0.0078
+        }
+      ],
+      "detail": {
+        "energy": 88.9747
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 14,
+          "capHeightPx": 44.2,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.6787,
+          "advTall": 0.4977,
+          "advX": 0.6787,
+          "gap": 0.0452,
+          "xRatio": 0.7022,
+          "stemW": 0.2689,
+          "contrast": 1.3421,
+          "serif": 0.6553,
+          "densTall": 0.7794,
+          "densX": 0.7384,
+          "weight": 0.7794
+        },
+        "widthClass": "normal",
+        "weightClass": "black",
+        "chosen": {
+          "family": "Changa",
+          "weight": 700,
+          "fontSizePx": 63,
+          "source": "catalog",
+          "estimatedSize": true,
+          "stamp": "83b4fcc02b5b"
+        }
+      }
+    },
+    {
+      "id": "intro",
+      "kind": "text",
+      "note": "Single line product description beneath heading",
+      "grid": null,
+      "box": {
+        "x": 0.2093,
+        "y": 0.2157,
+        "w": 0.4691,
+        "h": 0.0242
+      },
+      "px": {
+        "x": 332,
+        "y": 214,
+        "w": 744,
+        "h": 24
+      },
+      "aspect": 31,
+      "palette": [
+        {
+          "hex": "#f7f7f7",
+          "coverage": 0.8319
+        },
+        {
+          "hex": "#354569",
+          "coverage": 0.0608
+        },
+        {
+          "hex": "#7d869f",
+          "coverage": 0.0552
+        },
+        {
+          "hex": "#b2b8c8",
+          "coverage": 0.0461
+        },
+        {
+          "hex": "#232d5b",
+          "coverage": 0.0061
+        }
+      ],
+      "detail": {
+        "energy": 61.8827
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 55,
+          "capHeightPx": 14.3,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.5949,
+          "advTall": 0.385,
+          "advX": 0.5949,
+          "gap": 0.105,
+          "xRatio": 0.7182,
+          "stemW": 0.1619,
+          "contrast": 1.0846,
+          "serif": 0.3456,
+          "densTall": 0.517,
+          "densX": 0.5866,
+          "weight": 0.517
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "funds-label",
+      "kind": "text",
+      "note": "Small semibold total funds label",
+      "grid": null,
+      "box": {
+        "x": 0.2251,
+        "y": 0.2823,
+        "w": 0.1009,
+        "h": 0.0192
+      },
+      "px": {
+        "x": 357,
+        "y": 280,
+        "w": 160,
+        "h": 19
+      },
+      "aspect": 8.4211,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.7855
+        },
+        {
+          "hex": "#0d1236",
+          "coverage": 0.1046
+        },
+        {
+          "hex": "#767c93",
+          "coverage": 0.0402
+        },
+        {
+          "hex": "#3e4967",
+          "coverage": 0.0349
+        },
+        {
+          "hex": "#a4a8ba",
+          "coverage": 0.0349
+        }
+      ],
+      "detail": {
+        "energy": 48.7417
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 13,
+          "capHeightPx": 10.4,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.672,
+          "advTall": 0.704,
+          "advX": 0.672,
+          "gap": 0.064,
+          "xRatio": 0.7273,
+          "stemW": 0.2248,
+          "contrast": 1.2328,
+          "serif": 0.4696,
+          "densTall": 0.5757,
+          "densX": 0.6632,
+          "weight": 0.5757
+        },
+        "widthClass": "normal",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "funds-amount",
+      "kind": "text",
+      "note": "Tabular account funds amount in ink",
+      "grid": null,
+      "box": {
+        "x": 0.2251,
+        "y": 0.3135,
+        "w": 0.1072,
+        "h": 0.0393
+      },
+      "px": {
+        "x": 357,
+        "y": 311,
+        "w": 170,
+        "h": 39
+      },
+      "aspect": 4.359,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.6121
+        },
+        {
+          "hex": "#0b173f",
+          "coverage": 0.2462
+        },
+        {
+          "hex": "#6c768e",
+          "coverage": 0.055
+        },
+        {
+          "hex": "#a5a9bb",
+          "coverage": 0.044
+        },
+        {
+          "hex": "#3f4a66",
+          "coverage": 0.0426
+        }
+      ],
+      "detail": {
+        "energy": 51.7689
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 7,
+          "capHeightPx": 24.9,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.723,
+          "advTall": 0.723,
+          "advX": null,
+          "gap": 0.0803,
+          "xRatio": 0.8299,
+          "stemW": 0.2249,
+          "contrast": 1.0409,
+          "serif": null,
+          "densTall": 0.6282,
+          "densX": null,
+          "weight": 0.6282
+        },
+        "widthClass": "normal",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "commitments-label",
+      "kind": "text",
+      "note": "Small semibold commitments label",
+      "grid": null,
+      "box": {
+        "x": 0.3695,
+        "y": 0.2823,
+        "w": 0.1072,
+        "h": 0.0192
+      },
+      "px": {
+        "x": 586,
+        "y": 280,
+        "w": 170,
+        "h": 19
+      },
+      "aspect": 8.9474,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.8532
+        },
+        {
+          "hex": "#0b0e35",
+          "coverage": 0.0506
+        },
+        {
+          "hex": "#2e385a",
+          "coverage": 0.038
+        },
+        {
+          "hex": "#6d7390",
+          "coverage": 0.0304
+        },
+        {
+          "hex": "#949cae",
+          "coverage": 0.0278
+        }
+      ],
+      "detail": {
+        "energy": 37.0867
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 8,
+          "capHeightPx": 10.8,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.7442,
+          "advTall": 0.4806,
+          "advX": 0.9922,
+          "gap": 0.093,
+          "xRatio": 0.7591,
+          "stemW": 0.2136,
+          "contrast": 1.0904,
+          "serif": null,
+          "densTall": 0.6608,
+          "densX": 0.6406,
+          "weight": 0.6608
+        },
+        "widthClass": "wide",
+        "weightClass": "black"
+      }
+    },
+    {
+      "id": "commitments-amount",
+      "kind": "text",
+      "note": "Tabular commitments amount",
+      "grid": null,
+      "box": {
+        "x": 0.3695,
+        "y": 0.3135,
+        "w": 0.1084,
+        "h": 0.0393
+      },
+      "px": {
+        "x": 586,
+        "y": 311,
+        "w": 172,
+        "h": 39
+      },
+      "aspect": 4.4103,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.6497
+        },
+        {
+          "hex": "#0c1c46",
+          "coverage": 0.2362
+        },
+        {
+          "hex": "#354467",
+          "coverage": 0.0483
+        },
+        {
+          "hex": "#848aa3",
+          "coverage": 0.0362
+        },
+        {
+          "hex": "#b7bcca",
+          "coverage": 0.0295
+        }
+      ],
+      "detail": {
+        "energy": 48.0099
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 4,
+          "capHeightPx": 24.3,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 2.1851,
+          "advTall": 2.1851,
+          "advX": null,
+          "gap": 0.3298,
+          "xRatio": 0.7997,
+          "stemW": 0.2243,
+          "contrast": 1.0863,
+          "serif": 1.3719,
+          "densTall": 0.6212,
+          "densX": null,
+          "weight": 0.6212
+        },
+        "widthClass": "wide",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "available-label",
+      "kind": "text",
+      "note": "Available amount label in citron panel",
+      "grid": null,
+      "box": {
+        "x": 0.5328,
+        "y": 0.2984,
+        "w": 0.0946,
+        "h": 0.0222
+      },
+      "px": {
+        "x": 845,
+        "y": 296,
+        "w": 150,
+        "h": 22
+      },
+      "aspect": 6.8182,
+      "palette": [
+        {
+          "hex": "#f8f783",
+          "coverage": 0.8568
+        },
+        {
+          "hex": "#969564",
+          "coverage": 0.0424
+        },
+        {
+          "hex": "#22343b",
+          "coverage": 0.0398
+        },
+        {
+          "hex": "#081131",
+          "coverage": 0.0345
+        },
+        {
+          "hex": "#eae088",
+          "coverage": 0.0265
+        }
+      ],
+      "detail": {
+        "energy": 34.2917
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 13,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.6914,
+          "advTall": 0.7299,
+          "advX": 0.6914,
+          "gap": 0.0768,
+          "xRatio": 0.6983,
+          "stemW": 0.2316,
+          "contrast": 1.2008,
+          "serif": 0.5413,
+          "densTall": 0.6324,
+          "densX": 0.6375,
+          "weight": 0.6324
+        },
+        "widthClass": "normal",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "available-amount",
+      "kind": "text",
+      "note": "Large available financial amount in ink",
+      "grid": null,
+      "box": {
+        "x": 0.5328,
+        "y": 0.3327,
+        "w": 0.1438,
+        "h": 0.0454
+      },
+      "px": {
+        "x": 845,
+        "y": 330,
+        "w": 228,
+        "h": 45
+      },
+      "aspect": 5.0667,
+      "palette": [
+        {
+          "hex": "#f8f882",
+          "coverage": 0.6639
+        },
+        {
+          "hex": "#0a142f",
+          "coverage": 0.2028
+        },
+        {
+          "hex": "#ebe48d",
+          "coverage": 0.0593
+        },
+        {
+          "hex": "#080c3c",
+          "coverage": 0.0528
+        },
+        {
+          "hex": "#7e7f57",
+          "coverage": 0.0213
+        }
+      ],
+      "detail": {
+        "energy": 49.5024
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 28,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.7143,
+          "advTall": 0.7143,
+          "advX": null,
+          "gap": 0.1071,
+          "xRatio": 0.8344,
+          "stemW": 0.2328,
+          "contrast": 1.1055,
+          "serif": null,
+          "densTall": 0.5784,
+          "densX": null,
+          "weight": 0.5784
+        },
+        "widthClass": "normal",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "available-status",
+      "kind": "control",
+      "note": "Amber incomplete evidence notice next to balance",
+      "grid": null,
+      "box": {
+        "x": 0.5328,
+        "y": 0.4204,
+        "w": 0.1419,
+        "h": 0.0363
+      },
+      "px": {
+        "x": 845,
+        "y": 417,
+        "w": 225,
+        "h": 36
+      },
+      "aspect": 6.25,
+      "palette": [
+        {
+          "hex": "#f8f6d8",
+          "coverage": 0.89
+        },
+        {
+          "hex": "#b6533e",
+          "coverage": 0.047
+        },
+        {
+          "hex": "#f3c8af",
+          "coverage": 0.0275
+        },
+        {
+          "hex": "#dd9c82",
+          "coverage": 0.0183
+        },
+        {
+          "hex": "#f8f7f7",
+          "coverage": 0.0172
+        }
+      ],
+      "detail": {
+        "energy": 22.6236
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "activity-tabs",
+      "kind": "control",
+      "note": "Recent activity upcoming payments and calendar tabs",
+      "grid": null,
+      "box": {
+        "x": 0.2245,
+        "y": 0.5161,
+        "w": 0.4489,
+        "h": 0.0373
+      },
+      "px": {
+        "x": 356,
+        "y": 512,
+        "w": 712,
+        "h": 37
+      },
+      "aspect": 19.2432,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.9475
+        },
+        {
+          "hex": "#1d4bce",
+          "coverage": 0.0206
+        },
+        {
+          "hex": "#687491",
+          "coverage": 0.0136
+        },
+        {
+          "hex": "#aab2c3",
+          "coverage": 0.0106
+        },
+        {
+          "hex": "#c4d0f8",
+          "coverage": 0.0076
+        }
+      ],
+      "detail": {
+        "energy": 23.8318
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "transaction-table",
+      "kind": "control",
+      "note": "Dense readable transaction ledger with date merchant category account amount columns",
+      "grid": null,
+      "box": {
+        "x": 0.2238,
+        "y": 0.5726,
+        "w": 0.4489,
+        "h": 0.3629
+      },
+      "px": {
+        "x": 355,
+        "y": 568,
+        "w": 712,
+        "h": 360
+      },
+      "aspect": 1.9778,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.9576
+        },
+        {
+          "hex": "#b2b8c7",
+          "coverage": 0.0173
+        },
+        {
+          "hex": "#828aa1",
+          "coverage": 0.0137
+        },
+        {
+          "hex": "#5c6684",
+          "coverage": 0.0059
+        },
+        {
+          "hex": "#2f3a5a",
+          "coverage": 0.0056
+        }
+      ],
+      "detail": {
+        "energy": 21.5893
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "review-title",
+      "kind": "text",
+      "note": "Right workspace heading Conecta las pistas",
+      "grid": null,
+      "box": {
+        "x": 0.7194,
+        "y": 0.124,
+        "w": 0.2125,
+        "h": 0.0232
+      },
+      "px": {
+        "x": 1141,
+        "y": 123,
+        "w": 337,
+        "h": 23
+      },
+      "aspect": 14.6522,
+      "palette": [
+        {
+          "hex": "#f8f7f7",
+          "coverage": 0.8244
+        },
+        {
+          "hex": "#0a0d36",
+          "coverage": 0.0884
+        },
+        {
+          "hex": "#c6cbd7",
+          "coverage": 0.0395
+        },
+        {
+          "hex": "#080816",
+          "coverage": 0.0244
+        },
+        {
+          "hex": "#8a91a5",
+          "coverage": 0.0233
+        }
+      ],
+      "detail": {
+        "energy": 84.1184
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 14,
+          "capHeightPx": 16.8,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.6402,
+          "advTall": 0.804,
+          "advX": 0.6402,
+          "gap": 0.0447,
+          "xRatio": 0.7322,
+          "stemW": 0.2224,
+          "contrast": 1.2141,
+          "serif": 0.4726,
+          "densTall": 0.6073,
+          "densX": 0.6895,
+          "weight": 0.6073
+        },
+        "widthClass": "normal",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "review-description",
+      "kind": "text",
+      "note": "Concise explanation of statement and wallet comparison",
+      "grid": null,
+      "box": {
+        "x": 0.7194,
+        "y": 0.1573,
+        "w": 0.2327,
+        "h": 0.0222
+      },
+      "px": {
+        "x": 1141,
+        "y": 156,
+        "w": 369,
+        "h": 22
+      },
+      "aspect": 16.7727,
+      "palette": [
+        {
+          "hex": "#f7f7f7",
+          "coverage": 0.8222
+        },
+        {
+          "hex": "#b9c1cd",
+          "coverage": 0.0783
+        },
+        {
+          "hex": "#576382",
+          "coverage": 0.0589
+        },
+        {
+          "hex": "#868ea5",
+          "coverage": 0.0315
+        },
+        {
+          "hex": "#384373",
+          "coverage": 0.0091
+        }
+      ],
+      "detail": {
+        "energy": 51.1955
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 30,
+          "capHeightPx": 11.4,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.6444,
+          "advTall": 0.6151,
+          "advX": 0.6444,
+          "gap": 0.0879,
+          "xRatio": 0.7236,
+          "stemW": 0.1862,
+          "contrast": 1.1308,
+          "serif": 0.5207,
+          "densTall": 0.546,
+          "densX": 0.6034,
+          "weight": 0.546
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "review-source",
+      "kind": "control",
+      "note": "Statement source evidence amount and account",
+      "grid": null,
+      "box": {
+        "x": 0.7238,
+        "y": 0.2883,
+        "w": 0.1154,
+        "h": 0.1331
+      },
+      "px": {
+        "x": 1148,
+        "y": 286,
+        "w": 183,
+        "h": 132
+      },
+      "aspect": 1.3864,
+      "palette": [
+        {
+          "hex": "#f7f7f7",
+          "coverage": 0.9169
+        },
+        {
+          "hex": "#0b1236",
+          "coverage": 0.0402
+        },
+        {
+          "hex": "#bac0cd",
+          "coverage": 0.0211
+        },
+        {
+          "hex": "#7a8399",
+          "coverage": 0.013
+        },
+        {
+          "hex": "#0a1222",
+          "coverage": 0.0088
+        }
+      ],
+      "detail": {
+        "energy": 18.2147
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "review-candidate",
+      "kind": "control",
+      "note": "Wallet candidate amount and account",
+      "grid": null,
+      "box": {
+        "x": 0.8531,
+        "y": 0.2883,
+        "w": 0.1154,
+        "h": 0.1331
+      },
+      "px": {
+        "x": 1353,
+        "y": 286,
+        "w": 183,
+        "h": 132
+      },
+      "aspect": 1.3864,
+      "palette": [
+        {
+          "hex": "#f7f7f6",
+          "coverage": 0.9255
+        },
+        {
+          "hex": "#0b1035",
+          "coverage": 0.0384
+        },
+        {
+          "hex": "#646f87",
+          "coverage": 0.0134
+        },
+        {
+          "hex": "#ccd0db",
+          "coverage": 0.0119
+        },
+        {
+          "hex": "#a3a9bb",
+          "coverage": 0.0107
+        }
+      ],
+      "detail": {
+        "energy": 17.2396
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "review-action",
+      "kind": "control",
+      "note": "Primary review coincidence button",
+      "grid": null,
+      "box": {
+        "x": 0.7238,
+        "y": 0.4718,
+        "w": 0.1507,
+        "h": 0.0514
+      },
+      "px": {
+        "x": 1148,
+        "y": 468,
+        "w": 239,
+        "h": 51
+      },
+      "aspect": 4.6863,
+      "palette": [
+        {
+          "hex": "#1848cb",
+          "coverage": 0.7632
+        },
+        {
+          "hex": "#f6f7f8",
+          "coverage": 0.1985
+        },
+        {
+          "hex": "#cbd5f4",
+          "coverage": 0.0135
+        },
+        {
+          "hex": "#3766d8",
+          "coverage": 0.0128
+        },
+        {
+          "hex": "#9eb7ee",
+          "coverage": 0.012
+        }
+      ],
+      "detail": {
+        "energy": 24.5988
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "category-title",
+      "kind": "text",
+      "note": "Expense category work area heading",
+      "grid": null,
+      "box": {
+        "x": 0.7201,
+        "y": 0.5887,
+        "w": 0.1576,
+        "h": 0.0262
+      },
+      "px": {
+        "x": 1142,
+        "y": 584,
+        "w": 250,
+        "h": 26
+      },
+      "aspect": 9.6154,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.8377
+        },
+        {
+          "hex": "#090c26",
+          "coverage": 0.0495
+        },
+        {
+          "hex": "#858da1",
+          "coverage": 0.0454
+        },
+        {
+          "hex": "#4f5674",
+          "coverage": 0.0344
+        },
+        {
+          "hex": "#c7c9d6",
+          "coverage": 0.033
+        }
+      ],
+      "detail": {
+        "energy": 52.8125
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 15.5,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.6788,
+          "advTall": 0.6626,
+          "advX": 0.5818,
+          "gap": 0.097,
+          "xRatio": 0.6672,
+          "stemW": 0.2174,
+          "contrast": 1.2692,
+          "serif": 0.731,
+          "densTall": 0.5107,
+          "densX": 0.7217,
+          "weight": 0.5107
+        },
+        "widthClass": "condensed",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "category-rows",
+      "kind": "control",
+      "note": "Labeled expense category progress bars and amounts",
+      "grid": null,
+      "box": {
+        "x": 0.7188,
+        "y": 0.631,
+        "w": 0.2472,
+        "h": 0.3266
+      },
+      "px": {
+        "x": 1140,
+        "y": 626,
+        "w": 392,
+        "h": 324
+      },
+      "aspect": 1.2099,
+      "palette": [
+        {
+          "hex": "#f6f6f6",
+          "coverage": 0.9725
+        },
+        {
+          "hex": "#5a6483",
+          "coverage": 0.0084
+        },
+        {
+          "hex": "#1e54d5",
+          "coverage": 0.0078
+        },
+        {
+          "hex": "#c0c0d0",
+          "coverage": 0.0069
+        },
+        {
+          "hex": "#9298af",
+          "coverage": 0.0043
+        }
+      ],
+      "detail": {
+        "energy": 17.3171
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "balance-panel",
+      "kind": "chrome",
+      "note": "Semantic financial equation controls and contextual descriptions",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.21,
+        "y": 0.2571,
+        "w": 0.4767,
+        "h": 0.2188
+      },
+      "px": {
+        "x": 333,
+        "y": 255,
+        "w": 756,
+        "h": 217
+      },
+      "aspect": 3.4839,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.6453
+        },
+        {
+          "hex": "#f8f881",
+          "coverage": 0.264
+        },
+        {
+          "hex": "#f8f6d8",
+          "coverage": 0.0483
+        },
+        {
+          "hex": "#0a153b",
+          "coverage": 0.0342
+        },
+        {
+          "hex": "#14275f",
+          "coverage": 0.0082
+        }
+      ],
+      "detail": {
+        "energy": 35.4111
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "review-panel",
+      "kind": "chrome",
+      "note": "Source candidate evidence and explicit review decision panel",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.7062,
+        "y": 0.1008,
+        "w": 0.2812,
+        "h": 0.4516
+      },
+      "px": {
+        "x": 1120,
+        "y": 100,
+        "w": 446,
+        "h": 448
+      },
+      "aspect": 0.9955,
+      "palette": [
+        {
+          "hex": "#f7f6f6",
+          "coverage": 0.9138
+        },
+        {
+          "hex": "#1949ca",
+          "coverage": 0.046
+        },
+        {
+          "hex": "#091035",
+          "coverage": 0.0168
+        },
+        {
+          "hex": "#16306e",
+          "coverage": 0.0124
+        },
+        {
+          "hex": "#586381",
+          "coverage": 0.011
+        }
+      ],
+      "detail": {
+        "energy": 25.5666
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "heading-region",
+      "kind": "chrome",
+      "note": "Page title context and description as semantic text",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.2068,
+        "y": 0.1028,
+        "w": 0.4792,
+        "h": 0.1391
+      },
+      "px": {
+        "x": 328,
+        "y": 102,
+        "w": 760,
+        "h": 138
+      },
+      "aspect": 5.5072,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.8512
+        },
+        {
+          "hex": "#09121d",
+          "coverage": 0.1145
+        },
+        {
+          "hex": "#475069",
+          "coverage": 0.0127
+        },
+        {
+          "hex": "#c4c6d2",
+          "coverage": 0.0109
+        },
+        {
+          "hex": "#979da6",
+          "coverage": 0.0108
+        }
+      ],
+      "detail": {
+        "energy": 49.7311
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    }
+  ],
+  "compSha256": "b445fd68159183f655e3cf995fd6a9033f9a39bfaf4c6a2e02a9cdf640f137fc",
+  "regionsSource": {
+    "path": ".impeccable/build/regions.json",
+    "sha256": "9fb5061feec780686652322f138d322d5aa1a9edb7aff02e2b5e2c2e39ab76f3"
+  }
+}

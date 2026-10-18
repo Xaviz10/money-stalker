@@ -1,0 +1,260 @@
+{
+  "regions": [
+    {
+      "id": "top-navigation",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 0,
+        "y": 0,
+        "w": 1586,
+        "h": 78
+      },
+      "note": "White top navigation with brand and primary sections"
+    },
+    {
+      "id": "accounts-rail",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 0,
+        "y": 78,
+        "w": 305,
+        "h": 914
+      },
+      "note": "Deep ultramarine account hierarchy and net worth rail"
+    },
+    {
+      "id": "headline",
+      "kind": "text",
+      "pixelBox": {
+        "x": 332,
+        "y": 143,
+        "w": 668,
+        "h": 63
+      },
+      "note": "Heavy geometric grotesk title Cada peso localizado"
+    },
+    {
+      "id": "intro",
+      "kind": "text",
+      "pixelBox": {
+        "x": 332,
+        "y": 214,
+        "w": 744,
+        "h": 24
+      },
+      "note": "Single line product description beneath heading"
+    },
+    {
+      "id": "funds-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 357,
+        "y": 280,
+        "w": 160,
+        "h": 19
+      },
+      "note": "Small semibold total funds label"
+    },
+    {
+      "id": "funds-amount",
+      "kind": "text",
+      "pixelBox": {
+        "x": 357,
+        "y": 311,
+        "w": 170,
+        "h": 39
+      },
+      "note": "Tabular account funds amount in ink"
+    },
+    {
+      "id": "commitments-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 586,
+        "y": 280,
+        "w": 170,
+        "h": 19
+      },
+      "note": "Small semibold commitments label"
+    },
+    {
+      "id": "commitments-amount",
+      "kind": "text",
+      "pixelBox": {
+        "x": 586,
+        "y": 311,
+        "w": 172,
+        "h": 39
+      },
+      "note": "Tabular commitments amount"
+    },
+    {
+      "id": "available-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 845,
+        "y": 296,
+        "w": 150,
+        "h": 22
+      },
+      "note": "Available amount label in citron panel"
+    },
+    {
+      "id": "available-amount",
+      "kind": "text",
+      "pixelBox": {
+        "x": 845,
+        "y": 330,
+        "w": 228,
+        "h": 45
+      },
+      "note": "Large available financial amount in ink"
+    },
+    {
+      "id": "available-status",
+      "kind": "control",
+      "pixelBox": {
+        "x": 845,
+        "y": 417,
+        "w": 225,
+        "h": 36
+      },
+      "note": "Amber incomplete evidence notice next to balance"
+    },
+    {
+      "id": "activity-tabs",
+      "kind": "control",
+      "pixelBox": {
+        "x": 356,
+        "y": 512,
+        "w": 712,
+        "h": 37
+      },
+      "note": "Recent activity upcoming payments and calendar tabs"
+    },
+    {
+      "id": "transaction-table",
+      "kind": "control",
+      "pixelBox": {
+        "x": 355,
+        "y": 568,
+        "w": 712,
+        "h": 360
+      },
+      "note": "Dense readable transaction ledger with date merchant category account amount columns"
+    },
+    {
+      "id": "review-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1141,
+        "y": 123,
+        "w": 337,
+        "h": 23
+      },
+      "note": "Right workspace heading Conecta las pistas"
+    },
+    {
+      "id": "review-description",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1141,
+        "y": 156,
+        "w": 369,
+        "h": 22
+      },
+      "note": "Concise explanation of statement and wallet comparison"
+    },
+    {
+      "id": "review-source",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1148,
+        "y": 286,
+        "w": 183,
+        "h": 132
+      },
+      "note": "Statement source evidence amount and account"
+    },
+    {
+      "id": "review-candidate",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1353,
+        "y": 286,
+        "w": 183,
+        "h": 132
+      },
+      "note": "Wallet candidate amount and account"
+    },
+    {
+      "id": "review-action",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1148,
+        "y": 468,
+        "w": 239,
+        "h": 51
+      },
+      "note": "Primary review coincidence button"
+    },
+    {
+      "id": "category-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1142,
+        "y": 584,
+        "w": 250,
+        "h": 26
+      },
+      "note": "Expense category work area heading"
+    },
+    {
+      "id": "category-rows",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1140,
+        "y": 626,
+        "w": 392,
+        "h": 324
+      },
+      "note": "Labeled expense category progress bars and amounts"
+    },
+    {
+      "id": "balance-panel",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 333,
+        "y": 255,
+        "w": 756,
+        "h": 217
+      },
+      "container": true,
+      "note": "Semantic financial equation controls and contextual descriptions"
+    },
+    {
+      "id": "review-panel",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1120,
+        "y": 100,
+        "w": 446,
+        "h": 448
+      },
+      "container": true,
+      "note": "Source candidate evidence and explicit review decision panel"
+    },
+    {
+      "id": "heading-region",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 328,
+        "y": 102,
+        "w": 760,
+        "h": 138
+      },
+      "container": true,
+      "note": "Page title context and description as semantic text"
+    }
+  ]
+}

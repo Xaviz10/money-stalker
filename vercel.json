@@ -1,0 +1,5 @@
+{
+  "framework": "vite",
+  "buildCommand": "APP_BASE_PATH=/ npm run build",
+  "outputDirectory": "dist"
+}

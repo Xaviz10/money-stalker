@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-18T17:58:46.286196Z",
+  "title": "Design System: Money Stalker",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Action Blue",
+        "tonalRamp": [
+          "oklch(15% 0.2271 264.56)",
+          "oklch(27% 0.2271 264.56)",
+          "oklch(38% 0.2271 264.56)",
+          "oklch(50% 0.2271 264.56)",
+          "oklch(61% 0.2271 264.56)",
+          "oklch(73% 0.2271 264.56)",
+          "oklch(84% 0.2271 264.56)",
+          "oklch(95% 0.2271 264.56)"
+        ]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Action Blue Hover",
+        "tonalRamp": [
+          "oklch(15% 0.2072 264.37)",
+          "oklch(27% 0.2072 264.37)",
+          "oklch(38% 0.2072 264.37)",
+          "oklch(50% 0.2072 264.37)",
+          "oklch(61% 0.2072 264.37)",
+          "oklch(73% 0.2072 264.37)",
+          "oklch(84% 0.2072 264.37)",
+          "oklch(95% 0.2072 264.37)"
+        ]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Soft Action Blue",
+        "tonalRamp": [
+          "oklch(15% 0.0182 269.09)",
+          "oklch(27% 0.0182 269.09)",
+          "oklch(38% 0.0182 269.09)",
+          "oklch(50% 0.0182 269.09)",
+          "oklch(61% 0.0182 269.09)",
+          "oklch(73% 0.0182 269.09)",
+          "oklch(84% 0.0182 269.09)",
+          "oklch(95% 0.0182 269.09)"
+        ]
+      },
+      "rail": {
+        "role": "primary",
+        "displayName": "Account Ultramarine",
+        "tonalRamp": [
+          "oklch(15% 0.1321 265.10)",
+          "oklch(27% 0.1321 265.10)",
+          "oklch(38% 0.1321 265.10)",
+          "oklch(50% 0.1321 265.10)",
+          "oklch(61% 0.1321 265.10)",
+          "oklch(73% 0.1321 265.10)",
+          "oklch(84% 0.1321 265.10)",
+          "oklch(95% 0.1321 265.10)"
+        ]
+      },
+      "rail-muted": {
+        "role": "neutral",
+        "displayName": "Rail Supporting Text",
+        "tonalRamp": [
+          "oklch(15% 0.0497 267.65)",
+          "oklch(27% 0.0497 267.65)",
+          "oklch(38% 0.0497 267.65)",
+          "oklch(50% 0.0497 267.65)",
+          "oklch(61% 0.0497 267.65)",
+          "oklch(73% 0.0497 267.65)",
+          "oklch(84% 0.0497 267.65)",
+          "oklch(95% 0.0497 267.65)"
+        ]
+      },
+      "rail-line": {
+        "role": "neutral",
+        "displayName": "Rail Divider",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00 / 0.149)",
+          "oklch(27% 0.0000 0.00 / 0.149)",
+          "oklch(38% 0.0000 0.00 / 0.149)",
+          "oklch(50% 0.0000 0.00 / 0.149)",
+          "oklch(61% 0.0000 0.00 / 0.149)",
+          "oklch(73% 0.0000 0.00 / 0.149)",
+          "oklch(84% 0.0000 0.00 / 0.149)",
+          "oklch(95% 0.0000 0.00 / 0.149)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Financial Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0521 264.48)",
+          "oklch(27% 0.0521 264.48)",
+          "oklch(38% 0.0521 264.48)",
+          "oklch(50% 0.0521 264.48)",
+          "oklch(61% 0.0521 264.48)",
+          "oklch(73% 0.0521 264.48)",
+          "oklch(84% 0.0521 264.48)",
+          "oklch(95% 0.0521 264.48)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Reading Blue",
+        "tonalRamp": [
+          "oklch(15% 0.0664 262.46)",
+          "oklch(27% 0.0664 262.46)",
+          "oklch(38% 0.0664 262.46)",
+          "oklch(50% 0.0664 262.46)",
+          "oklch(61% 0.0664 262.46)",
+          "oklch(73% 0.0664 262.46)",
+          "oklch(84% 0.0664 262.46)",
+          "oklch(95% 0.0664 262.46)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Slate",
+        "tonalRamp": [
+          "oklch(15% 0.0523 260.51)",
+          "oklch(27% 0.0523 260.51)",
+          "oklch(38% 0.0523 260.51)",
+          "oklch(50% 0.0523 260.51)",
+          "oklch(61% 0.0523 260.51)",
+          "oklch(73% 0.0523 260.51)",
+          "oklch(84% 0.0523 260.51)",
+          "oklch(95% 0.0523 260.51)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Cool Canvas",
+        "tonalRamp": [
+          "oklch(15% 0.0057 264.53)",
+          "oklch(27% 0.0057 264.53)",
+          "oklch(38% 0.0057 264.53)",
+          "oklch(50% 0.0057 264.53)",
+          "oklch(61% 0.0057 264.53)",
+          "oklch(73% 0.0057 264.53)",
+          "oklch(84% 0.0057 264.53)",
+          "oklch(95% 0.0057 264.53)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "White Workspace",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(38% 0.0000 0.00)",
+          "oklch(50% 0.0000 0.00)",
+          "oklch(61% 0.0000 0.00)",
+          "oklch(73% 0.0000 0.00)",
+          "oklch(84% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Fine Divider",
+        "tonalRamp": [
+          "oklch(15% 0.0150 260.73)",
+          "oklch(27% 0.0150 260.73)",
+          "oklch(38% 0.0150 260.73)",
+          "oklch(50% 0.0150 260.73)",
+          "oklch(61% 0.0150 260.73)",
+          "oklch(73% 0.0150 260.73)",
+          "oklch(84% 0.0150 260.73)",
+          "oklch(95% 0.0150 260.73)"
+        ]
+      },
+      "citron": {
+        "role": "secondary",
+        "displayName": "Available Citron",
+        "tonalRamp": [
+          "oklch(15% 0.1528 108.99)",
+          "oklch(27% 0.1528 108.99)",
+          "oklch(38% 0.1528 108.99)",
+          "oklch(50% 0.1528 108.99)",
+          "oklch(61% 0.1528 108.99)",
+          "oklch(73% 0.1528 108.99)",
+          "oklch(84% 0.1528 108.99)",
+          "oklch(95% 0.1528 108.99)"
+        ]
+      },
+      "citron-soft": {
+        "role": "secondary",
+        "displayName": "Soft Citron",
+        "tonalRamp": [
+          "oklch(15% 0.0390 107.09)",
+          "oklch(27% 0.0390 107.09)",
+          "oklch(38% 0.0390 107.09)",
+          "oklch(50% 0.0390 107.09)",
+          "oklch(61% 0.0390 107.09)",
+          "oklch(73% 0.0390 107.09)",
+          "oklch(84% 0.0390 107.09)",
+          "oklch(95% 0.0390 107.09)"
+        ]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Confirmed Green",
+        "tonalRamp": [
+          "oklch(15% 0.0908 163.93)",
+          "oklch(27% 0.0908 163.93)",
+          "oklch(38% 0.0908 163.93)",
+          "oklch(50% 0.0908 163.93)",
+          "oklch(61% 0.0908 163.93)",
+          "oklch(73% 0.0908 163.93)",
+          "oklch(84% 0.0908 163.93)",
+          "oklch(95% 0.0908 163.93)"
+        ]
+      },
+      "success-bg": {
+        "role": "semantic",
+        "displayName": "Confirmed Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0157 160.62)",
+          "oklch(27% 0.0157 160.62)",
+          "oklch(38% 0.0157 160.62)",
+          "oklch(50% 0.0157 160.62)",
+          "oklch(61% 0.0157 160.62)",
+          "oklch(73% 0.0157 160.62)",
+          "oklch(84% 0.0157 160.62)",
+          "oklch(95% 0.0157 160.62)"
+        ]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Attention Amber",
+        "tonalRamp": [
+          "oklch(15% 0.0996 62.03)",
+          "oklch(27% 0.0996 62.03)",
+          "oklch(38% 0.0996 62.03)",
+          "oklch(50% 0.0996 62.03)",
+          "oklch(61% 0.0996 62.03)",
+          "oklch(73% 0.0996 62.03)",
+          "oklch(84% 0.0996 62.03)",
+          "oklch(95% 0.0996 62.03)"
+        ]
+      },
+      "warning-bg": {
+        "role": "semantic",
+        "displayName": "Attention Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0340 84.59)",
+          "oklch(27% 0.0340 84.59)",
+          "oklch(38% 0.0340 84.59)",
+          "oklch(50% 0.0340 84.59)",
+          "oklch(61% 0.0340 84.59)",
+          "oklch(73% 0.0340 84.59)",
+          "oklch(84% 0.0340 84.59)",
+          "oklch(95% 0.0340 84.59)"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Review Red",
+        "tonalRamp": [
+          "oklch(15% 0.1453 30.34)",
+          "oklch(27% 0.1453 30.34)",
+          "oklch(38% 0.1453 30.34)",
+          "oklch(50% 0.1453 30.34)",
+          "oklch(61% 0.1453 30.34)",
+          "oklch(73% 0.1453 30.34)",
+          "oklch(84% 0.1453 30.34)",
+          "oklch(95% 0.1453 30.34)"
+        ]
+      },
+      "danger-bg": {
+        "role": "semantic",
+        "displayName": "Review Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0172 35.34)",
+          "oklch(27% 0.0172 35.34)",
+          "oklch(38% 0.0172 35.34)",
+          "oklch(50% 0.0172 35.34)",
+          "oklch(61% 0.0172 35.34)",
+          "oklch(73% 0.0172 35.34)",
+          "oklch(84% 0.0172 35.34)",
+          "oklch(95% 0.0172 35.34)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus Blue",
+        "tonalRamp": [
+          "oklch(15% 0.1973 264.13)",
+          "oklch(27% 0.1973 264.13)",
+          "oklch(38% 0.1973 264.13)",
+          "oklch(50% 0.1973 264.13)",
+          "oklch(61% 0.1973 264.13)",
+          "oklch(73% 0.1973 264.13)",
+          "oklch(84% 0.1973 264.13)",
+          "oklch(95% 0.1973 264.13)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Main dashboard statement."
+      },
+      "heading": {
+        "displayName": "Heading",
+        "purpose": "General page titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Shared section and panel headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Explanatory paragraphs."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels and secondary context."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Supporting dates and context."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-overlay",
+        "value": "0 20px 70px #10245429",
+        "purpose": "Native modal elevation only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "motion-fast",
+        "value": "160ms",
+        "purpose": "Color and border state transitions."
+      },
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Shared state-transition easing."
+      },
+      {
+        "name": "review-done",
+        "value": "450ms",
+        "purpose": "One completion acknowledgement for the eyes; disabled when reduced motion is requested."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1500px",
+        "query": "(min-width: 1500px)"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1390px",
+        "query": "(max-width: 1390px)"
+      },
+      {
+        "name": "insights-stack",
+        "value": "1100px",
+        "query": "(max-width: 1100px)"
+      },
+      {
+        "name": "account-disclosure",
+        "value": "850px",
+        "query": "(max-width: 850px)"
+      },
+      {
+        "name": "phone",
+        "value": "600px",
+        "query": "(max-width: 600px)"
+      },
+      {
+        "name": "narrow-amount-reflow",
+        "value": "360px",
+        "query": "(max-width: 360px)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Native action with the shipped variant and visible keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-button ds-primary\">Guardar movimiento</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:var(--height-control);padding:11px var(--space-4);border:1px solid transparent;border-radius:var(--radius-control);font-family:var(--font-ui);font-size:13px;font-weight:650;line-height:1.4;cursor:pointer;transition:background-color var(--motion-fast) var(--ease-out),color var(--motion-fast) var(--ease-out),border-color var(--motion-fast) var(--ease-out)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:not-allowed}.ds-primary{background:var(--color-primary);color:var(--color-surface)}.ds-primary:hover{background:var(--color-primary-hover)}@media(prefers-reduced-motion:reduce){.ds-button{transition:none}}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Native action with the shipped variant and visible keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-button ds-secondary\">Registrar por separado</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:var(--height-control);padding:11px var(--space-4);border:1px solid transparent;border-radius:var(--radius-control);font-family:var(--font-ui);font-size:13px;font-weight:650;line-height:1.4;cursor:pointer;transition:background-color var(--motion-fast) var(--ease-out),color var(--motion-fast) var(--ease-out),border-color var(--motion-fast) var(--ease-out)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:not-allowed}.ds-secondary{background:var(--color-surface);color:var(--color-primary);border-color:var(--color-line)}.ds-secondary:hover{background:var(--color-primary-soft);border-color:#b8c9ef}@media(prefers-reduced-motion:reduce){.ds-button{transition:none}}"
+    },
+    {
+      "name": "Quiet button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Native action with the shipped variant and visible keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-button ds-quiet\">Ver detalle</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:var(--height-control);padding:11px var(--space-4);border:1px solid transparent;border-radius:var(--radius-control);font-family:var(--font-ui);font-size:13px;font-weight:650;line-height:1.4;cursor:pointer;transition:background-color var(--motion-fast) var(--ease-out),color var(--motion-fast) var(--ease-out),border-color var(--motion-fast) var(--ease-out)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:not-allowed}.ds-quiet{background:transparent;color:var(--color-primary)}.ds-quiet:hover{background:var(--color-primary-soft)}@media(prefers-reduced-motion:reduce){.ds-button{transition:none}}"
+    },
+    {
+      "name": "Danger button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Native action with the shipped variant and visible keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-button ds-danger\">Eliminar</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:var(--height-control);padding:11px var(--space-4);border:1px solid transparent;border-radius:var(--radius-control);font-family:var(--font-ui);font-size:13px;font-weight:650;line-height:1.4;cursor:pointer;transition:background-color var(--motion-fast) var(--ease-out),color var(--motion-fast) var(--ease-out),border-color var(--motion-fast) var(--ease-out)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:not-allowed}.ds-danger{background:var(--color-danger-bg);color:var(--color-danger);border-color:#ebc4bc}@media(prefers-reduced-motion:reduce){.ds-button{transition:none}}"
+    },
+    {
+      "name": "Labeled field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Native input wrapped by its visible label.",
+      "html": "<label class=\"ds-field\"><span>Nombre de la cuenta</span><input placeholder=\"Ahorros\"></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:var(--space-2);font-family:var(--font-ui)}.ds-field>span{font-size:12px;font-weight:600;color:var(--color-text)}.ds-field input{min-width:0;min-height:44px;padding:11px var(--space-3);border:1px solid #cad5e8;border-radius:var(--radius-control);background:var(--color-surface);color:var(--color-ink);font-family:var(--font-ui);font-size:13px;caret-color:var(--color-primary)}.ds-field input::placeholder{color:#637492}.ds-field input:focus-visible{outline:3px solid var(--color-focus);outline-offset:3px}"
+    },
+    {
+      "name": "Top navigation",
+      "kind": "nav",
+      "description": "White route navigation with blue current-page underline.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Principal\"><a href=\"#/resumen\" aria-current=\"page\">Resumen</a><a href=\"#/movimientos\">Movimientos</a><a href=\"#/revisar\">Revisar</a></nav>",
+      "css": ".ds-nav{display:flex;gap:25px;height:var(--height-header);background:var(--color-surface);font-family:var(--font-ui)}.ds-nav a{position:relative;display:flex;align-items:center;height:100%;color:var(--color-text);font-size:13px;font-weight:550;text-decoration:none;transition:color var(--motion-fast) var(--ease-out)}.ds-nav a:hover,.ds-nav a[aria-current]{color:var(--color-primary)}.ds-nav a[aria-current]{font-weight:700}.ds-nav a[aria-current]:after{content:\"\";position:absolute;left:0;right:0;bottom:14px;height:3px;border-radius:2px;background:var(--color-primary)}.ds-nav a:focus-visible{outline:3px solid var(--color-focus);outline-offset:3px}@media(max-width:850px){.ds-nav{height:45px;gap:25px;overflow-x:auto}.ds-nav a{font-size:12px;white-space:nowrap}.ds-nav a[aria-current]:after{bottom:0}}@media(prefers-reduced-motion:reduce){.ds-nav a{transition:none}}"
+    },
+    {
+      "name": "Review badge",
+      "kind": "chip",
+      "refersTo": "badge-warning",
+      "description": "Textual pending state; the color supports its literal label.",
+      "html": "<span class=\"ds-badge\">Por confirmar</span>",
+      "css": ".ds-badge{display:inline-flex;gap:5px;padding:var(--space-1) 7px;border-radius:5px;font-family:var(--font-ui);font-size:10px;line-height:1.5;font-weight:550;white-space:nowrap;color:var(--color-warning);background:var(--color-warning-bg)}"
+    },
+    {
+      "name": "Work panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat shared container with section heading.",
+      "html": "<section class=\"ds-panel\"><h2>Gasto por categoría</h2><p>Las categorías aparecerán al registrar tus gastos.</p></section>",
+      "css": ".ds-panel{min-width:0;padding:var(--space-6);border:1px solid var(--color-line);border-radius:var(--radius-panel);background:var(--color-surface);font-family:var(--font-ui);color:var(--color-ink)}.ds-panel h2{margin:0 0 var(--space-5);font-size:var(--text-title);font-weight:750;line-height:1.3;letter-spacing:-.025em}.ds-panel p{margin:0;color:var(--color-text);font-size:var(--text-body);line-height:1.7}@media(max-width:600px){.ds-panel{padding:21px 18px}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Accounts first",
+    "overview": "Money Stalker combines familiar account organization with expressive financial typography and a curious eye companion. The approved composition uses white top navigation, a deep ultramarine account rail, a primary ledger, and a right evidence/category workspace. The citron available amount is its financial focal point. The user rejected the earlier generic pastel helper-card treatment.\n\nThe eye helps orient, inspect evidence, and acknowledge completed review. Financial labels and warnings stay literal; the interface represents recorded data and explicit user decisions. Spanish copy, COP formatting, and America/Bogota dates give the workspace its local context.",
+    "keyCharacteristics": [
+      "Grouped accounts and cards with readable balances and debt.",
+      "One self-hosted variable family, heavy headings, and tabular figures.",
+      "Blue actions, a citron available total, and textual semantic states.",
+      "Flat white work surfaces, fine borders, and native controls."
+    ],
+    "rules": [
+      {
+        "name": "The Explicit State Rule",
+        "body": "Pair status color with literal text and, where present, an icon. Color never carries the entire meaning alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Global Amount Rule",
+        "body": "Keep the citron amount explicitly labeled as available across all accounts. Account selection scopes activity and category spending, while the global amount remains global.",
+        "section": "colors"
+      },
+      {
+        "name": "The Complete Amount Rule",
+        "body": "Preserve the currency sign, grouping, and complete amount as a readable unit. At the narrowest breakpoint, reflow comparisons before squeezing figures; exceptionally long totals can scroll within their own amount region.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Workspace Rule",
+        "body": "Group routine content with border, tone, and spacing. Reserve the shipped overlay shadow for modal elevation.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** reuse live tokens, shared primitives, and the catalog before adding a visual variant.",
+      "**Do** preserve white top navigation, the ultramarine hierarchy, heavy Inter headings, and the citron global available amount.",
+      "**Do** use tabular COP figures, explicit financial scope, and complete amounts at narrow widths.",
+      "**Do** pair status color with text and distinguish stale/incomplete data from an empty state.",
+      "**Do** preserve native controls, visible focus, accessible labels, and reduced-motion behavior.",
+      "**Do** update the catalog, this reference, and its sidecar when a repeated pattern enters the shared system."
+    ],
+    "donts": [
+      "**Don't** replace the approved hierarchy with the rejected generic pastel helper-card composition.",
+      "**Don't** give debit instruments separate balances or make associated credit debt look like shared cash.",
+      "**Don't** imply bank synchronization, autonomous matching, or complete evidence through visual state or copy.",
+      "**Don't** ship example balances, fabricated analytics, unverified bank logos, or raster interface panels as real product data or UI.",
+      "**Don't** add decorative shadows to routine panels or replace the display family without an approved system change.",
+      "**Don't** clip, split, or hide a financial amount to preserve a desktop row on a narrow screen."
+    ]
+  }
+}
