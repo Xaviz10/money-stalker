@@ -70,7 +70,7 @@ export class MoneyStalkerStack extends Stack {
     worker.addEventSource(new SqsEventSource(queue, { batchSize: 1, reportBatchItemFailures: true }));
     new events.Rule(this, 'DailyRecovery', { schedule: events.Schedule.rate(Duration.days(1)), targets: [new LambdaFunction(recovery, { retryAttempts: 1 })] });
     const api = new apigw.HttpApi(this, 'HttpAPI', {
-      corsPreflight: { allowOrigins: [url.origin], allowHeaders: ['authorization', 'content-type'], allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.PATCH, apigw.CorsHttpMethod.DELETE], exposeHeaders: ['content-disposition'], maxAge: Duration.minutes(5) },
+      corsPreflight: { allowOrigins: [url.origin], allowHeaders: ['authorization', 'content-type'], allowMethods: [apigw.CorsHttpMethod.OPTIONS, apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.PATCH, apigw.CorsHttpMethod.DELETE], exposeHeaders: ['content-disposition'], maxAge: Duration.minutes(5) },
     });
     const stage = api.defaultStage!.node.defaultChild as apigw.CfnStage;
     stage.defaultRouteSettings = { throttlingBurstLimit: 10, throttlingRateLimit: 2 };

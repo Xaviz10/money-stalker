@@ -10,6 +10,7 @@ describe('infrastructure safeguards', () => {
     t.hasResourceProperties('AWS::S3::Bucket', { PublicAccessBlockConfiguration: { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true } });
     t.hasResourceProperties('AWS::Cognito::UserPool', { AdminCreateUserConfig: { AllowAdminCreateUserOnly: true }, UserPoolTier: 'ESSENTIALS' });
     t.hasResourceProperties('AWS::Cognito::UserPoolClient', { GenerateSecret: false, AllowedOAuthFlows: ['code'], CallbackURLs: ['https://example.github.io/money-stalker/'] });
+    t.hasResourceProperties('AWS::ApiGatewayV2::Api', { CorsConfiguration: Match.objectLike({ AllowOrigins: ['https://example.github.io'], AllowMethods: Match.arrayWith(['OPTIONS', 'GET', 'POST', 'PATCH', 'DELETE']) }) });
     t.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'ANY /{proxy+}', AuthorizationType: 'JWT', AuthorizationScopes: ['openid'] });
     t.hasResourceProperties('AWS::DynamoDB::Table', { BillingMode: 'PAY_PER_REQUEST', PointInTimeRecoverySpecification: Match.objectLike({ PointInTimeRecoveryEnabled: true }) });
     t.hasResourceProperties('AWS::Budgets::Budget', { Budget: Match.objectLike({ BudgetLimit: { Amount: 5, Unit: 'USD' } }), NotificationsWithSubscribers: Match.arrayWith([Match.objectLike({ Notification: Match.objectLike({ Threshold: 4 }) })]) });
