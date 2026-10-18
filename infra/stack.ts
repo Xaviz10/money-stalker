@@ -77,6 +77,7 @@ export class MoneyStalkerStack extends Stack {
     const integration = new HttpLambdaIntegration('APIIntegration', http);
     api.addRoutes({ path: '/capture-events', methods: [apigw.HttpMethod.POST], integration });
     const authorizer = new HttpUserPoolAuthorizer('UserAuthorizer', pool, { userPoolClients: [client] });
+    api.addRoutes({ path: '/{proxy+}', methods: [apigw.HttpMethod.OPTIONS], integration });
     api.addRoutes({ path: '/{proxy+}', methods: [apigw.HttpMethod.ANY], integration, authorizer, authorizationScopes: ['openid'] });
     if (props.budgetEmail) {
       new budgets.CfnBudget(this, 'MonthlyBudget', {

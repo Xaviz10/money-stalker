@@ -6,6 +6,7 @@ import { S3Files } from './storage';
 import { processJob } from './processing';
 const repo = new DynamoRepository(), files = new S3Files(), api = createAPI(repo, files), sqs = new SQSClient({});
 export async function http(event: APIGatewayProxyEventV2WithJWTAuthorizer) {
+  if (event.requestContext.http.method === 'OPTIONS') return { statusCode: 204, headers: { 'cache-control': 'no-store' } };
   let body: unknown;
   try {
     const text = event.body ? Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8').toString('utf8') : '';
