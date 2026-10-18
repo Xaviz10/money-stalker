@@ -9,9 +9,9 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   isMobile,
 }) => {
   await page.goto("./#/cuentas");
-  const create = page
-    .getByRole("heading", { name: "Agregar cuenta", exact: true })
-    .locator("..");
+  const create = page.locator(".settings-section").filter({
+    has: page.getByText("Agregar producto", { exact: true }),
+  });
   await create.getByLabel("Tipo de cuenta").selectOption("credit");
   await create
     .getByLabel("Nombre de la cuenta", { exact: true })
@@ -27,6 +27,7 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   await expect(page.locator(".standalone-cards")).toContainText(
     "Nu independiente",
   );
+  await create.locator("summary").click();
   await create.getByLabel("Tipo de cuenta").selectOption("bank");
   await create
     .getByLabel("Nombre de la cuenta", { exact: true })
@@ -39,9 +40,10 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   let state = await (await request.get(`${apiBase}/state`)).json();
   const bank = state.accounts.find((a: any) => a.kind === "bank"),
     credit = state.accounts.find((a: any) => a.kind === "credit");
-  const instrument = page
-    .getByRole("heading", { name: "Tarjetas y alias de captura", exact: true })
-    .locator("..");
+  const instrument = page.locator(".settings-section").filter({
+    has: page.getByText("Tarjetas y alias de captura", { exact: true }),
+  });
+  await instrument.locator("summary").click();
   await instrument.getByLabel("Nombre de tarjeta").fill("Visa débito");
   await instrument.getByLabel("Cuenta asociada").selectOption(bank.id);
   await instrument.getByLabel("Alias separados por comas").fill("1234");

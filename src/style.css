@@ -1782,6 +1782,153 @@ input[type="checkbox"] {
 .table-scroll {
   overflow-x: auto;
 }
+.movement-register {
+  padding: 0;
+  overflow: hidden;
+}
+.register-product-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 27px var(--space-6) 25px;
+  border-bottom: 1px solid var(--color-line);
+  background: #fbfcff;
+}
+.register-product-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-panel);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.register-product-icon.credit {
+  color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+.register-product-icon.cash {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
+.register-product-name {
+  min-width: 0;
+}
+.register-product-name > span,
+.register-balance > span,
+.register-export > span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--color-muted);
+}
+.register-product-name h1 {
+  margin: 0;
+  font-size: 27px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.register-product-name small {
+  display: block;
+  margin-top: 5px;
+  color: var(--color-muted);
+  font-size: 11px;
+}
+.register-balance {
+  text-align: right;
+}
+.register-balance strong {
+  display: block;
+  color: var(--color-ink);
+  font-size: 24px;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.register-balance small {
+  display: block;
+  margin-top: 5px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.register-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.85fr) minmax(220px, 1.4fr) auto;
+  align-items: end;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-line);
+}
+.register-export {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+.register-export > span {
+  margin: 0 var(--space-1) 0 0;
+}
+.register-export .button {
+  min-height: 40px;
+  padding: 8px 11px;
+  font-size: 11px;
+}
+.movement-table {
+  padding: 0 var(--space-6) var(--space-5);
+}
+.movement-table table {
+  min-width: 640px;
+}
+.movement-table th:first-child,
+.movement-table td:first-child {
+  padding-left: 0;
+}
+.movement-table th:last-child,
+.movement-table td:last-child {
+  padding-right: 0;
+}
+.register-date {
+  white-space: nowrap;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.register-empty-row td {
+  height: 230px;
+  text-align: center;
+}
+.register-empty-row td > div {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  max-width: 42ch;
+  margin: auto;
+  color: var(--color-muted);
+}
+.register-empty-row svg {
+  margin-bottom: var(--space-3);
+  color: #7c93bd;
+}
+.register-empty-row strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+.register-empty-row span {
+  margin-top: var(--space-2);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.movement-register.no-products {
+  padding: var(--space-6);
+  text-align: center;
+}
+.movement-register.no-products .button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 .transaction-name {
   border: 0;
   background: transparent;
@@ -1893,6 +2040,83 @@ input[type="checkbox"] {
 .instrument-list {
   margin-top: var(--space-5);
   border-top: 1px solid var(--color-line);
+}
+.settings-hub {
+  padding: 0;
+  overflow: hidden;
+}
+.settings-hub > .section-heading {
+  padding: var(--space-6);
+  margin: 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.settings-hub > .section-heading p {
+  max-width: 60ch;
+}
+.settings-section {
+  border-bottom: 1px solid var(--color-line);
+}
+.settings-section:last-child {
+  border-bottom: 0;
+}
+.settings-section > summary {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 78px;
+  padding: 14px var(--space-6);
+  cursor: pointer;
+  list-style: none;
+}
+.settings-section > summary::-webkit-details-marker {
+  display: none;
+}
+.settings-section > summary:hover {
+  background: #fafbfe;
+}
+.settings-section > summary > span:nth-child(2) {
+  min-width: 0;
+}
+.settings-section > summary strong,
+.settings-section > summary small {
+  display: block;
+}
+.settings-section > summary strong {
+  color: var(--color-ink);
+  font-size: 13px;
+}
+.settings-section > summary small {
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.settings-section > summary > svg {
+  color: var(--color-primary);
+}
+.settings-section[open] > summary > svg {
+  transform: rotate(90deg);
+}
+.settings-section-icon {
+  display: grid !important;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.settings-section-body {
+  max-width: 820px;
+  padding: 0 var(--space-6) 30px 76px;
+}
+.settings-section-body > h3 {
+  margin-top: var(--space-4);
+  font-size: 17px;
+}
+.settings-section-body > hr {
+  margin: 30px 0;
 }
 .instrument-row > .settings-editor {
   padding-left: 50px;
@@ -2491,6 +2715,13 @@ hr {
   .page-heading h1 {
     font-size: 32px;
   }
+  .register-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .register-export {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
 }
 @media (max-width: 600px) {
   .app-header {
@@ -2783,6 +3014,63 @@ hr {
   }
   .panel {
     padding: 21px 18px;
+  }
+  .movement-register,
+  .settings-hub {
+    padding: 0;
+  }
+  .register-product-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 21px 18px;
+  }
+  .register-product-name h1 {
+    font-size: 23px;
+  }
+  .register-balance {
+    grid-column: 1 / -1;
+    text-align: left;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-line);
+  }
+  .register-balance strong {
+    font-size: 25px;
+  }
+  .register-toolbar {
+    grid-template-columns: 1fr;
+    padding: var(--space-4) 18px;
+  }
+  .register-export {
+    grid-column: auto;
+  }
+  .movement-table {
+    padding: 0 18px var(--space-4);
+  }
+  .movement-table table {
+    min-width: 560px;
+  }
+  .register-empty-row td {
+    height: 200px;
+  }
+  .register-empty-row td > div {
+    width: calc(100vw - 68px);
+    max-width: calc(100vw - 68px);
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .settings-hub > .section-heading {
+    padding: 21px 18px;
+  }
+  .settings-section > summary {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    min-height: 74px;
+    padding: 13px 18px;
+  }
+  .settings-section-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .settings-section-body {
+    padding: 0 18px 24px;
   }
   .activity-panel {
     padding: 0;

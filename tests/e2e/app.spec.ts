@@ -8,18 +8,31 @@ test("account → capture → import → review → export works on the project 
   request,
 }) => {
   await page.goto("./#/cuentas");
+  const create = page.locator(".settings-section").filter({
+    has: page.getByText("Agregar producto", { exact: true }),
+  });
   await page
     .getByLabel("Nombre de la cuenta", { exact: true })
     .fill("Ahorros de prueba");
   await page.getByLabel("Saldo inicial (COP)").fill("1.000.000");
   await page.getByLabel("Fecha del saldo inicial").fill("2026-01-01");
-  await page
-    .getByRole("heading", { name: "Agregar cuenta", exact: true })
-    .locator("..")
-    .getByRole("button", { name: "Guardar", exact: true })
-    .click();
+  await create.getByRole("button", { name: "Guardar", exact: true }).click();
   await expect(page.locator(".account-row")).toContainText("Ahorros de prueba");
   const state = await (await request.get(`${apiBase}/state`)).json();
+  expect(
+    (
+      await request.post(`${apiBase}/accounts`, {
+        data: {
+          id: "empty-wallet",
+          name: "Bolsillo sin movimientos",
+          kind: "cash",
+          openingMinor: "0",
+          openingDate: "2026-01-01",
+          eligible: true,
+        },
+      })
+    ).ok(),
+  ).toBe(true);
   const device = await (
     await request.post(`${apiBase}/devices`, {
       data: { name: "Synthetic phone" },
@@ -55,15 +68,13 @@ test("account → capture → import → review → export works on the project 
   await page
     .getByLabel("Cuenta del archivo")
     .selectOption(state.accounts[0].id);
-  await page
-    .getByLabel("Archivo CSV o Excel")
-    .setInputFiles({
-      name: "sample.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(
-        "Fecha;Descripcion;Valor;Moneda;Tipo\n2026-10-05;Café de ejemplo;12.500,00;COP;gasto",
-      ),
-    });
+  await page.getByLabel("Archivo CSV o Excel").setInputFiles({
+    name: "sample.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      "Fecha;Descripcion;Valor;Moneda;Tipo\n2026-10-05;Café de ejemplo;12.500,00;COP;gasto",
+    ),
+  });
   await page.getByRole("button", { name: "Subir y previsualizar" }).click();
   await page
     .getByRole("button", { name: "Confirmar 1 filas aceptadas" })
@@ -85,7 +96,27 @@ test("account → capture → import → review → export works on the project 
     "$ 987.500",
   );
   await page.getByRole("link", { name: "Movimientos", exact: true }).click();
-  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(
+    page.getByRole("heading", { name: "Ahorros de prueba", exact: true }),
+  ).toBeVisible();
+  const ledger = page.getByRole("table", {
+    name: "Movimientos del producto seleccionado",
+  });
+  await expect(ledger.locator("tbody tr")).toHaveCount(1);
+  await page.getByLabel("Ver producto").selectOption("empty-wallet");
+  await expect(
+    page.getByRole("heading", {
+      name: "Bolsillo sin movimientos",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    ledger.getByRole("columnheader", { name: "Fecha" }),
+  ).toBeVisible();
+  await expect(ledger).toContainText(
+    "Aún no hay movimientos en Bolsillo sin movimientos",
+  );
+  await page.getByLabel("Ver producto").selectOption(state.accounts[0].id);
   await page
     .getByRole("button", { name: "Café de ejemplo", exact: true })
     .click();

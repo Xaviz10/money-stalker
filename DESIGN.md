@@ -230,6 +230,8 @@ Keyboard focus uses a three-pixel outline with a three-pixel offset on light sur
 
 `DisclosureEditor` places a native inline disclosure beneath a saved account or capture-card row. Its summary uses the literal action “Editar cuenta” or “Editar tarjeta”; opening it reveals a prefilled form on the primary-soft surface. Saving updates the existing record ID and returns to the compact saved row. Protect opening balances and account types once movements exist, and explain that correction movements preserve financial history.
 
+The accounts route shows saved products first. Creation, margin/categories, capture cards, bills, and iPhone capture setup live in a single `Administrar` hub made from native disclosures. Keep these sections collapsed until requested, except `Agregar producto` on an empty account list. A disclosure summary names the job and describes its contents; do not expose every form at once.
+
 ### Navigation
 
 The white header combines a citron eye tile, compact wordmark, route links, and actions. Active links use blue, heavier text, a blue underline, and `aria-current="page"`. Review counts use separate small markers. The responsive frame retains top navigation and exposes the account disclosure beneath it.
@@ -237,6 +239,12 @@ The white header combines a citron eye tile, compact wordmark, route links, and 
 ### Account hierarchy
 
 The ultramarine `AccountRail` uses native institution disclosures, text monograms, and chevrons. Account buttons show type icon, name, literal type label, balance, and `aria-pressed` selection. Selection turns the row white with ink text and a blue symbol tile.
+
+### Product movement register
+
+The Movements route is scoped to exactly one account or card. Its header keeps the product type, name, institution, balance or debt, and total movement count visible. The account rail and `Ver producto` select change that scope without leaving the route; “all accounts” is unavailable here because a mixed ledger obscures the current product.
+
+The ledger always renders its column headers. An empty product uses a table row that says the product has no movements, rather than replacing the register with a generic empty card. Search applies only to the current product and does not change the total movement count. On phones, the table scrolls horizontally while the empty explanation stays within the visible width. New movements opened from this route default to the visible product.
 
 Debit instruments indent under their bank account and explain that they use its balance; they have no separate amount. Associated credit accounts retain separate debt in nested rows. Independent credit cards and cash have their own sections. Institutions come from explicit data. The net-worth summary stays distinct from cash and available money. Organization must not duplicate balances; `domain/account-groups.ts` owns these relationships.
 

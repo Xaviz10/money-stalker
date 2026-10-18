@@ -148,6 +148,7 @@ export function App() {
   const [loading, setLoading] = useState(false),
     [notice, setNotice] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<string>();
+  const [movementAccount, setMovementAccount] = useState<string>();
   const [accountsOpen, setAccountsOpen] = useState(false);
   const [refreshedAt, setRefreshedAt] = useState<Date>();
   const [stale, setStale] = useState(false);
@@ -207,6 +208,17 @@ export function App() {
       return () => clearInterval(timer);
     }
   }, [signedIn, refresh]);
+  useEffect(() => {
+    if (!state.accounts.length) {
+      setMovementAccount(undefined);
+      return;
+    }
+    if (
+      !movementAccount ||
+      !state.accounts.some((a) => a.id === movementAccount)
+    )
+      setMovementAccount(state.accounts[0].id);
+  }, [state.accounts, movementAccount]);
   const act = async (
     fn: () => Promise<unknown>,
     message = "Cambios guardados",
@@ -261,6 +273,11 @@ export function App() {
       </main>
     );
   const selectAccount = (id?: string) => {
+    if (page === "movimientos") {
+      setMovementAccount(id ?? state.accounts[0]?.id);
+      setAccountsOpen(false);
+      return;
+    }
     setSelectedAccount(id);
     setAccountsOpen(false);
     location.hash = "#/resumen";
@@ -345,8 +362,14 @@ export function App() {
         >
           <Icon name="wallet" size={17} />
           <span>
-            {selectedAccount
-              ? state.accounts.find((a) => a.id === selectedAccount)?.name
+            {(page === "movimientos" ? movementAccount : selectedAccount)
+              ? state.accounts.find(
+                  (a) =>
+                    a.id ===
+                    (page === "movimientos"
+                      ? movementAccount
+                      : selectedAccount),
+                )?.name
               : "Mis cuentas y tarjetas"}
           </span>
           <Icon name="chevron" size={15} />
@@ -357,14 +380,17 @@ export function App() {
           <AccountRail
             state={state}
             balances={summary?.balances}
-            selected={selectedAccount}
+            selected={
+              page === "movimientos" ? movementAccount : selectedAccount
+            }
             onSelect={selectAccount}
+            allowAll={page !== "movimientos"}
           />
         </div>
         <main
           className={`route-content ${page === "resumen" ? "route-dashboard" : ""}`}
         >
-          {page !== "resumen" && (
+          {page !== "resumen" && page !== "movimientos" && (
             <div className="page-heading">
               <div>
                 <h1>
@@ -419,7 +445,14 @@ export function App() {
               <SurfaceLoading failed={stale} />
             ))}
           {page === "movimientos" && (
-            <Movements state={state} open={setEditing} onError={setError} />
+            <Movements
+              state={state}
+              balances={summary?.balances}
+              selectedAccount={movementAccount}
+              selectAccount={setMovementAccount}
+              open={setEditing}
+              onError={setError}
+            />
           )}
           {page === "revisar" &&
             (summary ? (
@@ -449,6 +482,9 @@ export function App() {
         <TransactionDialog
           value={editing}
           state={state}
+          preferredAccountId={
+            page === "movimientos" ? movementAccount : selectedAccount
+          }
           close={() => setEditing(undefined)}
           saved={async () => {
             setEditing(undefined);
@@ -464,63 +500,98 @@ export function App() {
 function TransactionTable({
   transactions,
   state,
+  selectedAccount,
+  emptyMessage,
   open,
 }: {
   transactions: Transaction[];
   state: State;
+  selectedAccount: string;
+  emptyMessage: string;
   open: (t: Transaction) => void;
 }) {
   return (
-    <div className="table-scroll">
-      <table>
+    <div className="table-scroll movement-table">
+      <table aria-label="Movimientos del producto seleccionado">
         <thead>
           <tr>
+            <th>Fecha</th>
             <th>Movimiento</th>
-            <th>Cuenta</th>
             <th>Categoría</th>
             <th>Estado</th>
             <th className="number">Valor</th>
           </tr>
         </thead>
         <tbody>
-          {transactions.map((t) => (
-            <tr key={t.id}>
-              <td>
-                <button className="transaction-name" onClick={() => open(t)}>
-                  {t.merchant ||
-                    {
-                      expense: "Gasto",
-                      income: "Ingreso",
-                      transfer: "Transferencia",
-                      refund: "Devolución",
-                    }[t.kind]}
-                </button>
-                <small>
-                  {t.date}
-                  {t.kind === "transfer" ? " · Transferencia" : ""}
-                </small>
-              </td>
-              <td>{state.accounts.find((a) => a.id === t.accountId)?.name}</td>
-              <td>
-                {state.categories.find((c) => c.id === t.categoryId)?.name}
-              </td>
-              <td>
-                <Badge tone={t.status === "posted" ? "green" : "amber"}>
-                  {t.status === "posted" ? "Registrado" : "Por confirmar"}
-                </Badge>
-              </td>
-              <td
-                className={`number amount ${t.kind === "income" || t.kind === "refund" ? "positive" : ""}`}
-              >
-                {t.kind === "income" || t.kind === "refund"
-                  ? "+"
-                  : t.kind === "expense"
-                    ? "−"
-                    : ""}
-                {formatCOP(t.amountMinor)}
+          {transactions.length ? (
+            transactions.map((t) => {
+              const incoming =
+                t.kind === "income" ||
+                t.kind === "refund" ||
+                (t.kind === "transfer" &&
+                  t.counterAccountId === selectedAccount);
+              const otherAccount =
+                t.kind === "transfer"
+                  ? state.accounts.find(
+                      (a) =>
+                        a.id ===
+                        (t.accountId === selectedAccount
+                          ? t.counterAccountId
+                          : t.accountId),
+                    )
+                  : undefined;
+              return (
+                <tr key={t.id}>
+                  <td className="register-date">
+                    <time dateTime={t.date}>{t.date}</time>
+                  </td>
+                  <td>
+                    <button
+                      className="transaction-name"
+                      onClick={() => open(t)}
+                    >
+                      {t.merchant ||
+                        {
+                          expense: "Gasto",
+                          income: "Ingreso",
+                          transfer: "Transferencia",
+                          refund: "Devolución",
+                        }[t.kind]}
+                    </button>
+                    {t.note && <small>{t.note}</small>}
+                  </td>
+                  <td>
+                    {t.kind === "transfer"
+                      ? (otherAccount?.name ?? "Transferencia")
+                      : state.categories.find((c) => c.id === t.categoryId)
+                          ?.name}
+                  </td>
+                  <td>
+                    <Badge tone={t.status === "posted" ? "green" : "amber"}>
+                      {t.status === "posted" ? "Registrado" : "Por confirmar"}
+                    </Badge>
+                  </td>
+                  <td className={`number amount ${incoming ? "positive" : ""}`}>
+                    {incoming ? "+" : "−"}
+                    {formatCOP(t.amountMinor)}
+                  </td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr className="register-empty-row">
+              <td colSpan={5}>
+                <div>
+                  <Icon name="arrows" size={24} />
+                  <strong>{emptyMessage}</strong>
+                  <span>
+                    La tabla permanece aquí para que siempre sepas qué producto
+                    estás consultando.
+                  </span>
+                </div>
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>
@@ -528,41 +599,120 @@ function TransactionTable({
 }
 function Movements({
   state,
+  balances,
+  selectedAccount,
+  selectAccount,
   open,
   onError,
 }: {
   state: State;
+  balances?: Record<string, string>;
+  selectedAccount?: string;
+  selectAccount: (id: string) => void;
   open: (t: Transaction) => void;
   onError: (e: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const transactions = state.transactions
+  const account = state.accounts.find((a) => a.id === selectedAccount);
+  if (!account)
+    return (
+      <section className="panel movement-register no-products">
+        <Empty title="Agrega tu primer producto">
+          Crea una cuenta bancaria, tarjeta de crédito o efectivo para abrir su
+          registro de movimientos.
+        </Empty>
+        <a className="button primary" href="#/cuentas">
+          Agregar producto <Icon name="arrow" size={16} />
+        </a>
+      </section>
+    );
+  const accountTransactions = state.transactions
     .filter(
       (t) =>
         !t.voided &&
-        `${t.merchant} ${t.note} ${t.date}`
-          .toLowerCase()
-          .includes(search.toLowerCase()),
+        (t.accountId === account.id || t.counterAccountId === account.id),
     )
     .sort((a, b) => b.date.localeCompare(a.date));
+  const transactions = accountTransactions.filter((t) =>
+    `${t.merchant ?? ""} ${t.note ?? ""} ${t.date}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
   return (
-    <section className="panel">
-      <div className="section-heading toolbar">
-        <input
-          aria-label="Buscar movimientos"
-          type="search"
-          placeholder="Buscar comercio, nota o fecha…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="button-row">
+    <section className="panel movement-register">
+      <header className="register-product-header">
+        <div className={`register-product-icon ${account.kind}`}>
+          <Icon
+            name={
+              account.kind === "credit"
+                ? "card"
+                : account.kind === "cash"
+                  ? "wallet"
+                  : "bank"
+            }
+            size={23}
+          />
+        </div>
+        <div className="register-product-name">
+          <span>
+            {account.kind === "credit"
+              ? "Tarjeta de crédito"
+              : account.kind === "cash"
+                ? "Efectivo"
+                : "Cuenta bancaria"}
+          </span>
+          <h1>{account.name}</h1>
+          {account.institution && <small>{account.institution}</small>}
+        </div>
+        <div className="register-balance">
+          <span>
+            {account.kind === "credit" ? "Deuda actual" : "Saldo actual"}
+          </span>
+          <strong>
+            {balances ? formatCOP(balances[account.id] ?? "0") : "—"}
+          </strong>
+          <small>
+            {accountTransactions.length}{" "}
+            {accountTransactions.length === 1 ? "movimiento" : "movimientos"}
+          </small>
+        </div>
+      </header>
+      <div className="register-toolbar">
+        <Field label="Ver producto">
+          <select
+            value={account.id}
+            onChange={(e) => selectAccount(e.target.value)}
+          >
+            {state.accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} ·{" "}
+                {a.kind === "credit"
+                  ? "crédito"
+                  : a.kind === "bank"
+                    ? "cuenta"
+                    : "efectivo"}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Buscar en este producto">
+          <input
+            aria-label="Buscar movimientos"
+            type="search"
+            placeholder="Comercio, nota o fecha…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </Field>
+        <div className="register-export">
+          <span>Exportar todo</span>
           <button
             className="button secondary"
             onClick={() =>
               void download("csv").catch((e) => onError(e.message))
             }
           >
-            <Icon name="download" />
+            <Icon name="download" size={16} />
             CSV
           </button>
           <button
@@ -575,28 +725,30 @@ function Movements({
           </button>
         </div>
       </div>
-      {transactions.length ? (
-        <TransactionTable
-          transactions={transactions}
-          state={state}
-          open={open}
-        />
-      ) : (
-        <Empty title="No hay movimientos">
-          Los registros manuales, capturas y extractos aparecerán aquí.
-        </Empty>
-      )}
+      <TransactionTable
+        transactions={transactions}
+        state={state}
+        selectedAccount={account.id}
+        emptyMessage={
+          search
+            ? "No hay resultados para esta búsqueda"
+            : `Aún no hay movimientos en ${account.name}`
+        }
+        open={open}
+      />
     </section>
   );
 }
 function TransactionDialog({
   value,
   state,
+  preferredAccountId,
   close,
   saved,
 }: {
   value: Transaction | Observation | "new";
   state: State;
+  preferredAccountId?: string;
   close: () => void;
   saved: () => Promise<void>;
 }) {
@@ -734,7 +886,11 @@ function TransactionDialog({
             />
           </Field>
           <Field label="Cuenta de origen">
-            <select name="accountId" required defaultValue={initial?.accountId}>
+            <select
+              name="accountId"
+              required
+              defaultValue={initial?.accountId ?? preferredAccountId}
+            >
               <option value="">Selecciona una cuenta</option>
               {state.accounts.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -1339,6 +1495,36 @@ function InstrumentEditor({
   );
 }
 
+function SettingsSection({
+  title,
+  description,
+  icon,
+  children,
+  open = false,
+}: {
+  title: string;
+  description: string;
+  icon: "plus" | "card" | "calendar" | "shield";
+  children: ReactNode;
+  open?: boolean;
+}) {
+  return (
+    <details className="settings-section" open={open ? true : undefined}>
+      <summary>
+        <span className="settings-section-icon">
+          <Icon name={icon} size={19} />
+        </span>
+        <span>
+          <strong>{title}</strong>
+          <small>{description}</small>
+        </span>
+        <Icon name="chevron" size={15} />
+      </summary>
+      <div className="settings-section-body">{children}</div>
+    </details>
+  );
+}
+
 function Settings({
   state,
   summary,
@@ -1415,9 +1601,22 @@ function Settings({
           </p>
         )}
       </section>
-      <div className="two-columns">
-        <section className="panel">
-          <h2>Agregar cuenta</h2>
+      <section className="panel settings-hub">
+        <div className="section-heading">
+          <div>
+            <h2>Administrar</h2>
+            <p className="muted">
+              Abre solo la sección que necesitas. Tus productos guardados
+              permanecen visibles arriba.
+            </p>
+          </div>
+        </div>
+        <SettingsSection
+          title="Agregar producto"
+          description="Cuenta bancaria, tarjeta de crédito o efectivo"
+          icon="plus"
+          open={!state.accounts.length}
+        >
           <AppForm
             onSubmit={(f) =>
               save("/accounts", {
@@ -1539,9 +1738,13 @@ function Settings({
               importar.
             </p>
           </AppForm>
-        </section>
-        <section className="panel">
-          <h2>Tu margen de tranquilidad</h2>
+        </SettingsSection>
+        <SettingsSection
+          title="Margen y categorías"
+          description="Reserva protegida, día de ingreso y clasificación"
+          icon="shield"
+        >
+          <h3>Tu margen de tranquilidad</h3>
           <AppForm
             onSubmit={(f) =>
               save("/settings", {
@@ -1575,7 +1778,7 @@ function Settings({
             </p>
           </AppForm>
           <hr />
-          <h2>Nueva categoría</h2>
+          <h3>Nueva categoría</h3>
           <AppForm
             onSubmit={(f) =>
               save("/categories", { id: freshId(), name: str(f, "name") })
@@ -1585,11 +1788,12 @@ function Settings({
               <input name="name" required maxLength={200} />
             </Field>
           </AppForm>
-        </section>
-      </div>
-      <div className="two-columns">
-        <section className="panel">
-          <h2>Tarjetas y alias de captura</h2>
+        </SettingsSection>
+        <SettingsSection
+          title="Tarjetas y alias de captura"
+          description="Conecta los últimos dígitos de SMS y los alias de Wallet"
+          icon="card"
+        >
           <p className="small-note">
             Una tarjeta débito apunta a su cuenta bancaria; no crea un saldo
             nuevo. Agrega los últimos cuatro dígitos que aparecen en tus SMS,
@@ -1663,9 +1867,12 @@ function Settings({
               );
             })}
           </div>
-        </section>
-        <section className="panel">
-          <h2>Facturas y fechas</h2>
+        </SettingsSection>
+        <SettingsSection
+          title="Facturas y fechas"
+          description="Compromisos que reducen tu dinero disponible"
+          icon="calendar"
+        >
           <AppForm
             onSubmit={(f) =>
               save("/bills", {
@@ -1705,97 +1912,101 @@ function Settings({
               </Badge>
             </div>
           ))}
-        </section>
-      </div>
-      <section className="panel">
-        <h2>Capturas desde tu iPhone</h2>
-        <p>
-          Crea un token por dispositivo y úsalo en dos automatizaciones de
-          Atajos: una recibe el texto del SMS Bancolombia y otra recibe los
-          campos de la transacción de Wallet. Las capturas no usan screenshots.
-          El token solo permite enviar evidencias.
-        </p>
-        <AppForm
-          submit="Crear token de captura"
-          onSubmit={async (f) => {
-            const d = await post<{ token: string }>("/devices", {
-              name: str(f, "name"),
-            });
-            setToken(d.token);
-            await loadDevices();
-          }}
+        </SettingsSection>
+        <SettingsSection
+          title="Capturas desde tu iPhone"
+          description="Tokens revocables para SMS, Wallet y ubicación"
+          icon="shield"
         >
-          <Field label="Nombre del dispositivo">
-            <input
-              name="name"
-              required
-              placeholder="Mi iPhone"
-              maxLength={100}
-            />
-          </Field>
-        </AppForm>
-        {token && (
-          <div className="notice">
-            <div>
-              <strong>Copia el token ahora; no volverá a mostrarse.</strong>
-              <code className="token">{token}</code>
-              <small>
-                Endpoint: {apiURL}/capture-events · Cabecera Authorization:
-                Bearer TOKEN
-              </small>
-              <br />
-              <button className="text-button" onClick={() => setToken("")}>
-                Ya lo guardé
+          <p>
+            Crea un token por dispositivo y úsalo en dos automatizaciones de
+            Atajos: una recibe el texto del SMS Bancolombia y otra recibe los
+            campos de la transacción de Wallet. Las capturas no usan
+            screenshots. El token solo permite enviar evidencias.
+          </p>
+          <AppForm
+            submit="Crear token de captura"
+            onSubmit={async (f) => {
+              const d = await post<{ token: string }>("/devices", {
+                name: str(f, "name"),
+              });
+              setToken(d.token);
+              await loadDevices();
+            }}
+          >
+            <Field label="Nombre del dispositivo">
+              <input
+                name="name"
+                required
+                placeholder="Mi iPhone"
+                maxLength={100}
+              />
+            </Field>
+          </AppForm>
+          {token && (
+            <div className="notice">
+              <div>
+                <strong>Copia el token ahora; no volverá a mostrarse.</strong>
+                <code className="token">{token}</code>
+                <small>
+                  Endpoint: {apiURL}/capture-events · Cabecera Authorization:
+                  Bearer TOKEN
+                </small>
+                <br />
+                <button className="text-button" onClick={() => setToken("")}>
+                  Ya lo guardé
+                </button>
+              </div>
+            </div>
+          )}
+          {deviceError && (
+            <p className="error" role="alert">
+              {deviceError}
+            </p>
+          )}
+          {devices.map((d) => (
+            <div className="audit-row" key={d.id}>
+              <strong>{d.name}</strong>
+              <button
+                className="text-button"
+                disabled={d.revoked}
+                onClick={() =>
+                  void api(`/devices/${d.id}`, { method: "DELETE" })
+                    .then(loadDevices)
+                    .catch((e) => setDeviceError(e.message))
+                }
+              >
+                {d.revoked ? "Revocado" : "Revocar"}
               </button>
             </div>
-          </div>
-        )}
-        {deviceError && (
-          <p className="error" role="alert">
-            {deviceError}
+          ))}
+          <p className="small-note">
+            Los SMS Bancolombia de compra con tarjeta, pago QR, pago desde
+            cuenta y transferencia se leen automáticamente. Los campos o
+            destinos que falten se envían a Revisión.
           </p>
-        )}
-        {devices.map((d) => (
-          <div className="audit-row" key={d.id}>
-            <strong>{d.name}</strong>
-            <button
-              className="text-button"
-              disabled={d.revoked}
-              onClick={() =>
-                void api(`/devices/${d.id}`, { method: "DELETE" })
-                  .then(loadDevices)
-                  .catch((e) => setDeviceError(e.message))
-              }
-            >
-              {d.revoked ? "Revocado" : "Revocar"}
-            </button>
-          </div>
-        ))}
-        <p className="small-note">
-          Los SMS Bancolombia de compra con tarjeta, pago QR, pago desde cuenta
-          y transferencia se leen automáticamente. Los campos o destinos que
-          falten se envían a Revisión.
-        </p>
-        <p className="small-note">
-          Ambos atajos deben intentar obtener la ubicación actual y enviar
-          coordenadas, precisión y hora de captura. Si Localización está
-          desactivada o tarda demasiado, el movimiento se envía de todas formas.
-        </p>
-        {health?.pending.length ? (
-          <div className="notice">
-            <div>
-              <strong>
-                {health.pending.length} capturas o lotes pendientes
-              </strong>
-              {health.pending.map((j) => (
-                <p key={j.id}>
-                  {j.error ?? "Esperando procesamiento"} ·{" "}
-                  {new Date(j.createdAt).toLocaleString("es-CO")}
-                </p>
-              ))}
+          <p className="small-note">
+            Ambos atajos deben intentar obtener la ubicación actual y enviar
+            coordenadas, precisión y hora de captura. Si Localización está
+            desactivada o tarda demasiado, el movimiento se envía de todas
+            formas.
+          </p>
+          {health?.pending.length ? (
+            <div className="notice">
+              <div>
+                <strong>
+                  {health.pending.length} capturas o lotes pendientes
+                </strong>
+                {health.pending.map((j) => (
+                  <p key={j.id}>
+                    {j.error ?? "Esperando procesamiento"} ·{" "}
+                    {new Date(j.createdAt).toLocaleString("es-CO")}
+                  </p>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </SettingsSection>
       </section>
     </>
   );

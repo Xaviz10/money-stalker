@@ -8,11 +8,13 @@ export function AccountRail({
   balances,
   selected,
   onSelect,
+  allowAll = true,
 }: {
   state: State;
   balances?: Record<string, string>;
   selected?: string;
   onSelect: (id?: string) => void;
+  allowAll?: boolean;
 }) {
   const groups = groupAccounts(state);
   const row = (a: Account, nested = false) => (
@@ -54,14 +56,16 @@ export function AccountRail({
           Agregar
         </a>
       </div>
-      <button
-        className={`rail-all ${!selected ? "selected" : ""}`}
-        onClick={() => onSelect()}
-        aria-pressed={!selected}
-      >
-        <Icon name="overview" size={17} />
-        Todas las cuentas
-      </button>
+      {allowAll && (
+        <button
+          className={`rail-all ${!selected ? "selected" : ""}`}
+          onClick={() => onSelect()}
+          aria-pressed={!selected}
+        >
+          <Icon name="overview" size={17} />
+          Todas las cuentas
+        </button>
+      )}
       <div className="rail-groups">
         {groups.institutions.map((g) => (
           <details className="institution-group" key={g.id} open>

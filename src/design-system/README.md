@@ -32,6 +32,8 @@ Variants: primary for the main action, secondary for an alternate action, quiet 
 
 Use `DisclosureEditor` for inline editing beneath a saved settings row. Keep the saved summary visible, prefill every field, preserve the record ID, and name the submit action “Guardar cambios.”
 
+On the accounts route, keep saved products visible above the `Administrar` hub. Group creation, margin/categories, capture aliases, bills, and iPhone setup into native disclosure sections. Open creation automatically only when there are no products; otherwise let the user reveal one task at a time.
+
 ## Financial patterns
 
 `AccountRail` uses `domain/account-groups.ts`; do not infer an institution from a display name. `institution` is an optional explicit group name. Bank accounts hold cash balances; debit instruments point to those accounts. Credit accounts have separate debt and optional `parentAccountId` pointing to a bank account. Omitting that association creates an independent credit card. Cash accounts stay separate.
@@ -41,6 +43,8 @@ Grouping never changes money calculations. Do not add debit instrument balances,
 The dashboard's available amount is global. Selecting a rail account filters activity and category spending; show that scope explicitly. The net-worth rail summary means all account balances minus credit debt, including accounts excluded from spendable cash. Use the existing exact minor-unit helpers, never floating-point currency math.
 
 Source/candidate review must show amount/date/account context, explain statement-driven amount changes, require an explicit decision, preserve failure state, and offer correction undo. Initial loading, incomplete evidence, and stale refresh are distinct from an empty ledger or a zero balance.
+
+The Movements route is a product register. Scope it to one account or card, show that product’s balance or debt and movement count, and let both the account rail and `Ver producto` select switch the scope without routing back to Resumen. Keep the ledger and its headers visible when the selected product has no movements. Search is local to the current product, transfers use their direction relative to that product, and new movements default to it.
 
 ## Responsive behavior and accessibility
 
