@@ -1860,11 +1860,11 @@ input[type="checkbox"] {
   background: var(--color-success-bg);
   color: var(--color-success);
 }
-.account-organization {
+.settings-editor {
   width: 100%;
   padding-left: 50px;
 }
-.account-organization summary {
+.settings-editor summary {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -1874,21 +1874,28 @@ input[type="checkbox"] {
   min-height: 32px;
   list-style: none;
 }
-.account-organization summary::-webkit-details-marker {
+.settings-editor summary::-webkit-details-marker {
   display: none;
 }
-.account-organization[open] summary svg {
+.settings-editor[open] summary svg {
   transform: rotate(90deg);
 }
-.account-organization .form {
+.settings-editor .form {
   max-width: 480px;
   padding: 14px;
   background: var(--color-primary-soft);
   border-radius: var(--radius-control);
   margin: 5px 0;
 }
-.account-organization .field > span {
+.settings-editor .field > span {
   font-size: 11px;
+}
+.instrument-list {
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+.instrument-row > .settings-editor {
+  padding-left: 50px;
 }
 .import-history {
   display: flex;
@@ -2863,10 +2870,10 @@ hr {
     font-size: 10px;
     overflow-wrap: anywhere;
   }
-  .account-organization {
+  .settings-editor {
     padding-left: 47px;
   }
-  .account-organization .form {
+  .settings-editor .form {
     padding: var(--space-3);
   }
   .modal {

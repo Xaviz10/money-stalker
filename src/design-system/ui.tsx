@@ -260,6 +260,25 @@ export function SectionHeading({
   );
 }
 
+export function DisclosureEditor({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <details className={`settings-editor ${className}`}>
+      <summary>
+        {label} <Icon name="chevron" size={14} />
+      </summary>
+      {children}
+    </details>
+  );
+}
+
 export function Field({
   label,
   children,

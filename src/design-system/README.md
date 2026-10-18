@@ -5,7 +5,7 @@ The approved direction is **Accounts first**. The selected visual reference is `
 ## Source and ownership
 
 - `tokens.css`: live color, type, spacing, shape, focus, overlay, and motion primitives. The variable font is self-hosted in `fonts/`; the license is in `public/fonts/OFL-Inter.txt`.
-- `ui.tsx`: typed `Icon`, `Eyes`, `Badge`, `Button`, `Panel`, `EmptyState`, `SectionHeading`, and `Field` components.
+- `ui.tsx`: typed `Icon`, `Eyes`, `Badge`, `Button`, `Panel`, `EmptyState`, `SectionHeading`, `DisclosureEditor`, and `Field` components.
 - `../style.css`: shared components, application frame, finance patterns, and responsive layouts. New patterns belong in named sections rather than competing override layers.
 - Root `DESIGN.md`: portable design tokens and usage guidance. `.impeccable/design.json` carries responsive/motion extensions. Keep them synchronized with the implementation when changing the system.
 - `DesignSystem.tsx`: live examples of the shipped controls and their states. Examples are illustrative and do not write financial data.
@@ -13,17 +13,24 @@ The approved direction is **Accounts first**. The selected visual reference is `
 ## Reuse
 
 ```tsx
-import { Button, Field, Icon, Panel } from './design-system/ui';
+import { Button, Field, Icon, Panel } from "./design-system/ui";
 
 <Panel title="Nueva categoría">
-  <Field label="Nombre"><input name="name" required /></Field>
-  <Button type="submit"><Icon name="plus" size={17} />Guardar categoría</Button>
-</Panel>
+  <Field label="Nombre">
+    <input name="name" required />
+  </Field>
+  <Button type="submit">
+    <Icon name="plus" size={17} />
+    Guardar categoría
+  </Button>
+</Panel>;
 ```
 
 Use native links for navigation and buttons for actions. Label inputs through `Field`. Use `Icon` with its typed name; the SVG is decorative and the control supplies its accessible text. `Button` defaults to the browser's form submission semantics, so set `type="button"` for a non-submit action inside a form.
 
 Variants: primary for the main action, secondary for an alternate action, quiet for a low-priority action, danger for a destructive action. A disabled/busy control retains its label and explains the busy state in text. Badges communicate neutral, blue/selected, success, warning, or danger states using text as well as color.
+
+Use `DisclosureEditor` for inline editing beneath a saved settings row. Keep the saved summary visible, prefill every field, preserve the record ID, and name the submit action “Guardar cambios.”
 
 ## Financial patterns
 

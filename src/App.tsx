@@ -31,6 +31,7 @@ import {
   Icon,
   Eyes,
   Badge as SystemBadge,
+  DisclosureEditor,
   EmptyState,
   Field,
 } from "./design-system/ui";
@@ -1118,7 +1119,7 @@ function Imports({
   );
 }
 
-function AccountOrganization({
+function AccountEditor({
   account,
   state,
   save,
@@ -1127,28 +1128,50 @@ function AccountOrganization({
   state: State;
   save: (data: unknown) => Promise<void>;
 }) {
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(false),
+    [kind, setKind] = useState(account.kind);
+  const hasMovements = state.transactions.some(
+    (t) => t.accountId === account.id || t.counterAccountId === account.id,
+  );
   return (
-    <details className="account-organization">
-      <summary>
-        Organizar cuenta <Icon name="chevron" size={14} />
-      </summary>
+    <DisclosureEditor label="Editar cuenta" className="account-organization">
       <AppForm
-        submit="Guardar organización"
+        submit="Guardar cambios"
         onSubmit={async (f) => {
-          const { institution: _, parentAccountId: __, ...rest } = account;
           await save({
-            ...rest,
+            id: account.id,
+            name: str(f, "name"),
+            kind,
+            openingMinor: hasMovements
+              ? account.openingMinor
+              : amount(f, "opening"),
+            openingDate: hasMovements ? account.openingDate : str(f, "date"),
+            eligible:
+              kind === "credit" ? account.eligible : f.get("eligible") === "on",
             ...(str(f, "institution").trim()
               ? { institution: str(f, "institution").trim() }
               : {}),
-            ...(account.kind === "credit" && str(f, "parent")
-              ? { parentAccountId: str(f, "parent") }
+            ...(kind === "credit"
+              ? {
+                  closingDay: Number(f.get("closing")),
+                  dueDay: Number(f.get("due")),
+                  ...(str(f, "parent")
+                    ? { parentAccountId: str(f, "parent") }
+                    : {}),
+                }
               : {}),
           });
           setSaved(true);
         }}
       >
+        <Field label="Nombre de la cuenta">
+          <input
+            name="name"
+            required
+            defaultValue={account.name}
+            maxLength={200}
+          />
+        </Field>
         <Field label="Banco o entidad">
           <input
             name="institution"
@@ -1156,7 +1179,77 @@ function AccountOrganization({
             maxLength={200}
           />
         </Field>
-        {account.kind === "credit" && (
+        <Field label="Tipo de cuenta">
+          <select
+            value={kind}
+            disabled={hasMovements}
+            onChange={(e) => setKind(e.target.value as typeof account.kind)}
+          >
+            <option value="bank">Cuenta bancaria</option>
+            <option value="credit">Tarjeta de crédito</option>
+            <option value="cash">Efectivo</option>
+          </select>
+        </Field>
+        <div className="form-grid">
+          <Field
+            label={
+              kind === "credit" ? "Deuda inicial (COP)" : "Saldo inicial (COP)"
+            }
+          >
+            <input
+              name="opening"
+              required
+              disabled={hasMovements}
+              inputMode="decimal"
+              defaultValue={decimalCOP(account.openingMinor)}
+            />
+          </Field>
+          <Field label="Fecha del saldo inicial">
+            <input
+              name="date"
+              required
+              disabled={hasMovements}
+              type="date"
+              max={bogotaDate()}
+              defaultValue={account.openingDate}
+            />
+          </Field>
+          {kind === "credit" && (
+            <>
+              <Field label="Día de corte">
+                <input
+                  name="closing"
+                  type="number"
+                  min="1"
+                  max="31"
+                  required
+                  defaultValue={account.closingDay}
+                />
+              </Field>
+              <Field label="Día de pago">
+                <input
+                  name="due"
+                  type="number"
+                  min="1"
+                  max="31"
+                  required
+                  defaultValue={account.dueDay}
+                />
+              </Field>
+            </>
+          )}
+        </div>
+        {kind !== "credit" && (
+          <label className="checkbox">
+            <input
+              name="eligible"
+              type="checkbox"
+              defaultChecked={account.eligible}
+            />{" "}
+            Incluir este saldo en el disponible
+          </label>
+        )}
+        {kind === "credit" && (
           <Field label="Vincular con cuenta bancaria">
             <select name="parent" defaultValue={account.parentAccountId ?? ""}>
               <option value="">Tarjeta independiente</option>
@@ -1171,9 +1264,78 @@ function AccountOrganization({
             </select>
           </Field>
         )}
-        {saved && <p role="status">Organización guardada.</p>}
+        {hasMovements && (
+          <p className="small-note">
+            El tipo y el saldo inicial quedan protegidos después del primer
+            movimiento. Usa un movimiento de corrección si necesitas ajustar el
+            saldo.
+          </p>
+        )}
+        {saved && <p role="status">Cambios guardados.</p>}
       </AppForm>
-    </details>
+    </DisclosureEditor>
+  );
+}
+
+function InstrumentEditor({
+  instrument,
+  state,
+  save,
+}: {
+  instrument: State["instruments"][number];
+  state: State;
+  save: (data: unknown) => Promise<void>;
+}) {
+  const [saved, setSaved] = useState(false);
+  return (
+    <DisclosureEditor label="Editar tarjeta" className="instrument-editor">
+      <AppForm
+        submit="Guardar cambios"
+        onSubmit={async (f) => {
+          await save({
+            id: instrument.id,
+            name: str(f, "name"),
+            accountId: str(f, "accountId"),
+            aliases: str(f, "aliases")
+              .split(",")
+              .map((v) => v.trim())
+              .filter(Boolean),
+          });
+          setSaved(true);
+        }}
+      >
+        <Field label="Nombre de tarjeta">
+          <input
+            name="name"
+            required
+            defaultValue={instrument.name}
+            maxLength={200}
+          />
+        </Field>
+        <Field label="Cuenta asociada">
+          <select name="accountId" required defaultValue={instrument.accountId}>
+            {state.accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} ·{" "}
+                {a.kind === "credit"
+                  ? "crédito"
+                  : a.kind === "bank"
+                    ? "débito"
+                    : "efectivo"}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Alias separados por comas">
+          <input
+            name="aliases"
+            defaultValue={instrument.aliases.join(", ")}
+            placeholder="1122, wallet-debito"
+          />
+        </Field>
+        {saved && <p role="status">Tarjeta actualizada.</p>}
+      </AppForm>
+    </DisclosureEditor>
   );
 }
 
@@ -1238,7 +1400,8 @@ function Settings({
             <strong>
               {formatCOP(summary?.balances[a.id] ?? a.openingMinor)}
             </strong>
-            <AccountOrganization
+            <AccountEditor
+              key={`${a.id}:${a.name}:${a.kind}:${a.openingMinor}:${a.openingDate}:${a.institution ?? ""}:${a.parentAccountId ?? ""}:${a.closingDay ?? ""}:${a.dueDay ?? ""}:${a.eligible}`}
               account={a}
               state={state}
               save={(data) => save("/accounts", data)}
@@ -1433,6 +1596,12 @@ function Settings({
             por ejemplo los últimos cuatro dígitos visibles en cada mensaje.
             Nunca guardes números completos.
           </p>
+          <p className="small-note">
+            Para una tarjeta de crédito, créala primero arriba como una cuenta
+            de tipo <strong>Tarjeta de crédito</strong>. Después asocia aquí sus
+            alias de SMS y Wallet. El tipo débito o crédito depende de la cuenta
+            elegida.
+          </p>
           <AppForm
             onSubmit={(f) =>
               save("/instruments", {
@@ -1454,7 +1623,12 @@ function Settings({
                 <option value="">Selecciona una cuenta</option>
                 {state.accounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name}
+                    {a.name} ·{" "}
+                    {a.kind === "credit"
+                      ? "crédito"
+                      : a.kind === "bank"
+                        ? "débito"
+                        : "efectivo"}
                   </option>
                 ))}
               </select>
@@ -1463,17 +1637,32 @@ function Settings({
               <input name="aliases" placeholder="1122, wallet-debito" />
             </Field>
           </AppForm>
-          {state.instruments.map((i) => (
-            <p key={i.id}>
-              <strong>{i.name}</strong> ·{" "}
-              {state.accounts.find((a) => a.id === i.accountId)?.kind ===
-              "credit"
-                ? "Crédito"
-                : "Débito"}{" "}
-              · {state.accounts.find((a) => a.id === i.accountId)?.name}
-              {i.aliases.length ? ` · ${i.aliases.join(", ")}` : ""}
-            </p>
-          ))}
+          <div className="instrument-list">
+            {state.instruments.map((i) => {
+              const linked = state.accounts.find((a) => a.id === i.accountId);
+              return (
+                <div className="account-row instrument-row" key={i.id}>
+                  <span className="stat-icon">
+                    <Icon name="card" />
+                  </span>
+                  <div>
+                    <strong>{i.name}</strong>
+                    <small>
+                      {linked?.kind === "credit" ? "Crédito" : "Débito"} ·{" "}
+                      {linked?.name ?? "Cuenta no disponible"}
+                      {i.aliases.length ? ` · ${i.aliases.join(", ")}` : ""}
+                    </small>
+                  </div>
+                  <InstrumentEditor
+                    key={`${i.id}:${i.name}:${i.accountId}:${i.aliases.join(",")}`}
+                    instrument={i}
+                    state={state}
+                    save={(data) => save("/instruments", data)}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </section>
         <section className="panel">
           <h2>Facturas y fechas</h2>

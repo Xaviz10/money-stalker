@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { Badge, Button, EmptyState, Eyes, Icon, Panel } from "./ui";
+import {
+  Badge,
+  Button,
+  DisclosureEditor,
+  EmptyState,
+  Eyes,
+  Field,
+  Icon,
+  Panel,
+} from "./ui";
 const swatches = [
   ["Primary", "--color-primary"],
   ["Account rail", "--color-rail"],
@@ -130,6 +139,33 @@ export function DesignSystem() {
           Estructura de ejemplo. El diseño agrupa; los saldos se calculan una
           sola vez.
         </p>
+      </Panel>
+      <Panel title="Inline settings editor">
+        <div className="account-row">
+          <span className="stat-icon">
+            <Icon name="card" />
+          </span>
+          <div>
+            <strong>Visa crédito</strong>
+            <small>Crédito · cuenta principal · •8645</small>
+          </div>
+          <DisclosureEditor
+            label="Editar tarjeta"
+            className="instrument-editor"
+          >
+            <div className="form">
+              <Field label="Nombre de tarjeta">
+                <input defaultValue="Visa crédito" />
+              </Field>
+              <Button
+                type="button"
+                onClick={() => setNotice("Ejemplo guardado.")}
+              >
+                Guardar cambios
+              </Button>
+            </div>
+          </DisclosureEditor>
+        </div>
       </Panel>
       <Panel title="Empty states">
         <EmptyState

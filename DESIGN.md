@@ -130,6 +130,7 @@ Money Stalker combines familiar account organization with expressive financial t
 The eye helps orient, inspect evidence, and acknowledge completed review. Financial labels and warnings stay literal; the interface represents recorded data and explicit user decisions. Spanish copy, COP formatting, and America/Bogota dates give the workspace its local context.
 
 **Key Characteristics:**
+
 - Grouped accounts and cards with readable balances and debt.
 - One self-hosted variable family, heavy headings, and tabular figures.
 - Blue actions, a citron available total, and textual semantic states.
@@ -224,6 +225,10 @@ Keyboard focus uses a three-pixel outline with a three-pixel offset on light sur
 ### Inputs / Fields
 
 `Field` is a native wrapping label with its text above the control and an eight-pixel gap. Inputs, selects, and textareas use white surfaces, fine cool strokes, control corners, ink text, and visible focus. The minimum control height is (44px); textareas start taller and resize vertically. Errors use explicit danger messages with alert semantics where implemented. There is no shared error-outline variant to invent or document.
+
+### Settings editors
+
+`DisclosureEditor` places a native inline disclosure beneath a saved account or capture-card row. Its summary uses the literal action “Editar cuenta” or “Editar tarjeta”; opening it reveals a prefilled form on the primary-soft surface. Saving updates the existing record ID and returns to the compact saved row. Protect opening balances and account types once movements exist, and explain that correction movements preserve financial history.
 
 ### Navigation
 

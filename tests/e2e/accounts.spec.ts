@@ -49,6 +49,21 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
     .getByRole("button", { name: "Guardar", exact: true })
     .click();
   await expect(page.locator(".rail-instrument")).toContainText("Visa débito");
+  const savedInstrument = page
+    .locator(".instrument-row")
+    .filter({ has: page.getByText("Visa débito", { exact: true }) });
+  await savedInstrument.getByText("Editar tarjeta", { exact: true }).click();
+  await savedInstrument.getByLabel("Nombre de tarjeta").fill("Visa crédito");
+  await savedInstrument.getByLabel("Cuenta asociada").selectOption(credit.id);
+  await savedInstrument
+    .getByLabel("Alias separados por comas")
+    .fill("8645, wallet-visa-8645");
+  await savedInstrument
+    .getByRole("button", { name: "Guardar cambios", exact: true })
+    .click();
+  await expect(
+    page.locator(".instrument-row").filter({ hasText: "Visa crédito" }),
+  ).toContainText("Crédito · Nu independiente · 8645, wallet-visa-8645");
   const organization = page
     .locator(".account-row")
     .filter({ has: page.getByText("Nu independiente", { exact: true }) })
@@ -57,9 +72,7 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   await organization
     .getByLabel("Vincular con cuenta bancaria")
     .selectOption(bank.id);
-  await organization
-    .getByRole("button", { name: "Guardar organización" })
-    .click();
+  await organization.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page.locator(".bank-family")).toContainText("Nu independiente");
   await expect(page.locator(".standalone-cards")).toHaveCount(0);
   for (const t of [
@@ -119,9 +132,7 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   await organization
     .getByLabel("Vincular con cuenta bancaria")
     .selectOption("");
-  await organization
-    .getByRole("button", { name: "Guardar organización" })
-    .click();
+  await organization.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page.locator(".standalone-cards")).toContainText(
     "Nu independiente",
   );
