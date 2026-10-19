@@ -3011,6 +3011,316 @@ input[type="checkbox"] {
   font-size: 12px;
   line-height: 1.55;
 }
+
+/* Reports */
+.reports {
+  display: grid;
+  gap: var(--space-6);
+}
+.report-toolbar {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+.report-presets {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+.report-presets button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.report-presets button.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+.report-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 190px)) minmax(190px, 1fr);
+  gap: var(--space-3);
+}
+.report-filters label {
+  display: grid;
+  gap: var(--space-1);
+}
+.report-filters label > span {
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.report-summary {
+  display: grid;
+  grid-template-columns: 1.35fr repeat(3, 1fr);
+  gap: var(--space-3);
+}
+.report-summary article {
+  display: grid;
+  align-content: center;
+  gap: var(--space-1);
+  min-height: 124px;
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+.report-summary article > span,
+.report-summary small {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+.report-summary strong {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: clamp(20px, 2.2vw, 30px);
+  letter-spacing: -0.04em;
+}
+.report-summary .report-primary-stat {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+.report-primary-stat > span,
+.report-primary-stat strong,
+.report-primary-stat small {
+  color: #fff;
+}
+.report-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.report-panel-heading h2 {
+  margin: 3px 0 0;
+  font-size: 20px;
+}
+.report-panel-heading .eyebrow {
+  color: var(--color-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.report-range {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+.report-time-panel,
+.report-category-panel,
+.report-merchants {
+  padding: var(--space-6);
+}
+.report-trend {
+  position: relative;
+  padding-left: 58px;
+}
+.report-trend svg {
+  display: block;
+  width: 100%;
+  height: 250px;
+  overflow: visible;
+}
+.report-grid-line {
+  fill: none;
+  stroke: var(--color-line);
+  stroke-width: 0.4;
+  vector-effect: non-scaling-stroke;
+}
+.report-trend-line {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.report-trend circle {
+  fill: var(--color-surface);
+  stroke: var(--color-primary);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+.report-chart-scale {
+  position: absolute;
+  inset: 4px auto 23px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.report-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.report-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(290px, 0.8fr);
+  gap: var(--space-5);
+}
+.report-category-list {
+  display: grid;
+  gap: var(--space-4);
+}
+.report-category {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: var(--space-3);
+}
+.report-category-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.report-category > div > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: 7px;
+  font-size: 12px;
+}
+.report-category > div strong {
+  white-space: nowrap;
+}
+.report-category > small {
+  color: var(--color-muted);
+  font-size: 10px;
+  text-align: right;
+}
+.report-category-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+}
+.report-category-bar span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+}
+.report-merchants ol {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.report-merchants li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 13px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.report-merchants li:last-child {
+  border-bottom: 0;
+}
+.report-merchants li > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+.report-merchants li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.report-merchants li strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.report-merchants li small {
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.report-merchants li b {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.report-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: var(--space-10);
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .report-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .report-toolbar,
+  .report-time-panel,
+  .report-category-panel,
+  .report-merchants {
+    padding: var(--space-4);
+  }
+  .report-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .report-filters label:last-child {
+    grid-column: 1 / -1;
+  }
+  .report-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .report-summary article {
+    min-height: 108px;
+    padding: var(--space-4);
+  }
+  .report-summary strong {
+    font-size: 21px;
+  }
+  .report-trend {
+    padding-left: 44px;
+  }
+  .report-trend svg {
+    height: 190px;
+  }
+  .report-range {
+    display: none;
+  }
+  .report-category {
+    grid-template-columns: 34px minmax(0, 1fr) 32px;
+    gap: var(--space-2);
+  }
+  .report-category-icon {
+    width: 32px;
+    height: 32px;
+  }
+}
 .token {
   display: block;
   word-break: break-all;

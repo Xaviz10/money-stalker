@@ -38,6 +38,7 @@ Money Stalker is a Spanish, COP, America/Bogota personal-finance app for Colombi
 - Store COP in integer minor units and preserve date-only financial dates separately from received and location timestamps.
 - Keep expense/refund categories separate from income categories. A subcategory inherits the scope of its parent, and movement editors must show only compatible choices.
 - Deleting a movement removes it from balances and reports through a reversible, audited soft deletion; never erase its financial history silently.
+- Expense reports use posted and provisional expense/refund movements in the selected date range. Refunds reduce spending; income, transfers, future dates and deleted movements do not count as expense.
 
 ## Privacy and verification
 

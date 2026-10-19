@@ -269,6 +269,10 @@ The ledger always renders its column structure. An empty product uses a table ro
 
 Debit instruments indent under their bank account and explain that they use its balance; they have no separate amount. Associated credit accounts retain separate debt in nested rows. Independent credit cards and cash have their own sections. Institutions come from explicit data. The net-worth summary stays distinct from cash and available money. Organization must not duplicate balances; `domain/account-groups.ts` owns these relationships.
 
+### Reports
+
+Reports answer how much was spent, when, where, and in which category for an explicit date range and optional product. Lead with net spending after refunds, then show gross expenses, refunds, and daily average. Follow with a continuous time chart, category/subcategory bars, and ranked merchants. Keep filters visible and provide month, trailing-30-day, and year presets. On phones, preserve the summary grid and stack the analytical panels without horizontal page overflow. Income, transfers, future and deleted movements do not appear as expenses.
+
 ### Evidence and available money
 
 The labeled funds-minus-commitments equation leads to a citron global available-total surface with attached freshness/incomplete-evidence context. Selected-account scope belongs to the ledger and category work areas.

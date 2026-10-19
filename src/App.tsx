@@ -27,6 +27,7 @@ import {
 } from "./auth";
 import { Dashboard, displayDate, SurfaceLoading } from "./finance/Dashboard";
 import { ReviewDesk } from "./finance/ReviewDesk";
+import { Reports } from "./finance/Reports";
 import { AccountRail } from "./finance/AccountRail";
 import { AccountArtwork } from "./finance/AccountArtwork";
 import { CategoryIcon } from "./finance/CategoryIcon";
@@ -123,6 +124,7 @@ async function prepareAccountArtwork(file: File) {
 const nav = [
   ["resumen", "Resumen", "overview"],
   ["movimientos", "Movimientos", "arrows"],
+  ["reportes", "Reportes", "overview"],
   ["revisar", "Revisar", "check"],
   ["cuentas", "Cuentas y ajustes", "wallet"],
 ] as const;
@@ -413,6 +415,11 @@ export function App() {
       setAccountsOpen(false);
       return;
     }
+    if (page === "reportes") {
+      setSelectedAccount(id);
+      setAccountsOpen(false);
+      return;
+    }
     setSelectedAccount(id);
     setAccountsOpen(false);
     location.hash = "#/resumen";
@@ -531,6 +538,8 @@ export function App() {
                 <h1>
                   {page === "revisar"
                     ? "Conectemos las pistas."
+                    : page === "reportes"
+                      ? "Entiende adónde se fue tu dinero."
                     : page === "design-system"
                       ? "Design system"
                       : title}
@@ -540,6 +549,8 @@ export function App() {
                     ? "Cada movimiento, con su historia y sin duplicados."
                     : page === "revisar"
                       ? "Compara las evidencias. Tú tienes la última palabra."
+                      : page === "reportes"
+                        ? "Explora tus gastos por período, categoría y comercio."
                       : page === "design-system"
                         ? "Las reglas y componentes que mantienen Money Stalker consistente."
                         : "Cuentas bancarias, tarjetas y tu margen de tranquilidad."}
@@ -598,6 +609,9 @@ export function App() {
             ) : (
               <SurfaceLoading failed={stale} />
             ))}
+          {page === "reportes" && (
+            <Reports state={state} accountId={selectedAccount} onAccountChange={setSelectedAccount} />
+          )}
           {page === "cuentas" && (
             <Settings state={state} summary={summary} refresh={refresh} />
           )}
