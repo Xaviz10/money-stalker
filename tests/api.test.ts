@@ -46,6 +46,13 @@ describe('authorization and capture', () => {
   it('discards the entire mutation when validation fails', async () => { const { repo } = await setup(); await expect(repo.mutate('owner', s => { s.accounts.length = 0; throw new Error('failure'); })).rejects.toThrow(); expect((await repo.read('owner')).accounts).toHaveLength(1); });
 });
 describe('import lifecycle and retries', () => {
+  it('allows more than ten import files in one day', async () => {
+    const { send, repo } = await setup();
+    const responses = await Promise.all(Array.from({ length: 11 }, (_, index) =>
+      send('POST', '/imports', { filename: `statement-${index}.csv`, size: 1, accountId: 'bank', profile: 'cop-interchange-v1' })));
+    expect(responses.every(response => response.status === 201)).toBe(true);
+    expect(await repo.batches('owner')).toHaveLength(11);
+  });
   it('previews then commits; reimport and row retries preserve multiplicity without double posting', async () => {
     const { send, repo, files } = await setup(); const bytes = readFileSync('tests/fixtures/interchange.csv');
     const response = await send('POST', '/imports', { filename: 'test.csv', size: bytes.length, accountId: 'bank', profile: 'cop-interchange-v1' });

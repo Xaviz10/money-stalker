@@ -221,12 +221,6 @@ export function createAPI(repo: Repository, files: Files) {
           throw new DomainError("Perfil no verificado");
         if (!(await repo.read(h)).accounts.some((a) => a.id === b.accountId))
           throw new DomainError("Cuenta desconocida");
-        const existing = await repo.batches(h);
-        if (
-          existing.filter((b) => b.createdAt.slice(0, 10) === now.slice(0, 10))
-            .length >= 10
-        )
-          throw new DomainError("Máximo 10 archivos al día", 429);
         const batchId = randomUUID(),
           originalKey = `original/${h}/${batchId}/file`;
         const batch: Batch = {
