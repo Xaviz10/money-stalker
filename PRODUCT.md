@@ -16,6 +16,8 @@ The current project serves the owner's personal finances. The broader project pl
 
 The implementation supports accounts, manual movements, CSV/XLSX import with preview, SMS/Wallet evidence, suggested matches with user confirmation, correction history and undo. Money calculations are deterministic. The Bancolombia quarterly savings-account XLSX profile is verified against three original 2025 statements. The Bancolombia SMS parser is verified against the supplied purchase, QR payment, account payment and transfer messages. This is file and message-format support, not bank synchronization; automatic device capture still requires device-specific verification. Do not imply complete evidence or autonomous financial decisions.
 
+Categories have one optional subcategory level and an explicit expense or income scope. Manual creation and editing show only choices compatible with the movement type. Deleting a movement is an audited soft deletion: it stops affecting balances and reports and can be restored from correction history.
+
 ## Import and capture rules
 
 The importer detects the verified Bancolombia savings statement or the COP interchange format. Repeated page headers and statement metadata are skipped, while dated movement rows are preserved. Signed statement amounts use exact minor-unit arithmetic. Credit-card payments and transfers to a configured owned account are transfers, so they do not become expenses twice. A transfer without a configured owned destination is an expense.

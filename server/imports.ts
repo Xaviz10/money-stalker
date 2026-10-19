@@ -625,7 +625,14 @@ export function exportRecords(
   XLSX.utils.book_append_sheet(
     book,
     XLSX.utils.json_to_sheet(
-      state.categories.map((c) => ({ ID: c.id, Nombre: safeCell(c.name) })),
+      state.categories.map((c) => ({
+        ID: c.id,
+        Nombre: safeCell(c.name),
+        Tipo: c.scope,
+        CategoriaPrincipal: c.parentId
+          ? safeCell(state.categories.find((parent) => parent.id === c.parentId)?.name ?? "")
+          : "",
+      })),
     ),
     "Categorias",
   );

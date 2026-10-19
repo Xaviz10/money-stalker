@@ -28,7 +28,15 @@ function entries(state: State, t: TransactionInput): Entry[] {
     if (other.id === account.id) throw new DomainError('Selecciona dos cuentas distintas');
     return [line(other.id, true), line(account.id, false)];
   }
-  if (!state.categories.some(c => c.id === t.categoryId)) throw new DomainError('Categoría desconocida');
+  const category = state.categories.find(c => c.id === t.categoryId);
+  if (!category) throw new DomainError('Categoría desconocida');
+  const expectedScope = t.kind === 'income' ? 'income' : 'expense';
+  if (category.scope !== 'both' && category.scope !== expectedScope)
+    throw new DomainError(t.kind === 'income' ? 'Selecciona una categoría de ingreso' : 'Selecciona una categoría de gasto');
+  if (category.parentId) {
+    const parent = state.categories.find(c => c.id === category.parentId);
+    if (!parent || (parent.scope !== 'both' && parent.scope !== category.scope)) throw new DomainError('Subcategoría inválida');
+  }
   return t.kind === 'expense' ? [line(`expense:${t.categoryId}`, true), line(account.id, false)]
     : [line(account.id, true), line(t.kind === 'income' ? 'income' : `expense:${t.categoryId}`, false)];
 }
@@ -81,7 +89,16 @@ export function configure(state: State, kind: string, input: unknown) {
     if (state.instruments.some(i => i.id !== item.id && i.aliases.some(a => item.aliases.includes(a)))) throw new DomainError('Alias de tarjeta duplicado');
     upsert(state.instruments, item); return;
   }
-  if (kind === 'categories') { upsert(state.categories, categorySchema.parse(input)); return; }
+  if (kind === 'categories') {
+    const item = categorySchema.parse(input);
+    if (item.parentId) {
+      if (item.parentId === item.id) throw new DomainError('Una categoría no puede ser su propia subcategoría');
+      const parent = requireValue(state.categories.find(c => c.id === item.parentId), 'Categoría principal desconocida');
+      if (parent.parentId) throw new DomainError('Solo se permite un nivel de subcategorías');
+      if (parent.scope !== 'both' && item.scope !== parent.scope) throw new DomainError('La subcategoría debe tener el mismo tipo que su categoría principal');
+    }
+    upsert(state.categories, item); return;
+  }
   if (kind === 'bills') {
     const item = billSchema.omit({ paidTransactionId: true }).parse(input);
     const old = state.bills.find(b => b.id === item.id);
@@ -175,6 +192,14 @@ export function editTransaction(state: State, transactionId: string, input: unkn
   Object.assign(t, value, { entries: journal, revision: t.revision + 1 }); linkBill(state, t);
   if (remember && t.merchant) upsert(state.aliases, { id: merchantKey(t.merchant), merchant: merchantKey(t.merchant), categoryId: t.categoryId, note: t.note });
   state.audit.push({ id: `edit:${t.id}:${t.revision}`, at, action: 'edit', transactionId: t.id, beforeTransaction, expectedRevision: t.revision });
+}
+export function deleteTransaction(state: State, transactionId: string, at: string, expectedRevision?: number) {
+  const t = requireValue(state.transactions.find(item => item.id === transactionId && !item.voided), 'Movimiento desconocido');
+  if (expectedRevision !== undefined && t.revision !== expectedRevision) throw new DomainError('El movimiento cambió; actualiza antes de eliminar', 409);
+  const beforeTransaction = clone(t);
+  for (const bill of state.bills) if (bill.paidTransactionId === t.id) delete bill.paidTransactionId;
+  t.voided = true; t.revision++;
+  state.audit.push({ id: `delete:${t.id}:${t.revision}`, at, action: 'delete', transactionId: t.id, beforeTransaction, expectedRevision: t.revision });
 }
 export function undo(state: State, auditId: string, at: string) {
   const a = requireValue(state.audit.find(a => a.id === auditId), 'Cambio desconocido');

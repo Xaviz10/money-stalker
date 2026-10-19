@@ -36,6 +36,8 @@ Money Stalker is a Spanish, COP, America/Bogota personal-finance app for Colombi
 - Moving money between the owner's Bancolombia, Nequi or other accounts is a transfer. Paying another person or merchant through those rails is an expense unless the owner confirms an internal destination.
 - Uncertain matches or incomplete Shortcut captures go to Review. A Shortcut transfer without a configured owned destination becomes an expense. Do not invent missing values or silently merge ambiguous observations.
 - Store COP in integer minor units and preserve date-only financial dates separately from received and location timestamps.
+- Keep expense/refund categories separate from income categories. A subcategory inherits the scope of its parent, and movement editors must show only compatible choices.
+- Deleting a movement removes it from balances and reports through a reversible, audited soft deletion; never erase its financial history silently.
 
 ## Privacy and verification
 

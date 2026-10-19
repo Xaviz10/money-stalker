@@ -27,7 +27,9 @@ export const accountSchema = z.object({
   parentAccountId: id.optional(),
 });
 export const instrumentSchema = z.object({ id, name: text.min(1), accountId: id, aliases: z.array(text.min(1)).max(10) });
-export const categorySchema = z.object({ id, name: text.min(1) });
+export const categorySchema = z.object({
+  id, name: text.min(1), scope: z.enum(['expense', 'income', 'both']).default('expense'), parentId: id.optional(),
+});
 export const billSchema = z.object({ id, name: text.min(1), amountMinor: positive, dueDate: date, paidTransactionId: id.optional() });
 export const settingsSchema = z.object({ payday: z.number().int().min(1).max(31), reserveMinor: minor });
 export const transactionInput = z.object({
@@ -71,26 +73,43 @@ export type State = {
   aliases: { id: string; merchant: string; categoryId: string; note?: string }[]; settings: Settings;
 };
 export const defaultCategories: Category[] = [
-  { id: 'uncategorized', name: 'Sin categoría' },
+  { id: 'uncategorized', name: 'Sin categoría', scope: 'both' },
   // Keep the existing ID so movements previously classified as food become Mercado.
-  { id: 'food', name: 'Mercado' },
-  { id: 'restaurants', name: 'Restaurantes' },
-  { id: 'car', name: 'Carro' },
-  { id: 'delivery', name: 'Domicilios' },
-  { id: 'utilities', name: 'Servicios' },
-  { id: 'home', name: 'Hogar' },
-  { id: 'transport', name: 'Transporte' },
-  { id: 'health', name: 'Salud' },
-  { id: 'leisure', name: 'Ocio' },
-  { id: 'salary', name: 'Salario' },
-  { id: 'other', name: 'Otros' },
+  { id: 'food', name: 'Mercado', scope: 'expense' },
+  { id: 'food-supermarket', name: 'Supermercado', scope: 'expense', parentId: 'food' },
+  { id: 'restaurants', name: 'Restaurantes', scope: 'expense' },
+  { id: 'restaurants-cafe', name: 'Cafés', scope: 'expense', parentId: 'restaurants' },
+  { id: 'car', name: 'Carro', scope: 'expense' },
+  { id: 'car-fuel', name: 'Combustible', scope: 'expense', parentId: 'car' },
+  { id: 'car-tolls', name: 'Peajes', scope: 'expense', parentId: 'car' },
+  { id: 'car-parking', name: 'Parqueadero', scope: 'expense', parentId: 'car' },
+  { id: 'car-maintenance', name: 'Mantenimiento', scope: 'expense', parentId: 'car' },
+  { id: 'delivery', name: 'Domicilios', scope: 'expense' },
+  { id: 'utilities', name: 'Servicios', scope: 'expense' },
+  { id: 'utilities-internet', name: 'Internet y telefonía', scope: 'expense', parentId: 'utilities' },
+  { id: 'utilities-power', name: 'Energía', scope: 'expense', parentId: 'utilities' },
+  { id: 'utilities-water', name: 'Agua', scope: 'expense', parentId: 'utilities' },
+  { id: 'utilities-gas', name: 'Gas', scope: 'expense', parentId: 'utilities' },
+  { id: 'home', name: 'Hogar', scope: 'expense' },
+  { id: 'transport', name: 'Transporte', scope: 'expense' },
+  { id: 'health', name: 'Salud', scope: 'expense' },
+  { id: 'leisure', name: 'Ocio', scope: 'expense' },
+  { id: 'other', name: 'Otros gastos', scope: 'expense' },
+  { id: 'salary', name: 'Salario', scope: 'income' },
+  { id: 'salary-payroll', name: 'Nómina', scope: 'income', parentId: 'salary' },
+  { id: 'salary-bonus', name: 'Prima o bonificación', scope: 'income', parentId: 'salary' },
+  { id: 'freelance-income', name: 'Honorarios', scope: 'income' },
+  { id: 'investment-income', name: 'Rendimientos', scope: 'income' },
+  { id: 'rental-income', name: 'Arriendos recibidos', scope: 'income' },
+  { id: 'other-income', name: 'Otros ingresos', scope: 'income' },
 ];
 export function normalizeDefaultCategories(state: State) {
   for (const category of defaultCategories) {
     const existing = state.categories.find(c => c.id === category.id);
-    if (existing) existing.name = category.name;
+    if (existing) Object.assign(existing, category);
     else state.categories.push({ ...category });
   }
+  for (const category of state.categories) if (!category.scope) category.scope = 'expense';
 }
 export function normalizeUnlinkedTransfer(state: State, observation: Observation) {
   const accountIds = new Set(state.accounts.map(account => account.id));

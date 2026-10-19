@@ -251,6 +251,8 @@ The accounts route shows saved products first. Creation, margin/categories, auto
 
 Movement editors keep location optional and collapsed until it has evidence or the owner opens it. Captured iPhone coordinates use the primary blue and display accuracy and capture time. An owner-confirmed Google Place uses success green and may replace the merchant field. Never present captured coordinates as a confirmed business: delayed SMS delivery, online purchases and Watch payments make that inference unsafe.
 
+Movement type controls the category vocabulary. Expenses and refunds show expense categories; income shows its own categories; transfers show no category. When a principal category has children, expose a second optional subcategory control and display the saved path as `Categoría › Subcategoría`. Editing may change type and classification together. Deletion uses an inline confirmation, removes the movement from financial totals, and leaves an undoable audit entry.
+
 ### Navigation
 
 The white header combines a citron eye tile, compact wordmark, four user routes, and actions. Active links use blue, heavier text, a blue underline, and `aria-current="page"`. Review counts use separate small markers. Import is contextual to Movements rather than a top-level route. The responsive frame retains top navigation and exposes the account disclosure beneath it.

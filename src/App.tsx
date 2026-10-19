@@ -170,6 +170,19 @@ function flowLabel(record: FlowRecord, selectedAccount: string, state: State) {
   if (!incoming && destination?.kind === "credit") return "Pago de tarjeta";
   return incoming ? "Transferencia recibida" : "Transferencia enviada";
 }
+function categoryLabel(state: State, categoryId: string) {
+  const category = state.categories.find((item) => item.id === categoryId);
+  if (!category) return "Sin categoría";
+  const parent = category.parentId
+    ? state.categories.find((item) => item.id === category.parentId)
+    : undefined;
+  return parent ? `${parent.name} › ${category.name}` : category.name;
+}
+function categoryMatches(state: State, transactionCategoryId: string, filterId: string) {
+  if (!filterId) return true;
+  const category = state.categories.find((item) => item.id === transactionCategoryId);
+  return transactionCategoryId === filterId || category?.parentId === filterId;
+}
 function FlowIndicator({
   record,
   selectedAccount,
@@ -715,9 +728,7 @@ function TransactionTable({
                       <span>
                         {t.kind === "transfer"
                           ? (otherAccount?.name ?? "Transferencia")
-                          : (state.categories.find(
-                              (category) => category.id === t.categoryId,
-                            )?.name ?? "Sin categoría")}
+                          : categoryLabel(state, t.categoryId)}
                       </span>
                       <span aria-hidden="true">·</span>
                       <span>
@@ -735,8 +746,7 @@ function TransactionTable({
                     ) : (
                       <span className="register-category-label">
                         <CategoryIcon categoryId={t.categoryId} size={14} />
-                        {state.categories.find((c) => c.id === t.categoryId)
-                          ?.name ?? "Sin categoría"}
+                        {categoryLabel(state, t.categoryId)}
                       </span>
                     )}
                   </td>
@@ -828,7 +838,7 @@ function Movements({
           .toLowerCase()
           .includes(search.toLowerCase());
         const matchesCategory =
-          !categoryFilter || t.categoryId === categoryFilter;
+          categoryMatches(state, t.categoryId, categoryFilter);
         const matchesDirection =
           !directionFilter ||
           (directionFilter === "incoming"
@@ -907,7 +917,7 @@ function Movements({
                 <option value="">Todas</option>
                 {state.categories.map((category) => (
                   <option value={category.id} key={category.id}>
-                    {category.name}
+                    {category.parentId ? `↳ ${categoryLabel(state, category.id)}` : category.name}
                   </option>
                 ))}
               </select>
@@ -1001,14 +1011,20 @@ function TransactionDialog({
   const dialog = useRef<HTMLDialogElement>(null);
   const isObservation = value !== "new" && "source" in value;
   const initial = value === "new" ? undefined : value;
+  const transaction =
+    value !== "new" && !isObservation ? (value as Transaction) : undefined;
+  const initialCategory =
+    state.categories.find((item) => item.id === transaction?.categoryId) ??
+    state.categories.find((item) => item.id === "uncategorized")!;
   const [kind, setKind] = useState(initial?.kind ?? "expense");
   const [merchant, setMerchant] = useState(initial?.merchant ?? "");
+  const [categoryId, setCategoryId] = useState(initialCategory.parentId ?? initialCategory.id);
+  const [subcategoryId, setSubcategoryId] = useState(initialCategory.parentId ? initialCategory.id : "");
+  const [deleting, setDeleting] = useState(false);
   const [pendingDuplicate, setPendingDuplicate] = useState<{
     data: Record<string, unknown>;
     matches: Transaction[];
   }>();
-  const transaction =
-    value !== "new" && !isObservation ? (value as Transaction) : undefined;
   const [place, setPlace] = useState<TransactionPlace | undefined>(
     transaction?.place,
   );
@@ -1106,7 +1122,7 @@ function TransactionDialog({
               kind === "transfer" ? str(f, "counterAccountId") : null,
             amountMinor: amount(f, "amount"),
             merchant,
-            categoryId: str(f, "categoryId") || "uncategorized",
+            categoryId: subcategoryId || categoryId || "uncategorized",
             note: str(f, "note"),
             billId: str(f, "billId") || null,
             place: place ?? null,
@@ -1160,7 +1176,16 @@ function TransactionDialog({
             <select
               name="kind"
               value={kind}
-              onChange={(e) => setKind(e.target.value as typeof kind)}
+              onChange={(e) => {
+                const next = e.target.value as typeof kind;
+                setKind(next);
+                const scope = next === "income" ? "income" : "expense";
+                const selected = state.categories.find((item) => item.id === (subcategoryId || categoryId));
+                if (next !== "transfer" && selected?.scope !== "both" && selected?.scope !== scope) {
+                  setCategoryId("uncategorized");
+                  setSubcategoryId("");
+                }
+              }}
             >
               <option value="expense">Gasto</option>
               <option value="income">Ingreso</option>
@@ -1226,18 +1251,27 @@ function TransactionDialog({
               onChange={(event) => setMerchant(event.target.value)}
             />
           </Field>
-          <Field label="Categoría">
-            <select
-              name="categoryId"
-              defaultValue={transaction?.categoryId ?? "uncategorized"}
-            >
-              {state.categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {kind !== "transfer" && (
+            <>
+              <Field label={kind === "income" ? "Categoría de ingreso" : "Categoría de gasto"}>
+                <select name="categoryId" value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setSubcategoryId(""); }}>
+                  {state.categories
+                    .filter((category) => !category.parentId && (category.scope === "both" || category.scope === (kind === "income" ? "income" : "expense")))
+                    .map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </Field>
+              {state.categories.some((category) => category.parentId === categoryId) && (
+                <Field label="Subcategoría">
+                  <select value={subcategoryId} onChange={(event) => setSubcategoryId(event.target.value)}>
+                    <option value="">Sin subcategoría</option>
+                    {state.categories.filter((category) => category.parentId === categoryId).map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            </>
+          )}
           {kind === "expense" && (
             <Field label="Factura asociada">
               <select name="billId" defaultValue={transaction?.billId ?? ""}>
@@ -1307,6 +1341,24 @@ function TransactionDialog({
           </p>
         )}
       </AppForm>
+      {transaction && (
+        <section className="transaction-delete">
+          {!deleting ? (
+            <button type="button" className="text-button danger-text" onClick={() => setDeleting(true)}>Eliminar movimiento</button>
+          ) : (
+            <div role="alertdialog" aria-label="Confirmar eliminación del movimiento">
+              <div><strong>¿Eliminar este movimiento?</strong><p>Dejará de afectar saldos y reportes. La acción quedará en el historial.</p></div>
+              <div className="button-row">
+                <button type="button" className="button quiet" onClick={() => setDeleting(false)}>Cancelar</button>
+                <button type="button" className="button danger" onClick={async () => {
+                  await api(`/transactions/${transaction.id}`, { method: "DELETE", body: JSON.stringify({ expectedRevision: transaction.revision }) });
+                  await saved("Movimiento eliminado.");
+                }}>Sí, eliminar</button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
     </dialog>
   );
 }
@@ -2062,6 +2114,7 @@ function Settings({
 }) {
   const [accountKind, setAccountKind] = useState("bank"),
     [token, setToken] = useState("");
+  const [newCategoryScope, setNewCategoryScope] = useState<"expense" | "income">("expense");
   const [devices, setDevices] = useState<
     { id: string; name: string; revoked: boolean }[]
   >([]);
@@ -2335,9 +2388,29 @@ function Settings({
           <h3>Nueva categoría</h3>
           <AppForm
             onSubmit={(f) =>
-              save("/categories", { id: freshId(), name: str(f, "name") })
+              save("/categories", {
+                id: freshId(),
+                name: str(f, "name"),
+                scope: newCategoryScope,
+                ...(str(f, "parentId") ? { parentId: str(f, "parentId") } : {}),
+              })
             }
           >
+            <Field label="Tipo de movimiento">
+              <select value={newCategoryScope} onChange={(event) => setNewCategoryScope(event.target.value as "expense" | "income")}>
+                <option value="expense">Gasto o devolución</option>
+                <option value="income">Ingreso</option>
+              </select>
+            </Field>
+            <Field label="Categoría principal (opcional)">
+              <select name="parentId" defaultValue="" key={newCategoryScope}>
+                <option value="">Crear categoría principal</option>
+                {state.categories
+                  .filter((category) => !category.parentId && category.id !== "uncategorized" && category.scope === newCategoryScope)
+                  .map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+              <small>Selecciona una categoría principal para crear una subcategoría.</small>
+            </Field>
             <Field label="Nombre de categoría">
               <input name="name" required maxLength={200} />
             </Field>

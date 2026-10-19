@@ -4,6 +4,7 @@ import {
   addTransaction,
   configure,
   dashboard,
+  deleteTransaction,
   duplicateTransactions,
   editTransaction,
   merchantKey,
@@ -198,6 +199,7 @@ export function createAPI(repo: Repository, files: Files) {
               (item) =>
                 item.id !== selected.id &&
                 !item.voided &&
+                item.kind === selected.kind &&
                 merchantKey(item.merchant) === key,
             )
             .map((item) => item.id),
@@ -243,6 +245,11 @@ export function createAPI(repo: Repository, files: Files) {
           });
         }
         return { status: 200, body: { saved: true, updated } };
+      }
+      if (transaction && method === "DELETE") {
+        const b = z.object({ expectedRevision: z.number().int().min(1) }).parse(body);
+        await repo.mutate(h, (s) => deleteTransaction(s, transaction[1], now, b.expectedRevision));
+        return { status: 200, body: { deleted: true } };
       }
       if (method === "POST" && path === "/matches") {
         const b = z

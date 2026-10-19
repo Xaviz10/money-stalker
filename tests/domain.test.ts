@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addTransaction, configure, dashboard, editTransaction, ingestCapture, mergeObservation, recordStatement, refreshCaptureCandidates, resolveObservation, undo } from '../domain/ledger';
+import { addTransaction, configure, dashboard, deleteTransaction, editTransaction, ingestCapture, mergeObservation, recordStatement, refreshCaptureCandidates, resolveObservation, undo } from '../domain/ledger';
 import { emptyState, normalizeDefaultCategories, type Observation, type State } from '../domain/model';
 import { bogotaDate, formatCOP, nextPayday, parseCOP } from '../domain/money';
 const at = '2026-10-17T18:00:00Z';
@@ -16,18 +16,29 @@ function observation(id: string, extra: Partial<Observation> = {}): Observation 
 describe('exact COP amounts and dates', () => {
   it('uses the current built-in categories and upgrades the legacy food label', () => {
     const state = emptyState();
-    expect(state.categories.map(category => category.name)).toEqual([
-      'Sin categoría', 'Mercado', 'Restaurantes', 'Carro', 'Domicilios', 'Servicios', 'Hogar', 'Transporte', 'Salud', 'Ocio', 'Salario', 'Otros',
-    ]);
-    state.categories = [{ id: 'food', name: 'Alimentación' }];
+    expect(state.categories.map(category => category.name)).toEqual(expect.arrayContaining([
+      'Sin categoría', 'Mercado', 'Supermercado', 'Restaurantes', 'Carro', 'Peajes', 'Domicilios', 'Servicios', 'Salario', 'Nómina', 'Honorarios', 'Rendimientos',
+    ]));
+    state.categories = [{ id: 'food', name: 'Alimentación', scope: 'expense' }];
     normalizeDefaultCategories(state as State);
     expect(state.categories.find(category => category.id === 'food')?.name).toBe('Mercado');
     expect(state.categories).toEqual(expect.arrayContaining([
-      { id: 'car', name: 'Carro' },
-      { id: 'restaurants', name: 'Restaurantes' },
-      { id: 'delivery', name: 'Domicilios' },
-      { id: 'utilities', name: 'Servicios' },
+      expect.objectContaining({ id: 'car', name: 'Carro', scope: 'expense' }),
+      expect.objectContaining({ id: 'salary', name: 'Salario', scope: 'income' }),
+      expect.objectContaining({ id: 'car-tolls', name: 'Peajes', parentId: 'car' }),
     ]));
+  });
+  it('keeps expense and income category trees separate', () => {
+    const state = setup();
+    configure(state, 'categories', { id: 'commissions', name: 'Comisiones', scope: 'income' });
+    configure(state, 'categories', { id: 'sales-commission', name: 'Ventas', scope: 'income', parentId: 'commissions' });
+    expect(() => configure(state, 'categories', { id: 'invalid-child', name: 'Inválida', scope: 'expense', parentId: 'commissions' })).toThrow(/mismo tipo/);
+    expect(() => addTransaction(state, { ...purchase('wrong-expense'), categoryId: 'salary' }, at)).toThrow(/categoría de gasto/);
+    expect(() => addTransaction(state, { ...purchase('wrong-income'), kind: 'income', categoryId: 'car' }, at)).toThrow(/categoría de ingreso/);
+    const income = addTransaction(state, { ...purchase('income'), kind: 'income', categoryId: 'salary-payroll' }, at);
+    const expense = addTransaction(state, { ...purchase('toll'), categoryId: 'car-tolls' }, at);
+    expect(income.categoryId).toBe('salary-payroll'); expect(expense.categoryId).toBe('car-tolls');
+    expect(state.categories.find(category => category.id === 'sales-commission')).toMatchObject({ parentId: 'commissions', scope: 'income' });
   });
   it('resolves pending transfers without an owned destination as expenses', () => {
     const state = setup();
@@ -94,6 +105,12 @@ describe('commitments and balanced journal', () => {
   });
   it('does not count future salary and can show negative availability', () => { const s = setup(); configure(s, 'settings', { payday: 25, reserveMinor: '110000000' }); expect(dashboard(s, '2026-10-17').availableMinor).toBe('-10000000'); });
   it('rejects a duplicate transaction ID with altered financial intent', () => { const s = setup(); addTransaction(s, purchase('p'), at); expect(() => addTransaction(s, { ...purchase('p'), amountMinor: '1' }, at)).toThrow(/Identificador/); });
+  it('deletes a movement from balances and can restore it through the audit trail', () => {
+    const s = setup(); addTransaction(s, { id: 'delete-me', accountId: 'bank', date: '2026-10-10', amountMinor: '2500000', kind: 'expense', merchant: 'Compra' }, at);
+    expect(dashboard(s, '2026-10-17').balances.bank).toBe('97500000');
+    deleteTransaction(s, 'delete-me', at, 1); expect(dashboard(s, '2026-10-17').balances.bank).toBe('100000000'); expect(s.transactions[0].voided).toBe(true);
+    undo(s, s.audit.at(-1)!.id, at); expect(dashboard(s, '2026-10-17').balances.bank).toBe('97500000'); expect(s.transactions[0].voided).toBeFalsy();
+  });
 });
 describe('evidence reconciliation and corrections', () => {
   it('keeps Shortcut captures pending until the owner confirms them', () => {

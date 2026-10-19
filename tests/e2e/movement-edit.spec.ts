@@ -162,3 +162,43 @@ test("manual duplicates require confirmation without creating a review clue", as
   expect(state.transactions).toHaveLength(2);
   expect(state.observations).toHaveLength(0);
 });
+
+test("income categories, subcategories, type changes and deletion work in the movement editor", async ({ page, request }) => {
+  await request.post(`${apiBase}/accounts`, { data: { id: "bank", name: "Ahorros", kind: "bank", openingMinor: "100000000", openingDate: "2026-01-01", eligible: true } });
+  await page.goto("./#/movimientos");
+  await page.getByRole("button", { name: "Nuevo movimiento" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.locator('select[name="accountId"]').selectOption("bank");
+  await dialog.locator('input[name="amount"]').fill("5000000");
+  await dialog.locator('input[name="merchant"]').fill("Empresa de prueba");
+  await dialog.getByLabel("Tipo").selectOption("income");
+  const incomeCategory = dialog.getByLabel("Categoría de ingreso");
+  await expect(incomeCategory.getByRole("option", { name: "Salario" })).toHaveCount(1);
+  await expect(incomeCategory.getByRole("option", { name: "Carro" })).toHaveCount(0);
+  await incomeCategory.selectOption("salary");
+  await dialog.getByLabel("Subcategoría").selectOption("salary-payroll");
+  await dialog.getByRole("button", { name: "Registrar movimiento" }).click();
+  await expect(page.getByRole("status")).toContainText("Movimiento guardado");
+
+  await page.getByRole("button", { name: "Empresa de prueba", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Categoría de ingreso")).toHaveValue("salary");
+  await expect(dialog.getByLabel("Subcategoría")).toHaveValue("salary-payroll");
+  await dialog.getByLabel("Tipo").selectOption("expense");
+  await expect(dialog.getByLabel("Categoría de gasto").getByRole("option", { name: "Salario" })).toHaveCount(0);
+  await dialog.getByLabel("Categoría de gasto").selectOption("car");
+  await dialog.getByLabel("Subcategoría").selectOption("car-tolls");
+  await dialog.getByRole("button", { name: "Guardar cambios" }).click();
+
+  await page.getByRole("button", { name: "Empresa de prueba", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Eliminar movimiento" }).click();
+  const confirmation = dialog.getByRole("alertdialog", { name: "Confirmar eliminación del movimiento" });
+  await confirmation.getByRole("button", { name: "Sí, eliminar" }).click();
+  await expect(page.getByRole("status")).toContainText("Movimiento eliminado");
+  await expect(page.getByRole("button", { name: "Empresa de prueba", exact: true })).toHaveCount(0);
+
+  const state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.transactions).toHaveLength(1);
+  expect(state.transactions[0]).toMatchObject({ kind: "expense", categoryId: "car-tolls", voided: true });
+});
