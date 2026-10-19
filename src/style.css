@@ -2054,6 +2054,57 @@ input[type="checkbox"] {
 .shortcut-api-guide > div > p:first-child {
   margin-top: 0;
 }
+.shortcut-prerequisite {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+.shortcut-production-steps {
+  max-width: 72ch;
+}
+.shortcut-production-steps > li + li {
+  margin-top: var(--space-3);
+}
+.shortcut-endpoint {
+  display: block;
+  margin: var(--space-2) 0 0 !important;
+  padding: 8px 10px !important;
+  white-space: normal;
+  word-break: break-all;
+}
+.shortcut-field-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: var(--space-3) 0;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-line);
+}
+.shortcut-field-list span {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  background: var(--color-surface);
+}
+.shortcut-field-list code {
+  width: fit-content;
+  margin: 0;
+  color: var(--color-primary);
+  font-weight: 750;
+}
+.shortcut-field-list b {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+@media (max-width: 600px) {
+  .shortcut-field-list {
+    grid-template-columns: 1fr;
+  }
+}
 .notice .text-button,
 .action-notice .text-button {
   padding: 3px;

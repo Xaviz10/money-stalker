@@ -2327,47 +2327,159 @@ function Settings({
               />
             </Field>
           </AppForm>
-          <details className="shortcut-api-guide">
-            <summary>Configurar el envío a Money Stalker</summary>
+          <details className="shortcut-api-guide" open>
+            <summary>Atajo real · SMS Bancolombia</summary>
             <div>
-              <p>
-                Hazlo únicamente en cada prueba que sí entregó datos. Usa las
-                acciones <strong>Formatear fecha</strong>,{" "}
-                <strong>Diccionario</strong> y{" "}
-                <strong>Obtener contenido de URL</strong>.
+              <p className="shortcut-prerequisite">
+                <strong>Requisito:</strong> la prueba anterior mostró el texto
+                completo en <strong>Entrada del atajo</strong>.
               </p>
-              <ol>
+              <ol className="shortcut-production-steps">
                 <li>
-                  En la automatización de SMS, cambia el remitente de prueba a
-                  <code>85540</code> y usa el filtro
-                  <code>Bancolombia:</code>.
+                  Crea <strong>Atajos → Automatización → + → Mensaje</strong>.
+                  Remitente: <code>85540</code>. El mensaje contiene:
+                  <code>Bancolombia:</code>. Elige
+                  <strong>Ejecutar inmediatamente</strong>.
                 </li>
                 <li>
-                  Crea un identificador con <strong>Fecha actual</strong>
-                  formateada como <code>yyyyMMddHHmmssSSS</code> y antepone
-                  <code>sms-</code> o <code>wallet-</code>.
+                  Agrega <strong>Formatear fecha</strong>. Como entrada elige la
+                  variable <strong>Fecha actual</strong> y usa formato
+                  <strong>ISO 8601</strong>. Renombra el resultado como
+                  <code>ObservedAt</code>.
                 </li>
                 <li>
-                  Para SMS, crea un diccionario con <code>eventId</code>,
-                  <code>source</code> = <code>sms</code>,<code>observedAt</code>{" "}
-                  en ISO 8601 y <code>message</code>
-                  usando la entrada validada.
+                  Agrega otro <strong>Formatear fecha</strong> con
+                  <strong>Fecha actual</strong> y formato personalizado
+                  <code>yyyyMMddHHmmssSSS</code>. Después agrega
+                  <strong>Texto</strong> con <code>sms-</code> seguido de esa
+                  fecha. Renombra el resultado como <code>EventId</code>.
                 </li>
                 <li>
-                  En <strong>Obtener contenido de URL</strong>, usa el endpoint
-                  mostrado abajo, método <code>POST</code> y cuerpo
-                  <code>JSON</code> con ese diccionario.
+                  Agrega <strong>URL</strong> y pega:
+                  <code className="shortcut-endpoint">
+                    {apiURL}/capture-events
+                  </code>
                 </li>
                 <li>
-                  Agrega las cabeceras <code>Authorization</code> =
-                  <code>Bearer TU_TOKEN</code> y <code>Content-Type</code> =
+                  Agrega <strong>Obtener contenido de URL</strong> y toca
+                  <strong>Mostrar más</strong>. Método: <code>POST</code>.
+                  Cuerpo de la solicitud: <code>JSON</code>.
+                </li>
+                <li>
+                  En <strong>Cabeceras</strong>, agrega
+                  <code>Authorization</code> con
+                  <code>Bearer TU_TOKEN</code>. Sustituye
+                  <code>TU_TOKEN</code> por el acceso creado arriba. Agrega
+                  <code>Content-Type</code> con
                   <code>application/json</code>.
                 </li>
+                <li>
+                  En el cuerpo JSON agrega exactamente:
+                  <div className="shortcut-field-list">
+                    <span>
+                      <code>eventId</code>
+                      <b>Texto · EventId</b>
+                    </span>
+                    <span>
+                      <code>source</code>
+                      <b>Texto · sms</b>
+                    </span>
+                    <span>
+                      <code>observedAt</code>
+                      <b>Texto · ObservedAt</b>
+                    </span>
+                    <span>
+                      <code>message</code>
+                      <b>Texto · Entrada del atajo</b>
+                    </span>
+                  </div>
+                  Si <strong>Entrada del atajo</strong> es un objeto, tócala y
+                  elige la propiedad que mostró el contenido en la prueba.
+                </li>
+                <li>
+                  En la primera compra, agrega temporalmente
+                  <strong>Mostrar alerta</strong> después de la solicitud. Una
+                  respuesta con <code>durably_saved</code> confirma el envío;
+                  después elimina la alerta.
+                </li>
               </ol>
-              <p className="small-note">
-                Si la prueba de ubicación mostró todas las propiedades, agrega
-                <code>location</code> con latitud, longitud, precisión y su
-                propia fecha ISO 8601. Si no, omite el objeto completo.
+              <p className="shortcut-result">
+                <strong>Versión inicial:</strong> déjala sin ubicación. Así una
+                falla de Localización no impide guardar el SMS. Añadiremos la
+                ubicación después del envío con una ruta independiente.
+              </p>
+            </div>
+          </details>
+          <details className="shortcut-api-guide">
+            <summary>Atajo real · pago con Wallet</summary>
+            <div>
+              <p className="shortcut-prerequisite">
+                <strong>Requisito:</strong> la prueba de Wallet mostró valor,
+                comercio, fecha y tarjeta. Apple no garantiza esos campos para
+                todas las tarjetas.
+              </p>
+              <ol className="shortcut-production-steps">
+                <li>
+                  Crea <strong>Automatización → Transacción</strong>, selecciona
+                  una sola tarjeta y elige
+                  <strong>Ejecutar inmediatamente</strong>.
+                </li>
+                <li>
+                  Crea <code>ObservedAt</code> y <code>EventId</code> igual que
+                  en el atajo de SMS, usando el prefijo <code>wallet-</code>.
+                </li>
+                <li>
+                  Multiplica el valor de Wallet por <code>100</code> y redondea
+                  a cero decimales. Envíalo como texto en
+                  <code>amountMinor</code>.
+                </li>
+                <li>
+                  Usa el mismo endpoint, método, cabeceras y token. En el JSON
+                  agrega:
+                  <div className="shortcut-field-list">
+                    <span>
+                      <code>eventId</code>
+                      <b>EventId</b>
+                    </span>
+                    <span>
+                      <code>source</code>
+                      <b>wallet</b>
+                    </span>
+                    <span>
+                      <code>observedAt</code>
+                      <b>ObservedAt</b>
+                    </span>
+                    <span>
+                      <code>date</code>
+                      <b>Fecha · yyyy-MM-dd</b>
+                    </span>
+                    <span>
+                      <code>amountMinor</code>
+                      <b>Valor × 100</b>
+                    </span>
+                    <span>
+                      <code>currency</code>
+                      <b>COP</b>
+                    </span>
+                    <span>
+                      <code>merchant</code>
+                      <b>Comercio de Wallet</b>
+                    </span>
+                    <span>
+                      <code>instrumentHint</code>
+                      <b>Alias de la tarjeta</b>
+                    </span>
+                    <span>
+                      <code>kind</code>
+                      <b>expense</b>
+                    </span>
+                  </div>
+                </li>
+              </ol>
+              <p className="shortcut-result">
+                Si la prueba no mostró valor o comercio, no existe un atajo
+                automático completo para esa tarjeta. Déjalo desactivado: el SMS
+                Bancolombia y el extracto seguirán cubriendo el pago.
               </p>
             </div>
           </details>
@@ -2416,9 +2528,9 @@ function Settings({
             transferencia. Si faltan datos, la captura aparecerá en Revisión.
           </p>
           <p className="small-note">
-            Agrega ubicación únicamente si la prueba mostró todas sus
-            propiedades. Si Localización está desactivada o incompleta, omite el
-            objeto <code>location</code> completo.
+            En la primera versión de los atajos, omite <code>location</code>.
+            Así el movimiento se guarda incluso si Localización está
+            desactivada, tarda o devuelve datos incompletos.
           </p>
           {health?.pending.length ? (
             <div className="notice">
