@@ -15,7 +15,8 @@ function readStorage<T>(key: string, fallback: T): T {
   try { return JSON.parse(localStorage.getItem(key) ?? "null") ?? fallback; }
   catch { return fallback; }
 }
-function loadReviewSession(fallback: string[]) {
+function loadReviewSession(fallback: string[], reset: boolean) {
+  if (reset) { saveReviewSession([]); return []; }
   try {
     const parsed = JSON.parse(localStorage.getItem(REVIEW_PROGRESS_KEY) ?? sessionStorage.getItem(LEGACY_REVIEW_SESSION_KEY) ?? "null");
     if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
@@ -72,7 +73,9 @@ export function ReviewDesk({ state, act, edit, stale }: {
 }) {
   const rawPending = state.observations.filter((observation) => observation.status === "review");
   const rawPendingIds = rawPending.map((observation) => observation.id);
-  const [sessionIds, setSessionIds] = useState<string[]>(() => loadReviewSession(rawPendingIds));
+  const hasReviewHistory = state.audit.some((entry) => ["merge", "separate", "ignore"].includes(entry.action));
+  const resetReviewSession = !rawPending.length && !hasReviewHistory;
+  const [sessionIds, setSessionIds] = useState<string[]>(() => loadReviewSession(rawPendingIds, resetReviewSession));
   const [resolvedLocally, setResolvedLocally] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<Filters>(() => readStorage(REVIEW_FILTER_KEY, emptyFilters));
   const [activeId, setActiveId] = useState(() => readStorage(REVIEW_ACTIVE_KEY, ""));
@@ -88,13 +91,17 @@ export function ReviewDesk({ state, act, edit, stale }: {
       return next.size === current.size ? current : next;
     });
     setSessionIds((current) => {
+      if (resetReviewSession) {
+        if (current.length) saveReviewSession([]);
+        return current.length ? [] : current;
+      }
       const pendingIds = new Set(rawPendingIds), currentIds = new Set(current);
       const unresolved = current.filter((id) => pendingIds.has(id));
       const incoming = rawPendingIds.filter((id) => !currentIds.has(id));
       const next = !current.length || (!unresolved.length && incoming.length) ? rawPendingIds : incoming.length ? [...current, ...incoming] : current;
       if (next !== current) saveReviewSession(next); return next;
     });
-  }, [state.observations]);
+  }, [state.observations, resetReviewSession]);
 
   const pending = rawPending.filter((observation) => !resolvedLocally.has(observation.id));
   const unresolvedSession = new Set(pending.map((observation) => observation.id));

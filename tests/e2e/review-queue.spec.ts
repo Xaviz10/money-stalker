@@ -6,6 +6,26 @@ test.beforeEach(async ({ request }) => {
   await request.post(`${apiBase}/test/reset`);
 });
 
+test("clears progress from a deleted review queue", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "money-stalker.review-progress.v2",
+      JSON.stringify(Array.from({ length: 172 }, (_, index) => `old-${index}`)),
+    );
+  });
+  await page.goto("./#/revisar");
+  await expect(page.getByRole("heading", { name: "Todo en su lugar" })).toBeVisible();
+  await expect(page.getByText("172 resueltas", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Progreso guardado", { exact: true })).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        localStorage.getItem("money-stalker.review-progress.v2"),
+      ),
+    )
+    .toBe("[]");
+});
+
 test("review queue shows progress and registers repeated purchases individually or in a batch", async ({
   page,
   request,
