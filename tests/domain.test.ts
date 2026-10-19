@@ -19,6 +19,35 @@ describe('exact COP amounts and dates', () => {
   it('uses Bogota dates and clamps payday at month end', () => { expect(bogotaDate(new Date('2026-10-01T02:00:00Z'))).toBe('2026-09-30'); expect(nextPayday('2026-02-10', 31)).toBe('2026-02-28'); expect(nextPayday('2026-12-31', 31)).toBe('2027-01-31'); });
 });
 describe('commitments and balanced journal', () => {
+  it('keeps pre-opening history visible without changing current balances', () => {
+    const s = setup();
+    addTransaction(s, { id: 'old-bank', accountId: 'bank', date: '2025-12-20', kind: 'expense', amountMinor: '25000000', merchant: 'Compra histórica' }, at);
+    addTransaction(s, { id: 'old-card', accountId: 'card', date: '2025-12-21', kind: 'expense', amountMinor: '30000000', merchant: 'Compra histórica con tarjeta', status: 'provisional' }, at);
+    const d = dashboard(s, '2026-10-17');
+    expect(s.transactions.map(t => t.id)).toEqual(['old-bank', 'old-card']);
+    expect(d.balances.bank).toBe('100000000');
+    expect(d.balances.card).toBe('0');
+    expect(d.cardDebtMinor).toBe('0');
+    expect(d.cards[0].unconfirmedMinor).toBe('0');
+    expect(d.availableMinor).toBe('100000000');
+  });
+  it('applies each side of a transfer only after that account snapshot', () => {
+    const s = emptyState();
+    configure(s, 'accounts', { id: 'early', name: 'Cuenta enero', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01' });
+    configure(s, 'accounts', { id: 'late', name: 'Cuenta junio', kind: 'bank', openingMinor: '50000000', openingDate: '2026-06-01' });
+    addTransaction(s, { id: 'between-snapshots', accountId: 'early', counterAccountId: 'late', date: '2026-03-01', kind: 'transfer', amountMinor: '20000000' }, at);
+    const d = dashboard(s, '2026-10-17');
+    expect(d.balances.early).toBe('80000000');
+    expect(d.balances.late).toBe('50000000');
+  });
+  it('does not reserve pre-opening evidence that still needs review', () => {
+    const s = setup();
+    ingest(s, observation('historical-review', { date: '2025-12-20' }), at);
+    ingest(s, observation('historical-match', { date: '2025-12-21' }), at);
+    expect(s.transactions).toHaveLength(1);
+    expect(s.observations[1].status).toBe('review');
+    expect(dashboard(s, '2026-10-17').uncertainMinor).toBe('0');
+  });
   it('card purchase reserves once and repayment is not another expense', () => {
     const s = setup(); addTransaction(s, purchase('p'), at);
     expect(dashboard(s, '2026-10-17').availableMinor).toBe('80000000');

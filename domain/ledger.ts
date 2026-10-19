@@ -7,12 +7,10 @@ const merchantKey = (value: string) => value.normalize('NFKC').trim().toLocaleLo
 const findAccount = (state: State, id: string) => requireValue(state.accounts.find(a => a.id === id), 'Cuenta desconocida');
 function entries(state: State, t: TransactionInput): Entry[] {
   const account = findAccount(state, t.accountId);
-  if (t.date < account.openingDate) throw new DomainError('El movimiento es anterior al saldo inicial de la cuenta');
   const line = (accountId: string, debit: boolean): Entry => ({ accountId, debitMinor: debit ? t.amountMinor : '0', creditMinor: debit ? '0' : t.amountMinor });
   if (t.kind === 'transfer') {
     const other = findAccount(state, requireValue(t.counterAccountId, 'Selecciona la cuenta destino'));
     if (other.id === account.id) throw new DomainError('Selecciona dos cuentas distintas');
-    if (t.date < other.openingDate) throw new DomainError('La transferencia es anterior al saldo inicial del destino');
     return [line(other.id, true), line(account.id, false)];
   }
   if (!state.categories.some(c => c.id === t.categoryId)) throw new DomainError('Categoría desconocida');
@@ -170,6 +168,9 @@ export function dashboard(state: State, today: string) {
   const active = state.transactions.filter(t => !t.voided && t.date <= today);
   for (const t of active) for (const e of t.entries) {
     const a = state.accounts.find(a => a.id === e.accountId); if (!a) continue;
+    // The opening balance is a dated snapshot. Earlier movements stay visible as
+    // history, but are already represented by that snapshot and must not be counted again.
+    if (t.date < a.openingDate) continue;
     const delta = BigInt(e.debitMinor) - BigInt(e.creditMinor);
     balances[a.id] += a.kind === 'credit' ? -delta : delta;
   }
@@ -179,7 +180,11 @@ export function dashboard(state: State, today: string) {
   const dueBills = state.bills.filter(b => !b.paidTransactionId && b.dueDate < payday);
   const bills = dueBills.reduce((sum, b) => sum + BigInt(b.amountMinor), 0n);
   const pending = state.observations.filter(o => o.status === 'review');
-  const uncertain = pending.filter(o => o.kind === 'expense' && o.amountMinor).reduce((sum, o) => sum + BigInt(o.amountMinor!), 0n);
+  const uncertain = pending.filter(o => {
+    if (o.kind !== 'expense' || !o.amountMinor) return false;
+    const account = o.accountId ? state.accounts.find(a => a.id === o.accountId) : undefined;
+    return !account || !o.date || o.date >= account.openingDate;
+  }).reduce((sum, o) => sum + BigInt(o.amountMinor!), 0n);
   const month = active.filter(t => t.date.startsWith(today.slice(0, 7)));
   const spending = month.filter(t => ['expense', 'refund'].includes(t.kind)).reduce((sum, t) => sum + (t.kind === 'refund' ? -1n : 1n) * BigInt(t.amountMinor), 0n);
   const income = month.filter(t => t.kind === 'income').reduce((sum, t) => sum + BigInt(t.amountMinor), 0n);
@@ -192,13 +197,13 @@ export function dashboard(state: State, today: string) {
     balances: Object.fromEntries(Object.entries(balances).map(([k, v]) => [k, v.toString()])),
     cards: state.accounts.filter(a => a.kind === 'credit').map(a => {
       // Statement confirmation, not an inferred closing day, establishes posted purchases.
-      const unconfirmed = active.filter(t => t.accountId === a.id && t.kind === 'expense' && t.status === 'provisional').reduce((s, t) => s + BigInt(t.amountMinor), 0n);
+      const unconfirmed = active.filter(t => t.accountId === a.id && t.date >= a.openingDate && t.kind === 'expense' && t.status === 'provisional').reduce((s, t) => s + BigInt(t.amountMinor), 0n);
       const [year, month, day] = today.split('-').map(Number);
       const closeDate = (y: number, m: number) => `${y}-${String(m).padStart(2, '0')}-${String(Math.min(a.closingDay!, new Date(Date.UTC(y, m, 0)).getUTCDate())).padStart(2, '0')}`;
       let cutoff: string | undefined;
       if (a.closingDay) { cutoff = closeDate(year, month); if (cutoff >= today) cutoff = closeDate(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1); }
       let billed = cutoff && a.openingDate <= cutoff ? BigInt(a.openingMinor) : 0n;
-      if (cutoff) for (const t of active) for (const e of t.entries.filter(e => e.accountId === a.id)) {
+      if (cutoff) for (const t of active.filter(t => t.date >= a.openingDate)) for (const e of t.entries.filter(e => e.accountId === a.id)) {
         const delta = BigInt(e.creditMinor) - BigInt(e.debitMinor);
         if (t.date <= cutoff || delta < 0n) billed += delta;
       }

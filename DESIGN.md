@@ -233,6 +233,8 @@ Keyboard focus uses a three-pixel outline with a three-pixel offset on light sur
 
 `DisclosureEditor` places a native inline disclosure beneath a saved account or capture-card row. Its summary uses the literal action “Editar cuenta” or “Editar tarjeta”; opening it reveals a prefilled form on the primary-soft surface. Saving updates the existing record ID and returns to the compact saved row. Protect opening balances and account types once movements exist, and explain that correction movements preserve financial history.
 
+The opening-balance date is the account's financial snapshot. Older imported movements remain available as history without changing the current balance. Explain that consequence beside account creation and inside the import dialog before confirmation.
+
 The accounts route shows saved products first. Creation, margin/categories, automatic capture, and bills live in a single `Administrar` hub made from native disclosures. Keep these sections collapsed until requested, except `Agregar producto` on an empty account list. A disclosure summary names the job and describes its contents; do not expose every form at once. Automatic capture is one two-step job: associate the cards seen in SMS or Wallet, then create the iPhone access used by Shortcuts.
 
 ### Navigation

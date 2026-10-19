@@ -46,6 +46,8 @@ Source/candidate review must show amount/date/account context, explain statement
 
 The Movements route is a product register. Scope it to one account or card, show that product’s balance or debt and movement count, and use the account rail or its mobile disclosure as the single scope control. Keep the ledger structure visible when the selected product has no movements. Search, import, export, and new movements use the current product; transfers use their direction relative to it. Import opens as a modal with a required preview and confirmation. On phones, rows keep merchant and amount visible together and place date, category, and status beneath them.
 
+An account opening balance is a dated snapshot. Movements before that date remain visible in the product register and exports, but do not change the current balance, available amount, card debt, or unconfirmed card amount. Import help must explain this before confirmation.
+
 ## Responsive behavior and accessibility
 
 Desktop has top navigation, an account rail, main ledger, and right insights workspace. Below 1100px the insights move below the ledger. At 850px and below the rail is an in-flow, scrollable disclosure opened by “Mis cuentas y tarjetas.” It closes after selection. Narrow transactions keep merchant and amount together and move account/date beneath the name.

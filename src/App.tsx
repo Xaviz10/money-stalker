@@ -548,6 +548,12 @@ function TransactionTable({
                 t.kind === "refund" ||
                 (t.kind === "transfer" &&
                   t.counterAccountId === selectedAccount);
+              const selectedProduct = state.accounts.find(
+                (account) => account.id === selectedAccount,
+              );
+              const historical = Boolean(
+                selectedProduct && t.date < selectedProduct.openingDate,
+              );
               const otherAccount =
                 t.kind === "transfer"
                   ? state.accounts.find(
@@ -584,9 +590,28 @@ function TransactionTable({
                       : (state.categories.find((c) => c.id === t.categoryId)
                           ?.name ?? "Sin categoría")}
                   </td>
-                  <td className="register-status">
-                    <Badge tone={t.status === "posted" ? "green" : "amber"}>
-                      {t.status === "posted" ? "Registrado" : "Por confirmar"}
+                  <td
+                    className="register-status"
+                    title={
+                      historical
+                        ? "Anterior al saldo inicial; no cambia el saldo actual"
+                        : undefined
+                    }
+                  >
+                    <Badge
+                      tone={
+                        historical
+                          ? ""
+                          : t.status === "posted"
+                            ? "green"
+                            : "amber"
+                      }
+                    >
+                      {historical
+                        ? "Histórico"
+                        : t.status === "posted"
+                          ? "Registrado"
+                          : "Por confirmar"}
                     </Badge>
                   </td>
                   <td
@@ -1171,7 +1196,9 @@ function ImportDialog({
           </select>
         </Field>
         <p className="small-note">
-          Hasta 5 MB y 5.000 filas. Nada se agrega sin tu confirmación.
+          Hasta 5 MB y 5.000 filas. Nada se agrega sin tu confirmación. Los
+          movimientos anteriores al saldo inicial quedarán en el historial sin
+          cambiar el saldo actual.
         </p>
       </AppForm>
       <details className="import-help">
@@ -1242,19 +1269,31 @@ function ImportDialog({
                 </tr>
               </thead>
               <tbody>
-                {batch.rows?.map((row) => (
-                  <tr key={row.row}>
-                    <td>{row.row}</td>
-                    <td>{row.observation?.merchant ?? "—"}</td>
-                    <td>{row.observation?.date ?? "—"}</td>
-                    <td>
-                      {row.observation?.amountMinor
-                        ? formatCOP(row.observation.amountMinor)
-                        : "—"}
-                    </td>
-                    <td>{row.error ?? "Lista para conciliar"}</td>
-                  </tr>
-                ))}
+                {batch.rows?.map((row) => {
+                  const historical = Boolean(
+                    account &&
+                      row.observation?.date &&
+                      row.observation.date < account.openingDate,
+                  );
+                  return (
+                    <tr key={row.row}>
+                      <td>{row.row}</td>
+                      <td>{row.observation?.merchant ?? "—"}</td>
+                      <td>{row.observation?.date ?? "—"}</td>
+                      <td>
+                        {row.observation?.amountMinor
+                          ? formatCOP(row.observation.amountMinor)
+                          : "—"}
+                      </td>
+                      <td>
+                        {row.error ??
+                          (historical
+                            ? "Histórico · no cambia el saldo"
+                            : "Lista para conciliar")}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1797,8 +1836,8 @@ function Settings({
               </p>
             )}
             <p className="small-note">
-              El saldo inicial debe ser anterior a los movimientos que vas a
-              importar.
+              Esta fecha fija el punto de partida del saldo. Los movimientos
+              anteriores quedarán en el historial sin cambiar el saldo actual.
             </p>
           </AppForm>
         </SettingsSection>
