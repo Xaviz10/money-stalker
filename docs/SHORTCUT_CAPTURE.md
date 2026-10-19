@@ -61,7 +61,7 @@ The Wallet automation sends structured values supplied by the transaction trigge
 }
 ```
 
-`amountMinor` is an integer string in centavos. The alias in `instrumentHint` points to the corresponding debit or credit account configured under **Cuentas y ajustes → Tarjetas y alias de captura**. If Wallet omits amount, merchant or another field on the real device, the shortcut still sends the event and Money Stalker places it in Review.
+`amountMinor` is an integer string in centavos. The alias in `instrumentHint` points to the corresponding debit or credit account configured under **Cuentas y ajustes → Configurar capturas automáticas**. If Wallet omits amount, merchant or another field on the real device, the shortcut still sends the event and Money Stalker places it in Review.
 
 ## Location behavior
 
@@ -72,4 +72,3 @@ The server preserves the coordinates, accuracy and location timestamp on the sou
 ## Device validation still required
 
 Test SMS and Wallet separately while the phone is locked and unlocked, with location allowed and denied, offline and online, and with physical, online and Watch payments when relevant. Personal automations must be configured on each phone and may expose different Wallet fields by card or payment route.
-

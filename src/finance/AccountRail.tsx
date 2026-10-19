@@ -127,9 +127,6 @@ export function AccountRail({
           {balances ? formatCOP(netWorthMinor(state.accounts, balances)) : "—"}
         </strong>
         <small>Activos menos deuda de tarjetas.</small>
-        <a href="#/design-system">
-          Design system <Icon name="arrow" size={14} />
-        </a>
       </div>
     </aside>
   );

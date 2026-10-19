@@ -6,6 +6,7 @@ test.beforeEach(async ({ request }) => {
 test("account → capture → import → review → export works on the project path", async ({
   page,
   request,
+  isMobile,
 }) => {
   await page.goto("./#/cuentas");
   const create = page.locator(".settings-section").filter({
@@ -64,10 +65,12 @@ test("account → capture → import → review → export works on the project 
           .length,
     )
     .toBe(1);
-  await page.getByRole("link", { name: "Importar", exact: true }).click();
-  await page
-    .getByLabel("Cuenta del archivo")
-    .selectOption(state.accounts[0].id);
+  await page.getByRole("link", { name: "Movimientos", exact: true }).click();
+  await page.getByRole("button", { name: "Importar archivo" }).first().click();
+  const importDialog = page.getByRole("dialog");
+  await expect(importDialog).toContainText(
+    "El archivo se agregará a Ahorros de prueba",
+  );
   await page.getByLabel("Archivo CSV o Excel").setInputFiles({
     name: "sample.csv",
     mimeType: "text/csv",
@@ -82,6 +85,7 @@ test("account → capture → import → review → export works on the project 
   await expect(
     page.getByText("Completado", { exact: true }).first(),
   ).toBeVisible();
+  await importDialog.getByRole("button", { name: "Cerrar" }).click();
   await page.getByRole("link", { name: /Revisar/ }).click();
   await page.getByRole("button", { name: /Unir con Café de ejemplo/ }).click();
   await expect(
@@ -103,7 +107,12 @@ test("account → capture → import → review → export works on the project 
     name: "Movimientos del producto seleccionado",
   });
   await expect(ledger.locator("tbody tr")).toHaveCount(1);
-  await page.getByLabel("Ver producto").selectOption("empty-wallet");
+  if (isMobile)
+    await page.getByRole("button", { name: /Ahorros de prueba/ }).click();
+  await page
+    .locator(".rail-account")
+    .filter({ hasText: "Bolsillo sin movimientos" })
+    .click();
   await expect(
     page.getByRole("heading", {
       name: "Bolsillo sin movimientos",
@@ -111,12 +120,25 @@ test("account → capture → import → review → export works on the project 
     }),
   ).toBeVisible();
   await expect(
-    ledger.getByRole("columnheader", { name: "Fecha" }),
+    ledger.getByRole("columnheader", { name: "Movimiento" }),
+  ).toBeVisible();
+  await expect(
+    ledger.getByRole("columnheader", { name: "Valor" }),
   ).toBeVisible();
   await expect(ledger).toContainText(
-    "Aún no hay movimientos en Bolsillo sin movimientos",
+    "Este producto todavía no tiene movimientos",
   );
-  await page.getByLabel("Ver producto").selectOption(state.accounts[0].id);
+  await expect(
+    ledger.getByRole("button", { name: "Agregar movimiento" }),
+  ).toBeVisible();
+  if (isMobile)
+    await page
+      .getByRole("button", { name: /Bolsillo sin movimientos/ })
+      .click();
+  await page
+    .locator(".rail-account")
+    .filter({ hasText: "Ahorros de prueba" })
+    .click();
   await page
     .getByRole("button", { name: "Café de ejemplo", exact: true })
     .click();

@@ -32,7 +32,7 @@ Variants: primary for the main action, secondary for an alternate action, quiet 
 
 Use `DisclosureEditor` for inline editing beneath a saved settings row. Keep the saved summary visible, prefill every field, preserve the record ID, and name the submit action “Guardar cambios.”
 
-On the accounts route, keep saved products visible above the `Administrar` hub. Group creation, margin/categories, capture aliases, bills, and iPhone setup into native disclosure sections. Open creation automatically only when there are no products; otherwise let the user reveal one task at a time.
+On the accounts route, keep saved products visible above the `Administrar` hub. Group creation, margin/categories, automatic capture, and bills into native disclosure sections. Automatic capture sequences card aliases and iPhone access inside one disclosure. Open creation automatically only when there are no products; otherwise let the user reveal one task at a time.
 
 ## Financial patterns
 
@@ -44,7 +44,7 @@ The dashboard's available amount is global. Selecting a rail account filters act
 
 Source/candidate review must show amount/date/account context, explain statement-driven amount changes, require an explicit decision, preserve failure state, and offer correction undo. Initial loading, incomplete evidence, and stale refresh are distinct from an empty ledger or a zero balance.
 
-The Movements route is a product register. Scope it to one account or card, show that product’s balance or debt and movement count, and let both the account rail and `Ver producto` select switch the scope without routing back to Resumen. Keep the ledger and its headers visible when the selected product has no movements. Search is local to the current product, transfers use their direction relative to that product, and new movements default to it.
+The Movements route is a product register. Scope it to one account or card, show that product’s balance or debt and movement count, and use the account rail or its mobile disclosure as the single scope control. Keep the ledger structure visible when the selected product has no movements. Search, import, export, and new movements use the current product; transfers use their direction relative to it. Import opens as a modal with a required preview and confirmation. On phones, rows keep merchant and amount visible together and place date, category, and status beneath them.
 
 ## Responsive behavior and accessibility
 

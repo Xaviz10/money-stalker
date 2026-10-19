@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -23,7 +24,7 @@ import {
   login,
   logout,
 } from "./auth";
-import { Dashboard, SurfaceLoading } from "./finance/Dashboard";
+import { Dashboard, displayDate, SurfaceLoading } from "./finance/Dashboard";
 import { ReviewDesk } from "./finance/ReviewDesk";
 import { AccountRail } from "./finance/AccountRail";
 import { DesignSystem } from "./design-system/DesignSystem";
@@ -39,6 +40,7 @@ import {
 type Summary = ReturnType<typeof dashboard>;
 type Batch = {
   id: string;
+  accountId?: string;
   filename: string;
   profile?: string;
   status: string;
@@ -63,7 +65,6 @@ const nav = [
   ["resumen", "Resumen", "overview"],
   ["movimientos", "Movimientos", "arrows"],
   ["revisar", "Revisar", "check"],
-  ["importar", "Importar", "upload"],
   ["cuentas", "Cuentas y ajustes", "wallet"],
 ] as const;
 function Empty({ title, children }: { title: string; children: ReactNode }) {
@@ -143,8 +144,12 @@ export function App() {
   const [signedIn, setSignedIn] = useState(false),
     [ready, setReady] = useState(false),
     [error, setError] = useState("");
-  const [page, setPage] = useState(location.hash.slice(2) || "resumen");
+  const initialPage = location.hash.slice(2) || "resumen";
+  const [page, setPage] = useState(
+    initialPage === "importar" ? "movimientos" : initialPage,
+  );
   const [editing, setEditing] = useState<Transaction | Observation | "new">();
+  const [importing, setImporting] = useState(initialPage === "importar");
   const [loading, setLoading] = useState(false),
     [notice, setNotice] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<string>();
@@ -185,7 +190,14 @@ export function App() {
         setError(e.message);
         setReady(true);
       });
-    const route = () => setPage(location.hash.slice(2) || "resumen");
+    const route = () => {
+      const next = location.hash.slice(2) || "resumen";
+      if (next === "importar") {
+        setPage("movimientos");
+        setImporting(true);
+        history.replaceState(null, "", "#/movimientos");
+      } else setPage(next);
+    };
     const expired = () => {
       setSignedIn(false);
       setState(emptyState());
@@ -405,11 +417,9 @@ export function App() {
                     ? "Cada movimiento, con su historia y sin duplicados."
                     : page === "revisar"
                       ? "Compara las evidencias. Tú tienes la última palabra."
-                      : page === "importar"
-                        ? "Del archivo original a tus movimientos."
-                        : page === "design-system"
-                          ? "Las reglas y componentes que mantienen Money Stalker consistente."
-                          : "Cuentas bancarias, tarjetas y tu margen de tranquilidad."}
+                      : page === "design-system"
+                        ? "Las reglas y componentes que mantienen Money Stalker consistente."
+                        : "Cuentas bancarias, tarjetas y tu margen de tranquilidad."}
                 </p>
               </div>
             </div>
@@ -449,8 +459,8 @@ export function App() {
               state={state}
               balances={summary?.balances}
               selectedAccount={movementAccount}
-              selectAccount={setMovementAccount}
               open={setEditing}
+              openImport={() => setImporting(true)}
               onError={setError}
             />
           )}
@@ -465,16 +475,12 @@ export function App() {
             ) : (
               <SurfaceLoading failed={stale} />
             ))}
-          {page === "importar" && <Imports state={state} refresh={refresh} />}
           {page === "cuentas" && (
             <Settings state={state} summary={summary} refresh={refresh} />
           )}
           {page === "design-system" && <DesignSystem />}
           <footer className="footer">
             <span>Money Stalker · COP · Colombia</span>
-            <a href="#/design-system">
-              Design system <Icon name="arrow" size={14} />
-            </a>
           </footer>
         </main>
       </div>
@@ -493,6 +499,14 @@ export function App() {
           }}
         />
       )}
+      {importing && movementAccount && (
+        <ImportDialog
+          state={state}
+          accountId={movementAccount}
+          refresh={refresh}
+          close={() => setImporting(false)}
+        />
+      )}
     </div>
   );
 }
@@ -502,12 +516,16 @@ function TransactionTable({
   state,
   selectedAccount,
   emptyMessage,
+  emptyDescription,
+  emptyActions,
   open,
 }: {
   transactions: Transaction[];
   state: State;
   selectedAccount: string;
   emptyMessage: string;
+  emptyDescription: string;
+  emptyActions?: ReactNode;
   open: (t: Transaction) => void;
 }) {
   return (
@@ -543,9 +561,9 @@ function TransactionTable({
               return (
                 <tr key={t.id}>
                   <td className="register-date">
-                    <time dateTime={t.date}>{t.date}</time>
+                    <time dateTime={t.date}>{displayDate(t.date)}</time>
                   </td>
-                  <td>
+                  <td className="register-movement">
                     <button
                       className="transaction-name"
                       onClick={() => open(t)}
@@ -560,18 +578,20 @@ function TransactionTable({
                     </button>
                     {t.note && <small>{t.note}</small>}
                   </td>
-                  <td>
+                  <td className="register-category">
                     {t.kind === "transfer"
                       ? (otherAccount?.name ?? "Transferencia")
-                      : state.categories.find((c) => c.id === t.categoryId)
-                          ?.name}
+                      : (state.categories.find((c) => c.id === t.categoryId)
+                          ?.name ?? "Sin categoría")}
                   </td>
-                  <td>
+                  <td className="register-status">
                     <Badge tone={t.status === "posted" ? "green" : "amber"}>
                       {t.status === "posted" ? "Registrado" : "Por confirmar"}
                     </Badge>
                   </td>
-                  <td className={`number amount ${incoming ? "positive" : ""}`}>
+                  <td
+                    className={`number amount register-value ${incoming ? "positive" : ""}`}
+                  >
                     {incoming ? "+" : "−"}
                     {formatCOP(t.amountMinor)}
                   </td>
@@ -582,12 +602,10 @@ function TransactionTable({
             <tr className="register-empty-row">
               <td colSpan={5}>
                 <div>
-                  <Icon name="arrows" size={24} />
+                  <Eyes className="register-empty-eyes" />
                   <strong>{emptyMessage}</strong>
-                  <span>
-                    La tabla permanece aquí para que siempre sepas qué producto
-                    estás consultando.
-                  </span>
+                  <span>{emptyDescription}</span>
+                  {emptyActions}
                 </div>
               </td>
             </tr>
@@ -601,19 +619,40 @@ function Movements({
   state,
   balances,
   selectedAccount,
-  selectAccount,
   open,
+  openImport,
   onError,
 }: {
   state: State;
   balances?: Record<string, string>;
   selectedAccount?: string;
-  selectAccount: (id: string) => void;
-  open: (t: Transaction) => void;
+  open: (t: Transaction | "new") => void;
+  openImport: () => void;
   onError: (e: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const account = state.accounts.find((a) => a.id === selectedAccount);
+  const accountTransactions = useMemo(
+    () =>
+      state.transactions
+        .filter(
+          (t) =>
+            !t.voided &&
+            (t.accountId === selectedAccount ||
+              t.counterAccountId === selectedAccount),
+        )
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [selectedAccount, state.transactions],
+  );
+  const transactions = useMemo(
+    () =>
+      accountTransactions.filter((t) =>
+        `${t.merchant ?? ""} ${t.note ?? ""} ${t.date}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+      ),
+    [accountTransactions, search],
+  );
   if (!account)
     return (
       <section className="panel movement-register no-products">
@@ -626,20 +665,11 @@ function Movements({
         </a>
       </section>
     );
-  const accountTransactions = state.transactions
-    .filter(
-      (t) =>
-        !t.voided &&
-        (t.accountId === account.id || t.counterAccountId === account.id),
-    )
-    .sort((a, b) => b.date.localeCompare(a.date));
-  const transactions = accountTransactions.filter((t) =>
-    `${t.merchant ?? ""} ${t.note ?? ""} ${t.date}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
   return (
     <section className="panel movement-register">
+      <p className="sr-only" aria-live="polite">
+        Mostrando movimientos de {account.name}
+      </p>
       <header className="register-product-header">
         <div className={`register-product-icon ${account.kind}`}>
           <Icon
@@ -678,38 +708,25 @@ function Movements({
         </div>
       </header>
       <div className="register-toolbar">
-        <Field label="Ver producto">
-          <select
-            value={account.id}
-            onChange={(e) => selectAccount(e.target.value)}
-          >
-            {state.accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} ·{" "}
-                {a.kind === "credit"
-                  ? "crédito"
-                  : a.kind === "bank"
-                    ? "cuenta"
-                    : "efectivo"}
-              </option>
-            ))}
-          </select>
-        </Field>
         <Field label="Buscar en este producto">
           <input
-            aria-label="Buscar movimientos"
             type="search"
             placeholder="Comercio, nota o fecha…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </Field>
-        <div className="register-export">
-          <span>Exportar todo</span>
+        <div className="register-actions">
+          <button className="button secondary" onClick={openImport}>
+            <Icon name="upload" size={16} />
+            Importar archivo
+          </button>
+          <span className="register-action-label">Exportar producto</span>
           <button
             className="button secondary"
+            disabled={!accountTransactions.length}
             onClick={() =>
-              void download("csv").catch((e) => onError(e.message))
+              void download("csv", account.id).catch((e) => onError(e.message))
             }
           >
             <Icon name="download" size={16} />
@@ -717,10 +734,12 @@ function Movements({
           </button>
           <button
             className="button secondary"
+            disabled={!accountTransactions.length}
             onClick={() =>
-              void download("xlsx").catch((e) => onError(e.message))
+              void download("xlsx", account.id).catch((e) => onError(e.message))
             }
           >
+            <Icon name="download" size={16} />
             Excel
           </button>
         </div>
@@ -732,7 +751,26 @@ function Movements({
         emptyMessage={
           search
             ? "No hay resultados para esta búsqueda"
-            : `Aún no hay movimientos en ${account.name}`
+            : "Este producto todavía no tiene movimientos"
+        }
+        emptyDescription={
+          search
+            ? "Prueba con otro comercio, nota o fecha."
+            : "Agrega el primero manualmente o importa un extracto de este producto."
+        }
+        emptyActions={
+          search ? undefined : (
+            <div className="register-empty-actions">
+              <button className="button primary" onClick={() => open("new")}>
+                <Icon name="plus" size={16} />
+                Agregar movimiento
+              </button>
+              <button className="button secondary" onClick={openImport}>
+                <Icon name="upload" size={16} />
+                Importar archivo
+              </button>
+            </div>
+          )
         }
         open={open}
       />
@@ -987,18 +1025,25 @@ function TransactionDialog({
   );
 }
 
-function Imports({
+function ImportDialog({
   state,
+  accountId,
   refresh,
+  close,
 }: {
   state: State;
+  accountId: string;
   refresh: () => Promise<void>;
+  close: () => void;
 }) {
+  const dialog = useRef<HTMLDialogElement>(null);
   const [batch, setBatch] = useState<Batch>(),
     [list, setList] = useState<Batch[]>([]),
     [profiles, setProfiles] = useState<ImportProfile[]>([]),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [fileName, setFileName] = useState("");
+  const account = state.accounts.find((a) => a.id === accountId);
   const load = useCallback(
     async () => setList(await api<Batch[]>("/imports")),
     [],
@@ -1010,6 +1055,9 @@ function Imports({
     void api<ImportProfile[]>("/import-profiles")
       .then(setProfiles)
       .catch((e) => setError(e.message));
+  }, []);
+  useEffect(() => {
+    dialog.current?.showModal();
   }, []);
   useEffect(() => {
     if (batch?.status === "committing") {
@@ -1069,51 +1117,66 @@ function Imports({
     });
     await load();
   }
+  const accountImports = list.filter(
+    (item) => !item.accountId || item.accountId === accountId,
+  );
   return (
-    <>
-      <div className="notice">
+    <dialog
+      ref={dialog}
+      className="modal import-dialog"
+      onCancel={close}
+      onClose={close}
+    >
+      <div className="section-heading import-dialog-heading">
         <div>
-          <strong>Formato Bancolombia verificado</strong>
-          <br />
-          Reconocemos el extracto trimestral XLSX de cuenta de ahorros y el
-          formato de intercambio COP. Siempre verás una vista previa antes de
-          agregar movimientos.
+          <h2>Importar movimientos</h2>
+          <p>
+            El archivo se agregará a <strong>{account?.name}</strong> después de
+            que revises la vista previa.
+          </p>
         </div>
+        <button className="icon-button" onClick={close} aria-label="Cerrar">
+          <Icon name="close" />
+        </button>
       </div>
-      <div className="two-columns">
-        <section className="panel">
-          <h2>Importar archivo</h2>
-          <AppForm submit="Subir y previsualizar" onSubmit={upload}>
-            <Field label="Cuenta del archivo">
-              <select required name="accountId">
-                <option value="">Selecciona una cuenta</option>
-                {state.accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Archivo CSV o Excel">
-              <input name="file" type="file" required accept=".csv,.xlsx" />
-            </Field>
-            <Field label="Formato">
-              <select name="profile" defaultValue="auto">
-                <option value="auto">Detectar automáticamente</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <p className="small-note">
-              Hasta 5 MB y 5.000 filas. Revisa el resultado antes de confirmar.
-            </p>
-          </AppForm>
-        </section>
-        <section className="panel">
-          <h2>Formatos compatibles</h2>
+      <AppForm submit="Subir y previsualizar" onSubmit={upload}>
+        <input type="hidden" name="accountId" value={accountId} />
+        <Field label="Archivo CSV o Excel">
+          <span className="file-picker">
+            <input
+              name="file"
+              type="file"
+              required
+              accept=".csv,.xlsx"
+              onChange={(event) =>
+                setFileName(event.currentTarget.files?.[0]?.name ?? "")
+              }
+            />
+            <span className="file-picker-action">
+              <Icon name="upload" size={16} /> Elegir archivo
+            </span>
+            <small aria-live="polite">
+              {fileName || "Ningún archivo seleccionado"}
+            </small>
+          </span>
+        </Field>
+        <Field label="Formato">
+          <select name="profile" defaultValue="auto">
+            <option value="auto">Detectar automáticamente</option>
+            {profiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <p className="small-note">
+          Hasta 5 MB y 5.000 filas. Nada se agrega sin tu confirmación.
+        </p>
+      </AppForm>
+      <details className="import-help">
+        <summary>Formatos compatibles</summary>
+        <div>
           <p>
             <strong>Bancolombia:</strong> extracto trimestral XLSX de cuenta de
             ahorros, con fechas por página y valores firmados.
@@ -1131,15 +1194,15 @@ function Imports({
             transferencias cuando podemos identificar la cuenta destino. Si
             falta, aparecerán en Revisión. No se evalúan fórmulas.
           </p>
-        </section>
-      </div>
+        </div>
+      </details>
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
       {batch && (
-        <section className="panel">
+        <section className="import-preview">
           <div className="section-heading">
             <div>
               <h2>Vista previa · {batch.filename}</h2>
@@ -1243,9 +1306,9 @@ function Imports({
           </div>
         </section>
       )}
-      <section className="panel">
-        <h2>Archivos anteriores</h2>
-        {list.map((b) => (
+      <details className="import-help import-previous">
+        <summary>Archivos anteriores de {account?.name}</summary>
+        {accountImports.map((b) => (
           <button
             className="import-history"
             key={b.id}
@@ -1267,11 +1330,11 @@ function Imports({
             </Badge>
           </button>
         ))}
-        {!list.length && (
+        {!accountImports.length && (
           <p className="muted">Todavía no has subido archivos.</p>
         )}
-      </section>
-    </>
+      </details>
+    </dialog>
   );
 }
 
@@ -1790,10 +1853,11 @@ function Settings({
           </AppForm>
         </SettingsSection>
         <SettingsSection
-          title="Tarjetas y alias de captura"
-          description="Conecta los últimos dígitos de SMS y los alias de Wallet"
+          title="Configurar capturas automáticas"
+          description="Asocia tus tarjetas y conecta SMS, Wallet y ubicación"
           icon="card"
         >
+          <h3>1. Asocia las tarjetas que aparecen en tus mensajes</h3>
           <p className="small-note">
             Una tarjeta débito apunta a su cuenta bancaria; no crea un saldo
             nuevo. Agrega los últimos cuatro dígitos que aparecen en tus SMS,
@@ -1867,6 +1931,96 @@ function Settings({
               );
             })}
           </div>
+          <hr />
+          <h3>2. Conecta tu iPhone</h3>
+          <p>
+            Crea un acceso para tu dispositivo y úsalo en dos automatizaciones
+            de Atajos: una para el texto del SMS Bancolombia y otra para los
+            datos de Wallet. No necesitas enviar capturas de pantalla.
+          </p>
+          <AppForm
+            submit="Crear acceso para mi iPhone"
+            onSubmit={async (f) => {
+              const d = await post<{ token: string }>("/devices", {
+                name: str(f, "name"),
+              });
+              setToken(d.token);
+              await loadDevices();
+            }}
+          >
+            <Field label="Nombre del dispositivo">
+              <input
+                name="name"
+                required
+                placeholder="Mi iPhone"
+                maxLength={100}
+              />
+            </Field>
+          </AppForm>
+          {token && (
+            <div className="notice">
+              <div>
+                <strong>
+                  Copia este acceso ahora; no volverá a mostrarse.
+                </strong>
+                <code className="token">{token}</code>
+                <small>
+                  Endpoint: {apiURL}/capture-events · Cabecera Authorization:
+                  Bearer TOKEN
+                </small>
+                <br />
+                <button className="text-button" onClick={() => setToken("")}>
+                  Ya lo guardé
+                </button>
+              </div>
+            </div>
+          )}
+          {deviceError && (
+            <p className="error" role="alert">
+              {deviceError}
+            </p>
+          )}
+          {devices.map((d) => (
+            <div className="audit-row" key={d.id}>
+              <strong>{d.name}</strong>
+              <button
+                className="text-button"
+                disabled={d.revoked}
+                onClick={() =>
+                  void api(`/devices/${d.id}`, { method: "DELETE" })
+                    .then(loadDevices)
+                    .catch((e) => setDeviceError(e.message))
+                }
+              >
+                {d.revoked ? "Revocado" : "Revocar acceso"}
+              </button>
+            </div>
+          ))}
+          <p className="small-note">
+            Los SMS Bancolombia de compra con tarjeta, pago QR, pago desde
+            cuenta y transferencia se leen automáticamente. Si faltan datos, el
+            movimiento aparecerá en Revisión.
+          </p>
+          <p className="small-note">
+            Ambos atajos deben intentar obtener la ubicación actual. Si
+            Localización está desactivada o tarda demasiado, el movimiento se
+            envía de todas formas.
+          </p>
+          {health?.pending.length ? (
+            <div className="notice">
+              <div>
+                <strong>
+                  {health.pending.length} capturas o lotes pendientes
+                </strong>
+                {health.pending.map((j) => (
+                  <p key={j.id}>
+                    {j.error ?? "Esperando procesamiento"} ·{" "}
+                    {new Date(j.createdAt).toLocaleString("es-CO")}
+                  </p>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </SettingsSection>
         <SettingsSection
           title="Facturas y fechas"
@@ -1912,100 +2066,6 @@ function Settings({
               </Badge>
             </div>
           ))}
-        </SettingsSection>
-        <SettingsSection
-          title="Capturas desde tu iPhone"
-          description="Tokens revocables para SMS, Wallet y ubicación"
-          icon="shield"
-        >
-          <p>
-            Crea un token por dispositivo y úsalo en dos automatizaciones de
-            Atajos: una recibe el texto del SMS Bancolombia y otra recibe los
-            campos de la transacción de Wallet. Las capturas no usan
-            screenshots. El token solo permite enviar evidencias.
-          </p>
-          <AppForm
-            submit="Crear token de captura"
-            onSubmit={async (f) => {
-              const d = await post<{ token: string }>("/devices", {
-                name: str(f, "name"),
-              });
-              setToken(d.token);
-              await loadDevices();
-            }}
-          >
-            <Field label="Nombre del dispositivo">
-              <input
-                name="name"
-                required
-                placeholder="Mi iPhone"
-                maxLength={100}
-              />
-            </Field>
-          </AppForm>
-          {token && (
-            <div className="notice">
-              <div>
-                <strong>Copia el token ahora; no volverá a mostrarse.</strong>
-                <code className="token">{token}</code>
-                <small>
-                  Endpoint: {apiURL}/capture-events · Cabecera Authorization:
-                  Bearer TOKEN
-                </small>
-                <br />
-                <button className="text-button" onClick={() => setToken("")}>
-                  Ya lo guardé
-                </button>
-              </div>
-            </div>
-          )}
-          {deviceError && (
-            <p className="error" role="alert">
-              {deviceError}
-            </p>
-          )}
-          {devices.map((d) => (
-            <div className="audit-row" key={d.id}>
-              <strong>{d.name}</strong>
-              <button
-                className="text-button"
-                disabled={d.revoked}
-                onClick={() =>
-                  void api(`/devices/${d.id}`, { method: "DELETE" })
-                    .then(loadDevices)
-                    .catch((e) => setDeviceError(e.message))
-                }
-              >
-                {d.revoked ? "Revocado" : "Revocar"}
-              </button>
-            </div>
-          ))}
-          <p className="small-note">
-            Los SMS Bancolombia de compra con tarjeta, pago QR, pago desde
-            cuenta y transferencia se leen automáticamente. Los campos o
-            destinos que falten se envían a Revisión.
-          </p>
-          <p className="small-note">
-            Ambos atajos deben intentar obtener la ubicación actual y enviar
-            coordenadas, precisión y hora de captura. Si Localización está
-            desactivada o tarda demasiado, el movimiento se envía de todas
-            formas.
-          </p>
-          {health?.pending.length ? (
-            <div className="notice">
-              <div>
-                <strong>
-                  {health.pending.length} capturas o lotes pendientes
-                </strong>
-                {health.pending.map((j) => (
-                  <p key={j.id}>
-                    {j.error ?? "Esperando procesamiento"} ·{" "}
-                    {new Date(j.createdAt).toLocaleString("es-CO")}
-                  </p>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </SettingsSection>
       </section>
     </>

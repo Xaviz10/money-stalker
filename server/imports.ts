@@ -434,9 +434,16 @@ export const safeCell = (value: string) =>
 export function exportRecords(
   state: State,
   format: "csv" | "xlsx",
+  accountId?: string,
 ): { bytes: Buffer; type: string } {
   const records = state.transactions
-    .filter((t) => !t.voided)
+    .filter(
+      (t) =>
+        !t.voided &&
+        (!accountId ||
+          t.accountId === accountId ||
+          t.counterAccountId === accountId),
+    )
     .map((t) => ({
       ID: t.id,
       Fecha: t.date,
@@ -495,13 +502,15 @@ export function exportRecords(
   XLSX.utils.book_append_sheet(
     book,
     XLSX.utils.json_to_sheet(
-      state.accounts.map((a) => ({
-        ID: a.id,
-        Nombre: safeCell(a.name),
-        Tipo: a.kind,
-        SaldoInicialCOP: decimalCOP(a.openingMinor),
-        FechaInicial: a.openingDate,
-      })),
+      state.accounts
+        .filter((a) => !accountId || a.id === accountId)
+        .map((a) => ({
+          ID: a.id,
+          Nombre: safeCell(a.name),
+          Tipo: a.kind,
+          SaldoInicialCOP: decimalCOP(a.openingMinor),
+          FechaInicial: a.openingDate,
+        })),
     ),
     "Cuentas",
   );

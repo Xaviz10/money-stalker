@@ -13,7 +13,10 @@ colors:
   muted: "#596b89"
   canvas: "#f7f9fd"
   surface: "#ffffff"
+  surface-subtle: "#fbfcff"
+  surface-hover: "#fafbfe"
   line: "#e0e6f0"
+  icon-muted: "#7c93bd"
   citron: "#f6f673"
   citron-soft: "#fdfddf"
   success: "#207052"
@@ -152,7 +155,7 @@ The palette pairs deep ultramarine structure with white working space and a conc
 
 ### Neutral
 
-**Financial Ink** (`ink`) carries headings and important figures; `text` carries reading copy and `muted` carries context. `canvas` surrounds white `surface` work areas. `line` separates panels, rows, and work zones.
+**Financial Ink** (`ink`) carries headings and important figures; `text` carries reading copy and `muted` carries context. `canvas` surrounds white `surface` work areas. `surface-subtle` and `surface-hover` provide quiet structure, `icon-muted` supports secondary symbols, and `line` separates panels, rows, and work zones.
 
 ### Semantic states
 
@@ -230,11 +233,11 @@ Keyboard focus uses a three-pixel outline with a three-pixel offset on light sur
 
 `DisclosureEditor` places a native inline disclosure beneath a saved account or capture-card row. Its summary uses the literal action “Editar cuenta” or “Editar tarjeta”; opening it reveals a prefilled form on the primary-soft surface. Saving updates the existing record ID and returns to the compact saved row. Protect opening balances and account types once movements exist, and explain that correction movements preserve financial history.
 
-The accounts route shows saved products first. Creation, margin/categories, capture cards, bills, and iPhone capture setup live in a single `Administrar` hub made from native disclosures. Keep these sections collapsed until requested, except `Agregar producto` on an empty account list. A disclosure summary names the job and describes its contents; do not expose every form at once.
+The accounts route shows saved products first. Creation, margin/categories, automatic capture, and bills live in a single `Administrar` hub made from native disclosures. Keep these sections collapsed until requested, except `Agregar producto` on an empty account list. A disclosure summary names the job and describes its contents; do not expose every form at once. Automatic capture is one two-step job: associate the cards seen in SMS or Wallet, then create the iPhone access used by Shortcuts.
 
 ### Navigation
 
-The white header combines a citron eye tile, compact wordmark, route links, and actions. Active links use blue, heavier text, a blue underline, and `aria-current="page"`. Review counts use separate small markers. The responsive frame retains top navigation and exposes the account disclosure beneath it.
+The white header combines a citron eye tile, compact wordmark, four user routes, and actions. Active links use blue, heavier text, a blue underline, and `aria-current="page"`. Review counts use separate small markers. Import is contextual to Movements rather than a top-level route. The responsive frame retains top navigation and exposes the account disclosure beneath it.
 
 ### Account hierarchy
 
@@ -242,9 +245,9 @@ The ultramarine `AccountRail` uses native institution disclosures, text monogram
 
 ### Product movement register
 
-The Movements route is scoped to exactly one account or card. Its header keeps the product type, name, institution, balance or debt, and total movement count visible. The account rail and `Ver producto` select change that scope without leaving the route; “all accounts” is unavailable here because a mixed ledger obscures the current product.
+The Movements route is scoped to exactly one account or card. Its header keeps the product type, name, institution, balance or debt, and total movement count visible. The account rail on desktop and its in-flow disclosure on mobile are the single product switcher; “all accounts” is unavailable here because a mixed ledger obscures the current product.
 
-The ledger always renders its column headers. An empty product uses a table row that says the product has no movements, rather than replacing the register with a generic empty card. Search applies only to the current product and does not change the total movement count. On phones, the table scrolls horizontally while the empty explanation stays within the visible width. New movements opened from this route default to the visible product.
+The ledger always renders its column structure. An empty product uses a table row that says the product has no movements and offers manual entry or import, rather than replacing the register with a generic empty card. Search applies only to the current product and does not change the total movement count. On phones, each row keeps movement and amount together, with date, category, and status underneath. New movements and the import modal default to the visible product; product exports use that same scope.
 
 Debit instruments indent under their bank account and explain that they use its balance; they have no separate amount. Associated credit accounts retain separate debt in nested rows. Independent credit cards and cash have their own sections. Institutions come from explicit data. The net-worth summary stays distinct from cash and available money. Organization must not duplicate balances; `domain/account-groups.ts` owns these relationships.
 

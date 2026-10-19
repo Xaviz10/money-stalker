@@ -106,14 +106,7 @@ describe("CSV/XLSX parsing", () => {
       ["DESDE", "HASTA", "TIPO CUENTA", "NRO CUENTA"],
       ["2025/06/30", "2025/09/30", "CUENTA DE AHORROS", "00000000000"],
       ["FECHA", "DESCRIPCIÓN", "SUCURSAL", "DCTO.", "VALOR", "SALDO"],
-      [
-        "31/07",
-        "PAGO SUC VIRT TC VISA",
-        "",
-        "",
-        "-300,000.00",
-        "680,010.00",
-      ],
+      ["31/07", "PAGO SUC VIRT TC VISA", "", "", "-300,000.00", "680,010.00"],
       [
         "30/09",
         "PAGO DE NOMI EJEMPLO SAS",
@@ -190,6 +183,65 @@ describe("CSV/XLSX parsing", () => {
   });
 });
 describe("safe exports", () => {
+  it("scopes product exports to direct and incoming transfer movements", () => {
+    const s = emptyState();
+    configure(s, "accounts", {
+      id: "bank",
+      name: "Ahorros",
+      kind: "bank",
+      openingMinor: "0",
+      openingDate: "2026-01-01",
+    });
+    configure(s, "accounts", {
+      id: "wallet",
+      name: "Nequi",
+      kind: "bank",
+      openingMinor: "0",
+      openingDate: "2026-01-01",
+    });
+    addTransaction(
+      s,
+      {
+        id: "bank-expense",
+        accountId: "bank",
+        date: "2026-10-01",
+        kind: "expense",
+        amountMinor: "100000",
+        merchant: "Compra del banco",
+      },
+      now,
+    );
+    addTransaction(
+      s,
+      {
+        id: "wallet-expense",
+        accountId: "wallet",
+        date: "2026-10-02",
+        kind: "expense",
+        amountMinor: "200000",
+        merchant: "Compra de Nequi",
+      },
+      now,
+    );
+    addTransaction(
+      s,
+      {
+        id: "transfer",
+        accountId: "bank",
+        counterAccountId: "wallet",
+        date: "2026-10-03",
+        kind: "transfer",
+        amountMinor: "300000",
+        merchant: "Transferencia a Nequi",
+      },
+      now,
+    );
+    const csv = exportRecords(s, "csv", "wallet").bytes.toString();
+    expect(csv).toContain("Compra de Nequi");
+    expect(csv).toContain("Transferencia a Nequi");
+    expect(csv).not.toContain("Compra del banco");
+  });
+
   it("escapes CSV formulas and preserves exact strings in Excel", () => {
     const s = emptyState();
     configure(s, "accounts", {
@@ -245,9 +297,7 @@ describe("safe exports", () => {
     );
     expect(rows[0].ValorCOP).toBe("12500,25");
     expect(rows[0].Nota).toBe("Bogotá");
-    expect(rows[0].Ubicaciones).toBe(
-      `4.60971,-74.08175 ±24m ${now}`,
-    );
+    expect(rows[0].Ubicaciones).toBe(`4.60971,-74.08175 ±24m ${now}`);
     expect(book.SheetNames).toContain("Cuentas");
     expect(safeCell("\t=cmd")).toBe("'\t=cmd");
   });

@@ -320,7 +320,11 @@ export function createAPI(repo: Repository, files: Files) {
       }
       if (path === "/exports" && method === "GET") {
         const format = request.query?.format === "xlsx" ? "xlsx" : "csv";
-        const output = exportRecords(await repo.read(h), format);
+        const output = exportRecords(
+          await repo.read(h),
+          format,
+          request.query?.accountId,
+        );
         return {
           status: 200,
           body: output.bytes,

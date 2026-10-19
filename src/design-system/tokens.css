@@ -17,7 +17,10 @@
   --color-muted: #596b89;
   --color-canvas: #f7f9fd;
   --color-surface: #ffffff;
+  --color-surface-subtle: #fbfcff;
+  --color-surface-hover: #fafbfe;
   --color-line: #e0e6f0;
+  --color-icon-muted: #7c93bd;
   --color-citron: #f6f673;
   --color-citron-soft: #fdfddf;
   --color-success: #207052;

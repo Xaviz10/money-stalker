@@ -41,7 +41,7 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   const bank = state.accounts.find((a: any) => a.kind === "bank"),
     credit = state.accounts.find((a: any) => a.kind === "credit");
   const instrument = page.locator(".settings-section").filter({
-    has: page.getByText("Tarjetas y alias de captura", { exact: true }),
+    has: page.getByText("Configurar capturas automáticas", { exact: true }),
   });
   await instrument.locator("summary").click();
   await instrument.getByLabel("Nombre de tarjeta").fill("Visa débito");
