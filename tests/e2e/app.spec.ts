@@ -66,7 +66,11 @@ test("account → capture → import → review → export works on the project 
     )
     .toBe(1);
   await page.getByRole("link", { name: "Movimientos", exact: true }).click();
-  await page.getByRole("button", { name: "Importar archivo" }).first().click();
+  await page.getByText("Filtros y acciones", { exact: true }).click();
+  await page
+    .locator(".register-more")
+    .getByRole("button", { name: "Importar archivo" })
+    .click();
   const importDialog = page.getByRole("dialog");
   await expect(importDialog).toContainText(
     "El archivo se agregará a Ahorros de prueba",
@@ -160,7 +164,8 @@ test("account → capture → import → review → export works on the project 
   );
   await page.getByRole("button", { name: "Cerrar" }).click();
   const downloaded = page.waitForEvent("download");
-  await page.getByRole("button", { name: "CSV", exact: true }).click();
+  await page.getByText("Filtros y acciones", { exact: true }).click();
+  await page.getByRole("button", { name: "Exportar CSV" }).click();
   expect((await downloaded).suggestedFilename()).toBe("money-stalker.csv");
   expect(
     await page.evaluate(

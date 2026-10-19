@@ -697,6 +697,25 @@ function TransactionTable({
                       selectedAccount={selectedAccount}
                       state={state}
                     />
+                    <span className="register-mobile-meta">
+                      <time dateTime={t.date}>{displayDate(t.date)}</time>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {t.kind === "transfer"
+                          ? (otherAccount?.name ?? "Transferencia")
+                          : (state.categories.find(
+                              (category) => category.id === t.categoryId,
+                            )?.name ?? "Sin categoría")}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {historical
+                          ? "Histórico"
+                          : t.status === "posted"
+                            ? "Registrado"
+                            : "Por confirmar"}
+                      </span>
+                    </span>
                   </td>
                   <td className="register-category">
                     {t.kind === "transfer" ? (
@@ -775,6 +794,8 @@ function Movements({
   onError: (e: string) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [directionFilter, setDirectionFilter] = useState("");
   const account = state.accounts.find((a) => a.id === selectedAccount);
   const accountTransactions = useMemo(
     () =>
@@ -790,12 +811,20 @@ function Movements({
   );
   const transactions = useMemo(
     () =>
-      accountTransactions.filter((t) =>
-        `${t.merchant ?? ""} ${t.note ?? ""} ${t.date}`
+      accountTransactions.filter((t) => {
+        const matchesSearch = `${t.merchant ?? ""} ${t.note ?? ""} ${t.date}`
           .toLowerCase()
-          .includes(search.toLowerCase()),
-      ),
-    [accountTransactions, search],
+          .includes(search.toLowerCase());
+        const matchesCategory =
+          !categoryFilter || t.categoryId === categoryFilter;
+        const matchesDirection =
+          !directionFilter ||
+          (directionFilter === "incoming"
+            ? isIncoming(t, selectedAccount!)
+            : !isIncoming(t, selectedAccount!));
+        return matchesSearch && matchesCategory && matchesDirection;
+      }),
+    [accountTransactions, categoryFilter, directionFilter, search, selectedAccount],
   );
   if (!account)
     return (
@@ -853,50 +882,80 @@ function Movements({
             onChange={(e) => setSearch(e.target.value)}
           />
         </Field>
-        <div className="register-actions">
-          <button className="button secondary" onClick={openImport}>
-            <Icon name="upload" size={16} />
-            Importar archivo
-          </button>
-          <span className="register-action-label">Exportar producto</span>
-          <button
-            className="button secondary"
-            disabled={!accountTransactions.length}
-            onClick={() =>
-              void download("csv", account.id).catch((e) => onError(e.message))
-            }
-          >
-            <Icon name="download" size={16} />
-            CSV
-          </button>
-          <button
-            className="button secondary"
-            disabled={!accountTransactions.length}
-            onClick={() =>
-              void download("xlsx", account.id).catch((e) => onError(e.message))
-            }
-          >
-            <Icon name="download" size={16} />
-            Excel
-          </button>
-        </div>
+        <details className="register-more">
+          <summary>
+            <Icon name="search" size={16} /> Filtros y acciones
+          </summary>
+          <div className="register-more-panel">
+            <Field label="Categoría">
+              <select
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                <option value="">Todas</option>
+                {state.categories.map((category) => (
+                  <option value={category.id} key={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Dirección">
+              <select
+                value={directionFilter}
+                onChange={(event) => setDirectionFilter(event.target.value)}
+              >
+                <option value="">Entradas y salidas</option>
+                <option value="incoming">Entradas</option>
+                <option value="outgoing">Salidas</option>
+              </select>
+            </Field>
+            <div className="register-more-actions">
+              <button className="button secondary" onClick={openImport}>
+                <Icon name="upload" size={16} /> Importar archivo
+              </button>
+              <button
+                className="button secondary"
+                disabled={!accountTransactions.length}
+                onClick={() =>
+                  void download("csv", account.id).catch((e) =>
+                    onError(e.message),
+                  )
+                }
+              >
+                <Icon name="download" size={16} /> Exportar CSV
+              </button>
+              <button
+                className="button secondary"
+                disabled={!accountTransactions.length}
+                onClick={() =>
+                  void download("xlsx", account.id).catch((e) =>
+                    onError(e.message),
+                  )
+                }
+              >
+                <Icon name="download" size={16} /> Exportar Excel
+              </button>
+            </div>
+          </div>
+        </details>
       </div>
       <TransactionTable
         transactions={transactions}
         state={state}
         selectedAccount={account.id}
         emptyMessage={
-          search
+          search || categoryFilter || directionFilter
             ? "No hay resultados para esta búsqueda"
             : "Este producto todavía no tiene movimientos"
         }
         emptyDescription={
-          search
+          search || categoryFilter || directionFilter
             ? "Prueba con otro comercio, nota o fecha."
             : "Agrega el primero manualmente o importa un extracto de este producto."
         }
         emptyActions={
-          search ? undefined : (
+          search || categoryFilter || directionFilter ? undefined : (
             <div className="register-empty-actions">
               <button className="button primary" onClick={() => open("new")}>
                 <Icon name="plus" size={16} />
@@ -1536,10 +1595,12 @@ function AccountEditor({
   account,
   state,
   save,
+  saveInstrument,
 }: {
   account: State["accounts"][number];
   state: State;
   save: (data: unknown) => Promise<void>;
+  saveInstrument: (data: unknown) => Promise<void>;
 }) {
   const [saved, setSaved] = useState(false),
     [kind, setKind] = useState(account.kind);
@@ -1547,7 +1608,7 @@ function AccountEditor({
     (t) => t.accountId === account.id || t.counterAccountId === account.id,
   );
   return (
-    <DisclosureEditor label="Editar cuenta" className="account-organization">
+    <DisclosureEditor label="Editar producto" className="account-organization">
       <AppForm
         submit="Guardar cambios"
         onSubmit={async (f) => {
@@ -1729,6 +1790,45 @@ function AccountEditor({
         )}
         {saved && <p role="status">Cambios guardados.</p>}
       </AppForm>
+      <section className="product-aliases">
+        <div>
+          <h3>Tarjetas y alias de este producto</h3>
+          <p className="small-note">
+            Estos nombres y últimos cuatro dígitos permiten reconocer SMS y
+            pagos de Wallet. Nunca guardes el número completo.
+          </p>
+        </div>
+        {state.instruments
+          .filter((instrument) => instrument.accountId === account.id)
+          .map((instrument) => (
+            <div className="product-instrument" key={instrument.id}>
+              <span className="stat-icon">
+                <Icon name="card" />
+              </span>
+              <div>
+                <strong>{instrument.name}</strong>
+                <small>
+                  {instrument.aliases.length
+                    ? instrument.aliases.join(", ")
+                    : "Sin alias configurado"}
+                </small>
+              </div>
+              <InstrumentEditor
+                instrument={instrument}
+                state={state}
+                save={saveInstrument}
+              />
+            </div>
+          ))}
+        {!state.instruments.some(
+          (instrument) => instrument.accountId === account.id,
+        ) && (
+          <p className="small-note">
+            Todavía no hay una tarjeta o alias asociado. Puedes agregarlo en
+            Capturas automáticas.
+          </p>
+        )}
+      </section>
     </DisclosureEditor>
   );
 }
@@ -1891,6 +1991,7 @@ function Settings({
               account={a}
               state={state}
               save={(data) => save("/accounts", data)}
+              saveInstrument={(data) => save("/instruments", data)}
             />
           </div>
         ))}
@@ -2169,32 +2270,13 @@ function Settings({
               <input name="aliases" placeholder="1122, wallet-debito" />
             </Field>
           </AppForm>
-          <div className="instrument-list">
-            {state.instruments.map((i) => {
-              const linked = state.accounts.find((a) => a.id === i.accountId);
-              return (
-                <div className="account-row instrument-row" key={i.id}>
-                  <span className="stat-icon">
-                    <Icon name="card" />
-                  </span>
-                  <div>
-                    <strong>{i.name}</strong>
-                    <small>
-                      {linked?.kind === "credit" ? "Crédito" : "Débito"} ·{" "}
-                      {linked?.name ?? "Cuenta no disponible"}
-                      {i.aliases.length ? ` · ${i.aliases.join(", ")}` : ""}
-                    </small>
-                  </div>
-                  <InstrumentEditor
-                    key={`${i.id}:${i.name}:${i.accountId}:${i.aliases.join(",")}`}
-                    instrument={i}
-                    state={state}
-                    save={(data) => save("/instruments", data)}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          {state.instruments.length > 0 && (
+            <p className="small-note capture-product-note">
+              Para cambiar una tarjeta o sus alias, abre <strong>Editar
+              producto</strong> junto a la cuenta o tarjeta correspondiente en
+              Tus cuentas.
+            </p>
+          )}
           <hr />
           <h3>2. Comprueba qué entrega tu iPhone</h3>
           <p className="small-note shortcut-guide-intro">

@@ -63,7 +63,8 @@ export type Observation = {
   location?: Capture['location']; parserVersion: string;
 };
 export type Audit = { id: string; at: string; action: string; transactionId?: string;
-  beforeTransaction?: Transaction; beforeObservation?: Observation; expectedRevision?: number; undone?: boolean };
+  beforeTransaction?: Transaction; beforeObservation?: Observation; expectedRevision?: number; undone?: boolean;
+  batchId?: string; batchSize?: number };
 export type State = {
   accounts: Account[]; instruments: Instrument[]; categories: Category[]; bills: Bill[];
   transactions: Transaction[]; observations: Observation[]; audit: Audit[];

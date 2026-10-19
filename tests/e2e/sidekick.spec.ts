@@ -128,7 +128,7 @@ test("loading and failed refresh never pretend to be empty or current balances",
   await expect(page.locator(".available-total > strong")).toHaveText(balance!);
   await page.getByRole("link", { name: "Revisar coincidencia" }).click();
   await expect(
-    page.getByRole("button", { name: "Unir con Café de prueba" }),
+    page.getByRole("button", { name: "Unir de todos modos" }),
   ).toBeDisabled();
   expect(
     await page.evaluate(
@@ -143,22 +143,22 @@ test("review explains amount changes, preserves a failed match, confirms success
   const control = await mock(page, fixture());
   await page.goto("./#/revisar");
   await expect(
-    page.getByText("El valor es diferente · Misma fecha"),
+    page.getByText("Valor diferente · Misma fecha"),
   ).toBeVisible();
   await expect(
     page.getByText("Al unir, el valor cambiará a $ 19.000 según el extracto."),
   ).toBeVisible();
   control.failMatch = true;
-  await page.getByRole("button", { name: "Unir con Café de prueba" }).click();
+  await page.getByRole("button", { name: "Unir de todos modos" }).click();
   await expect(page.locator(".review-action-error")).toContainText(
     "No se pudo unir",
   );
   await expect(page.locator(".review-action-error")).toContainText(
-    "La selección continúa pendiente",
+    "La pista continúa pendiente",
   );
   await expect(page.locator(".clue")).toHaveCount(1);
   control.failMatch = false;
-  await page.getByRole("button", { name: "Unir con Café de prueba" }).click();
+  await page.getByRole("button", { name: "Unir de todos modos" }).click();
   await expect(
     page.getByRole("heading", { name: "Todo en su lugar" }),
   ).toBeVisible();

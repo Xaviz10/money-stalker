@@ -124,7 +124,8 @@ export function mergeObservation(state: State, observationId: string, transactio
   state.audit.push({ id: `merge:${observation.id}:${t.revision}`, at, action: 'merge', transactionId: t.id,
     beforeTransaction, beforeObservation, expectedRevision: t.revision });
 }
-export function resolveObservation(state: State, observationId: string, action: 'separate' | 'ignore', at: string, details?: unknown) {
+export function resolveObservation(state: State, observationId: string, action: 'separate' | 'ignore', at: string, details?: unknown,
+  batch?: { id: string; size: number }) {
   const o = requireValue(state.observations.find(o => o.id === observationId), 'Evidencia desconocida');
   normalizeUnlinkedTransfer(state, o);
   if (o.status !== 'review') throw new DomainError('La evidencia ya fue revisada', 409);
@@ -134,7 +135,8 @@ export function resolveObservation(state: State, observationId: string, action: 
     kind: o.kind, merchant: o.merchant, counterAccountId: o.counterAccountId, ...(typeof details === 'object' ? details : {}),
     reference: o.reference, id: `obs:${o.id}:v${state.transactions.filter(t => t.observationIds.includes(o.id)).length + 1}`, status: o.source === 'statement' ? 'posted' : 'provisional' }, at, o.id);
   o.status = 'linked'; o.transactionId = t.id;
-  state.audit.push({ id: `separate:${o.id}:${t.id}`, at, action: 'separate', beforeObservation, transactionId: t.id, expectedRevision: t.revision });
+  state.audit.push({ id: `separate:${o.id}:${t.id}`, at, action: 'separate', beforeObservation, transactionId: t.id,
+    expectedRevision: t.revision, ...(batch ? { batchId: batch.id, batchSize: batch.size } : {}) });
 }
 export function editTransaction(state: State, transactionId: string, input: unknown, at: string, remember = false, expectedRevision?: number) {
   const t = requireValue(state.transactions.find(t => t.id === transactionId && !t.voided), 'Movimiento desconocido');

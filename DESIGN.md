@@ -233,7 +233,9 @@ Keyboard focus uses a three-pixel outline with a three-pixel offset on light sur
 
 ### Settings editors
 
-`DisclosureEditor` places a native inline disclosure beneath a saved account or capture-card row. Its summary uses the literal action “Editar cuenta” or “Editar tarjeta”; opening it reveals a prefilled form on the primary-soft surface. Saving updates the existing record ID and returns to the compact saved row. Protect opening balances and account types once movements exist, and explain that correction movements preserve financial history.
+`DisclosureEditor` places a native inline disclosure beneath a saved product or attached-card row. Its summary uses the literal action “Editar producto” for the account/card product and “Editar tarjeta” for an attached SMS/Wallet identity; opening it reveals a prefilled form on the primary-soft surface. Saving updates the existing record ID and returns to the compact saved row. Protect opening balances and account types once movements exist, and explain that correction movements preserve financial history.
+
+Saved accounts and credit cards use the shared action “Editar producto”. That editor owns identity, institution, artwork, organization, and every SMS/Wallet card alias attached to the product. Automatic capture owns creation of an alias and the iPhone connection/instructions; it points back to the product editor for later changes.
 
 The opening-balance date is the account's financial snapshot. Older imported movements remain available as history without changing the current balance. Explain that consequence beside account creation and inside the import dialog before confirmation.
 
@@ -259,7 +261,7 @@ The ultramarine `AccountRail` uses native institution disclosures, text monogram
 
 The Movements route is scoped to exactly one account or card. Its header keeps the product type, name, institution, balance or debt, and total movement count visible. The account rail on desktop and its in-flow disclosure on mobile are the single product switcher; “all accounts” is unavailable here because a mixed ledger obscures the current product.
 
-The ledger always renders its column structure. An empty product uses a table row that says the product has no movements and offers manual entry or import, rather than replacing the register with a generic empty card. Search applies only to the current product and does not change the total movement count. On phones, each row keeps movement and amount together, with date, category, and status underneath. New movements and the import modal default to the visible product; product exports use that same scope.
+The ledger always renders its column structure. An empty product uses a table row that says the product has no movements and offers manual entry or import, rather than replacing the register with a generic empty card. Search applies only to the current product and does not change the total movement count. Category and direction filters, import, and the two export formats share one secondary action surface so the ledger remains visible near the top on phones. On phones, each row keeps movement and amount together, with date, category, and status on one predictable metadata line. New movements and the import modal default to the visible product; product exports use that same scope.
 
 Debit instruments indent under their bank account and explain that they use its balance; they have no separate amount. Associated credit accounts retain separate debt in nested rows. Independent credit cards and cash have their own sections. Institutions come from explicit data. The net-worth summary stays distinct from cash and available money. Organization must not duplicate balances; `domain/account-groups.ts` owns these relationships.
 
@@ -269,7 +271,7 @@ The labeled funds-minus-commitments equation leads to a citron global available-
 
 Review compares source/candidate amount, account, and date. Show discrepancies and statement-driven amount changes next to an explicit match action. Keep separate/complete, discard, and correction undo identifiable. On phones, source precedes candidate; the narrow dashboard preview also stacks its values.
 
-For long evidence queues, keep pending count, progress for the current session, and the latest save confirmation visible while the user works. Show ten clues at a time. Complete evidence supports direct separate registration and an explicit selection of up to ten clues for atomic separate registration. Equal amount and date remain suggestions only; batch merging is never offered.
+For long evidence queues, keep the durable pending count, resolved count, active filters, resume point, and latest save confirmation visible while the user works. Use a compact, filterable inbox grouped by normalized merchant, amount, account, movement type, and review reason; open one focused comparison at a time. Repeated complete evidence can be previewed and registered in groups of up to 500 as individual movements, with backend writes chunked below storage transaction limits. Equal amount and date remain suggestions only; batch merging is never offered. When candidate evidence conflicts on date, account, or value, emphasize separate registration over merging.
 
 ### Icon and Eyes
 

@@ -51,8 +51,14 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
     .getByRole("button", { name: "Guardar", exact: true })
     .click();
   await expect(page.locator(".rail-instrument")).toContainText("Visa débito");
-  const savedInstrument = page
-    .locator(".instrument-row")
+  const bankProduct = page
+    .locator(".account-row")
+    .filter({ has: page.getByText("Ahorros", { exact: true }) });
+  await bankProduct
+    .getByText("Editar producto", { exact: true })
+    .click();
+  const savedInstrument = bankProduct
+    .locator(".product-instrument")
     .filter({ has: page.getByText("Visa débito", { exact: true }) });
   await savedInstrument.getByText("Editar tarjeta", { exact: true }).click();
   await savedInstrument.getByLabel("Nombre de tarjeta").fill("Visa crédito");
@@ -63,17 +69,25 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   await savedInstrument
     .getByRole("button", { name: "Guardar cambios", exact: true })
     .click();
+  const creditProduct = page
+    .locator(".account-row")
+    .filter({ has: page.getByText("Nu independiente", { exact: true }) });
+  await creditProduct
+    .getByText("Editar producto", { exact: true })
+    .click();
   await expect(
-    page.locator(".instrument-row").filter({ hasText: "Visa crédito" }),
-  ).toContainText("Crédito · Nu independiente · 8645, wallet-visa-8645");
+    creditProduct.locator(".product-instrument").filter({ hasText: "Visa crédito" }),
+  ).toContainText("8645, wallet-visa-8645");
   const organization = page
     .locator(".account-row")
     .filter({ has: page.getByText("Nu independiente", { exact: true }) })
     .locator(".account-organization");
-  await organization.locator("summary").click();
-  await organization
-    .getByLabel("Vincular con cuenta bancaria")
-    .selectOption(bank.id);
+  const parentAccount = organization.getByLabel(
+    "Vincular con cuenta bancaria",
+  );
+  if (!(await parentAccount.isVisible()))
+    await organization.locator(":scope > summary").click();
+  await parentAccount.selectOption(bank.id);
   await organization.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page.locator(".bank-family")).toContainText("Nu independiente");
   await expect(page.locator(".standalone-cards")).toHaveCount(0);
@@ -130,10 +144,12 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   expect(d.liquidMinor).toBe("99000000");
   expect(d.cardDebtMinor).toBe("10500000");
   await page.getByRole("link", { name: "Cuentas", exact: true }).click();
-  await organization.locator("summary").click();
-  await organization
-    .getByLabel("Vincular con cuenta bancaria")
-    .selectOption("");
+  const unlinkParent = organization.getByLabel(
+    "Vincular con cuenta bancaria",
+  );
+  if (!(await unlinkParent.isVisible()))
+    await organization.locator(":scope > summary").click();
+  await unlinkParent.selectOption("");
   await organization.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page.locator(".standalone-cards")).toContainText(
     "Nu independiente",

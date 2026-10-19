@@ -79,20 +79,28 @@ describe('authorization and capture', () => {
     expect(state.aliases).toContainEqual({ id: 'peaje central', merchant: 'peaje central', categoryId: 'car', note: 'Ruta al trabajo' });
   });
   it('discards the entire mutation when validation fails', async () => { const { repo } = await setup(); await expect(repo.mutate('owner', s => { s.accounts.length = 0; throw new Error('failure'); })).rejects.toThrow(); expect((await repo.read('owner')).accounts).toHaveLength(1); });
-  it('registers a selected review batch as separate movements atomically', async () => {
+  it('registers more than one hundred repeated review clues in safe chunks', async () => {
     const { repo, send } = await setup();
+    const ids = Array.from({ length: 103 }, (_, index) => `toll-${index}`);
     await repo.mutate('owner', s => {
-      for (const id of ['toll-1', 'toll-2', 'toll-3']) s.observations.push({
+      for (const id of ids) s.observations.push({
         id, source: 'statement', observedAt: now, receivedAt: now, date: '2026-10-10', accountId: 'bank',
         amountMinor: '1500000', currency: 'COP', merchant: 'Peaje', kind: 'expense', status: 'review',
         candidates: [], parserVersion: 'test',
       });
     });
-    expect((await send('POST', '/reviews/batch', { observationIds: ['toll-1', 'toll-2', 'toll-3'], action: 'separate' })).status).toBe(200);
+    const response = await send('POST', '/reviews/batch', { observationIds: ids, action: 'separate' });
+    expect(response).toMatchObject({ status: 200, body: { saved: true, resolved: 103 } });
     const state = await repo.read('owner');
     expect(state.observations.every(o => o.status === 'linked')).toBe(true);
-    expect(state.transactions).toHaveLength(3);
-    expect(state.audit.filter(a => a.action === 'separate')).toHaveLength(3);
+    expect(state.transactions).toHaveLength(103);
+    expect(state.audit.filter(a => a.action === 'separate')).toHaveLength(103);
+    const batchId = (response.body as { batchId: string }).batchId;
+    expect((await send('POST', '/undo/batch', { batchId })).body).toMatchObject({ saved: true, undone: 103 });
+    const restored = await repo.read('owner');
+    expect(restored.observations.every(o => o.status === 'review')).toBe(true);
+    expect(restored.transactions.every(transaction => transaction.voided)).toBe(true);
+    expect(restored.audit.filter(a => a.batchId === batchId).every(a => a.undone)).toBe(true);
   });
 });
 describe('import lifecycle and retries', () => {

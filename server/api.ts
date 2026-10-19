@@ -242,18 +242,63 @@ export function createAPI(repo: Repository, files: Files) {
       if (method === "POST" && path === "/reviews/batch") {
         const b = z
           .object({
-            observationIds: z.array(id).min(1).max(10).refine(
+            observationIds: z.array(id).min(1).max(500).refine(
               (values) => new Set(values).size === values.length,
               "No repitas evidencias en el lote",
             ),
             action: z.literal("separate"),
           })
           .parse(body);
-        await repo.mutate(h, (s) => {
-          for (const observationId of b.observationIds)
-            resolveObservation(s, observationId, b.action, now);
-        });
-        return { status: 200, body: { saved: true, resolved: b.observationIds.length } };
+        let resolved = 0;
+        const batchId = randomUUID();
+        // Each separate review changes the observation and creates a movement
+        // plus an audit row. Chunks stay below DynamoDB's transaction limit
+        // while allowing a repeated historical group to contain hundreds.
+        for (let offset = 0; offset < b.observationIds.length; offset += 30) {
+          const chunk = b.observationIds.slice(offset, offset + 30);
+          resolved += await repo.mutate(h, (s) => {
+            let saved = 0;
+            for (const observationId of chunk) {
+              const observation = s.observations.find(
+                (item) => item.id === observationId,
+              );
+              if (!observation || observation.status !== "review") continue;
+              resolveObservation(s, observationId, b.action, now, undefined, {
+                id: batchId,
+                size: b.observationIds.length,
+              });
+              saved++;
+            }
+            return saved;
+          });
+        }
+        return { status: 200, body: { saved: true, resolved, batchId } };
+      }
+      if (method === "POST" && path === "/undo/batch") {
+        const b = z.object({ batchId: id }).parse(body);
+        const snapshot = await repo.read(h);
+        const auditIds = snapshot.audit
+          .filter((entry) => entry.batchId === b.batchId && !entry.undone)
+          .map((entry) => entry.id);
+        if (!auditIds.length)
+          throw new DomainError("Este lote ya fue deshecho o no existe", 404);
+        let undone = 0;
+        // Undo touches the movement, observation, original audit, and a new
+        // audit record. Twenty at a time stays below the storage limit.
+        for (let offset = 0; offset < auditIds.length; offset += 20) {
+          const chunk = auditIds.slice(offset, offset + 20);
+          undone += await repo.mutate(h, (s) => {
+            let saved = 0;
+            for (const auditId of chunk) {
+              const entry = s.audit.find((item) => item.id === auditId);
+              if (!entry || entry.undone) continue;
+              undo(s, auditId, now);
+              saved++;
+            }
+            return saved;
+          });
+        }
+        return { status: 200, body: { saved: true, undone } };
       }
       if (method === "POST" && path === "/undo") {
         const b = z.object({ auditId: z.string().max(300) }).parse(body);
