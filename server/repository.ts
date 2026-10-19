@@ -45,6 +45,8 @@ const stateItems = (state: State): Map<string, unknown> => {
     for (const value of state[key]) map.set(`${key}#${value.id}`, value);
   return map;
 };
+export const persistedStateItems = (state: State): Map<string, unknown> =>
+  new Map([...stateItems(state)].map(([key, value]) => [key, structuredClone(value)]));
 export class DynamoRepository implements Repository {
   constructor(private ledger = process.env.LEDGER_TABLE!, private intake = process.env.INTAKE_TABLE!) {}
   private async query(table: string, pk: string, prefix?: string) {
@@ -69,7 +71,7 @@ export class DynamoRepository implements Repository {
         if (old < 0) array.push(item); else array[old] = item;
       } }
     }
-    const persisted = stateItems(state);
+    const persisted = persistedStateItems(state);
     normalizeDefaultCategories(state);
     return { state, persisted, revision: meta?.revision ?? 0 };
   }

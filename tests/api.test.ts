@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createAPI } from '../server/api';
-import { MemoryRepository } from '../server/repository';
+import { MemoryRepository, persistedStateItems } from '../server/repository';
 import { MemoryFiles } from '../server/storage';
 import { captureJob, processJob } from '../server/processing';
 import { addTransaction, configure } from '../domain/ledger';
-import type { State } from '../domain/model';
+import { emptyState, type State } from '../domain/model';
 import { readFileSync } from 'node:fs';
 const now = '2026-10-17T18:00:00Z';
 async function setup() {
@@ -13,6 +13,21 @@ async function setup() {
   return { repo, files, api, send: (method: string, path: string, body?: unknown, subject = 'owner') => api({ method, path, body, subject }) };
 }
 describe('authorization and capture', () => {
+  it('keeps an immutable persistence snapshot when existing records mutate in place', () => {
+    const state = emptyState();
+    state.transactions.push({ id: 'existing', accountId: 'bank', date: '2026-10-10', amountMinor: '100', kind: 'expense', merchant: 'Test', categoryId: 'uncategorized', note: '', status: 'posted', entries: [], observationIds: [], revision: 1 });
+    state.observations.push({ id: 'clue', source: 'statement', observedAt: now, receivedAt: now, date: '2026-10-10', accountId: 'bank', amountMinor: '100', currency: 'COP', merchant: 'Test', kind: 'expense', status: 'review', candidates: [], parserVersion: 'test' });
+    const before = persistedStateItems(state);
+    state.transactions[0].categoryId = 'car';
+    state.transactions[0].revision++;
+    state.observations[0].status = 'linked';
+    state.observations[0].transactionId = 'existing';
+    expect(before.get('transactions#existing')).toMatchObject({ categoryId: 'uncategorized', revision: 1 });
+    expect(before.get('observations#clue')).toMatchObject({ status: 'review' });
+    expect(before.get('observations#clue')).not.toHaveProperty('transactionId');
+    expect(state.transactions[0]).toMatchObject({ categoryId: 'car', revision: 2 });
+    expect(state.observations[0]).toMatchObject({ status: 'linked', transactionId: 'existing' });
+  });
   it('rejects anonymous reads and isolates household data', async () => {
     const { api, send } = await setup(); expect((await api({ method: 'GET', path: '/state' })).status).toBe(401);
     expect((await send('GET', '/state', undefined, 'other')).body).toMatchObject({ accounts: [] });
