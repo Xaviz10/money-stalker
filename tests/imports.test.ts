@@ -23,6 +23,71 @@ describe("CSV/XLSX parsing", () => {
     );
     expect(result.rows[0].observation?.merchant).toBe("Café de ejemplo");
   });
+  it("infers opposite signed flows for bank accounts and credit cards", () => {
+    const bytes = Buffer.from(
+      "Fecha;Descripcion;Valor;Moneda;Tipo\n" +
+        "2026-10-01;Movimiento positivo;25.000,00;COP;\n" +
+        "2026-10-02;Movimiento negativo;-10.000,00;COP;",
+    );
+    const bank = {
+      id: "bank",
+      name: "Ahorros",
+      kind: "bank" as const,
+      openingMinor: "0",
+      openingDate: "2026-01-01",
+      eligible: true,
+    };
+    const card = {
+      id: "card",
+      name: "Visa",
+      kind: "credit" as const,
+      openingMinor: "0",
+      openingDate: "2026-01-01",
+      eligible: false,
+    };
+    const bankRows = parseImport(
+      bytes,
+      "bank.csv",
+      bank.id,
+      "cop-interchange-v1",
+      now,
+      profiles,
+      [bank, card],
+    ).rows;
+    const cardRows = parseImport(
+      bytes,
+      "card.csv",
+      card.id,
+      "cop-interchange-v1",
+      now,
+      profiles,
+      [bank, card],
+    ).rows;
+    expect(bankRows.map((row) => row.observation?.kind)).toEqual([
+      "income",
+      "expense",
+    ]);
+    expect(cardRows.map((row) => row.observation?.kind)).toEqual([
+      "expense",
+      "refund",
+    ]);
+    expect(cardRows.map((row) => row.observation?.amountMinor)).toEqual([
+      "2500000",
+      "1000000",
+    ]);
+  });
+  it("uses an explicit transaction type before the amount sign", () => {
+    const result = parse(
+      Buffer.from(
+        "Fecha;Descripcion;Valor;Moneda;Tipo\n2026-10-01;Abono manual;-25.000,00;COP;ingreso",
+      ),
+      "typed.csv",
+    );
+    expect(result.rows[0].observation).toMatchObject({
+      kind: "income",
+      amountMinor: "2500000",
+    });
+  });
   it("skips known headers and blank lines without dropping unknown totals", () => {
     const result = parse(
       Buffer.from(

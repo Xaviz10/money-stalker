@@ -117,7 +117,7 @@ export const profiles: Profile[] = [
   },
   {
     id: "cop-interchange-v1",
-    label: "CSV/XLSX de intercambio COP",
+    label: "CSV/XLSX de intercambio COP (signo o tipo)",
     verified: true,
     header: ["Fecha", "Descripcion", "Valor", "Moneda", "Tipo"],
     columns: {
@@ -131,7 +131,7 @@ export const profiles: Profile[] = [
     },
     strongReference: false,
     dateFormat: "iso",
-    signed: false,
+    signed: true,
   },
 ];
 const hash = (bytes: Uint8Array) =>
@@ -166,6 +166,21 @@ function parseEnglishCOP(input: unknown): string {
   const [whole = "0", decimal = ""] = value.split(".");
   const result = BigInt(whole || "0") * 100n + BigInt(decimal.padEnd(2, "0"));
   return (negative ? -result : result).toString();
+}
+
+function parseSignedCOP(input: unknown): string {
+  if (typeof input === "number") {
+    if (
+      !Number.isFinite(input) ||
+      Math.abs(input) > Number.MAX_SAFE_INTEGER / 100
+    )
+      throw new DomainError("Valor fuera de rango");
+    return BigInt(Math.round(input * 100)).toString();
+  }
+  const value = String(input ?? "").trim();
+  const sign = value.startsWith("-") ? -1n : 1n;
+  const unsigned = value.replace(/^[+-]/, "");
+  return (sign * BigInt(parseCOP(unsigned))).toString();
 }
 
 function statementWindow(grid: unknown[][]): { from: string; to: string } {
@@ -351,6 +366,8 @@ export function parseImport(
       const amount =
         profile.amountFormat === "english"
           ? parseEnglishCOP(rawAmount)
+          : profile.signed
+            ? parseSignedCOP(rawAmount)
           : typeof rawAmount === "number"
             ? (() => {
                 if (
@@ -368,17 +385,23 @@ export function parseImport(
         transferencia: "transfer",
         devolucion: "refund",
       };
+      const account = accounts.find((candidate) => candidate.id === accountId);
+      const inferredKind =
+        account?.kind === "credit"
+          ? BigInt(amount) < 0n
+            ? "refund"
+            : "expense"
+          : BigInt(amount) < 0n
+            ? "expense"
+            : "income";
       const merchant = String(read(row, profile.columns.merchant) ?? "")
         .trim()
         .slice(0, 200);
       const classified = profile.classify?.(merchant, amount, accounts);
       const kind =
         classified?.kind ??
-        (profile.signed
-          ? BigInt(amount) < 0n
-            ? "expense"
-            : "income"
-          : kinds[rawKind]);
+        kinds[rawKind] ??
+        (profile.signed ? inferredKind : undefined);
       if (!kind)
         throw new DomainError(
           "Tipo desconocido: gasto, ingreso, transferencia o devolución",

@@ -235,6 +235,8 @@ Keyboard focus uses a three-pixel outline with a three-pixel offset on light sur
 
 The opening-balance date is the account's financial snapshot. Older imported movements remain available as history without changing the current balance. Explain that consequence beside account creation and inside the import dialog before confirmation.
 
+The generic COP import accepts signed values. For bank and cash products, positive means money in and negative means money out. Credit cards reverse that interpretation: positive means a purchase and negative means a refund. An explicit type overrides the sign, especially for transfers and card payments. State these rules in the compatible-format help.
+
 The accounts route shows saved products first. Creation, margin/categories, automatic capture, and bills live in a single `Administrar` hub made from native disclosures. Keep these sections collapsed until requested, except `Agregar producto` on an empty account list. A disclosure summary names the job and describes its contents; do not expose every form at once. Automatic capture is one two-step job: associate the cards seen in SMS or Wallet, then create the iPhone access used by Shortcuts.
 
 ### Navigation

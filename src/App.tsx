@@ -1214,7 +1214,10 @@ function ImportDialog({
           </p>
           <p>
             Fecha ISO, valores como <code>25.000,00</code>, moneda{" "}
-            <code>COP</code>. Tipos: gasto, ingreso, transferencia, devolución.
+            <code>COP</code>. En cuentas, positivo es entrada y negativo es
+            salida. En tarjetas de crédito, positivo es compra y negativo es
+            devolución. Puedes indicar gasto, ingreso, transferencia o
+            devolución en <code>Tipo</code> para reemplazar esa inferencia.
           </p>
           <p className="small-note">
             Los pagos de tarjeta y las transferencias a Nequi se conservan como

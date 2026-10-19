@@ -48,6 +48,8 @@ The Movements route is a product register. Scope it to one account or card, show
 
 An account opening balance is a dated snapshot. Movements before that date remain visible in the product register and exports, but do not change the current balance, available amount, card debt, or unconfirmed card amount. Import help must explain this before confirmation.
 
+Signed interchange imports follow the selected product. Bank and cash accounts interpret positive values as income and negative values as expenses. Credit cards interpret positive values as purchases and negative values as refunds. An explicit transaction type overrides sign inference so payments and transfers keep their real meaning.
+
 ## Responsive behavior and accessibility
 
 Desktop has top navigation, an account rail, main ledger, and right insights workspace. Below 1100px the insights move below the ledger. At 850px and below the rail is an in-flow, scrollable disclosure opened by “Mis cuentas y tarjetas.” It closes after selection. Narrow transactions keep merchant and amount together and move account/date beneath the name.
