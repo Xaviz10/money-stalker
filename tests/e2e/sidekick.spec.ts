@@ -150,7 +150,12 @@ test("review explains amount changes, preserves a failed match, confirms success
   ).toBeVisible();
   control.failMatch = true;
   await page.getByRole("button", { name: "Unir con Café de prueba" }).click();
-  await expect(page.getByRole("alert")).toContainText("No se pudo unir");
+  await expect(page.locator(".review-action-error")).toContainText(
+    "No se pudo unir",
+  );
+  await expect(page.locator(".review-action-error")).toContainText(
+    "La selección continúa pendiente",
+  );
   await expect(page.locator(".clue")).toHaveCount(1);
   control.failMatch = false;
   await page.getByRole("button", { name: "Unir con Café de prueba" }).click();

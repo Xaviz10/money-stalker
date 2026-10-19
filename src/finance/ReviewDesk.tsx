@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { State, Observation, Transaction } from "../../domain/model";
 import { formatCOP } from "../../domain/money";
 import { api, post } from "../api";
@@ -73,9 +73,21 @@ export function ReviewDesk({
   edit: (o: Observation) => void;
   stale: boolean;
 }) {
-  const pending = state.observations.filter((o) => o.status === "review");
-  const total = useRef(pending.length);
-  if (pending.length > total.current) total.current = pending.length;
+  const rawPending = state.observations.filter((o) => o.status === "review");
+  const [resolvedLocally, setResolvedLocally] = useState<Set<string>>(
+    new Set(),
+  );
+  useEffect(() => {
+    setResolvedLocally((current) => {
+      const next = new Set(
+        [...current].filter((id) => rawPending.some((o) => o.id === id)),
+      );
+      return next.size === current.size ? current : next;
+    });
+  }, [state.observations]);
+  const pending = rawPending.filter((o) => !resolvedLocally.has(o.id));
+  const total = useRef(rawPending.length);
+  if (rawPending.length > total.current) total.current = rawPending.length;
   const resolved = Math.max(0, total.current - pending.length);
   const visible = pending.slice(0, 10);
   const history = state.audit
@@ -85,6 +97,7 @@ export function ReviewDesk({
   const [busy, setBusy] = useState<string>();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lastAction, setLastAction] = useState("");
+  const [actionError, setActionError] = useState("");
   const canSeparate = (o: Observation) =>
     Boolean(
       o.accountId &&
@@ -102,13 +115,26 @@ export function ReviewDesk({
     id: string,
     fn: () => Promise<unknown>,
     message: string,
+    resolvedObservationIds: string[] = [],
   ) => {
     setBusy(id);
+    setActionError("");
     try {
       await act(fn, "");
+      if (resolvedObservationIds.length)
+        setResolvedLocally((current) => {
+          const next = new Set(current);
+          for (const observationId of resolvedObservationIds)
+            next.add(observationId);
+          return next;
+        });
       setLastAction(message);
       return true;
-    } catch {
+    } catch (error) {
+      setActionError(
+        (error as Error).message ||
+          "No se pudo guardar. La pista continúa pendiente.",
+      );
       return false;
     } finally {
       setBusy(undefined);
@@ -145,17 +171,30 @@ export function ReviewDesk({
       )}
       {(pending.length > 0 || lastAction) && (
         <>
-          <section className="review-progress" aria-label="Progreso de revisión">
+          <section
+            className="review-progress"
+            aria-label="Progreso de revisión"
+          >
             <div className="review-progress-numbers">
-              <span><strong>{pending.length}</strong> pendientes</span>
-              <span><strong>{resolved}</strong> resueltas en esta sesión</span>
+              <span>
+                <strong>{pending.length}</strong> pendientes
+              </span>
+              <span>
+                <strong>{resolved}</strong> resueltas en esta sesión
+              </span>
             </div>
             <progress max={Math.max(total.current, 1)} value={resolved}>
               {resolved} de {total.current}
             </progress>
             <p role="status" aria-live="polite">
-              {lastAction || `Mostrando ${visible.length} de ${pending.length} pistas pendientes.`}
+              {lastAction ||
+                `Mostrando pistas ${resolved + 1}–${resolved + visible.length} de ${total.current}.`}
             </p>
+            {actionError && (
+              <p className="review-action-error" role="alert">
+                {actionError} La selección continúa pendiente.
+              </p>
+            )}
             {selectable.length > 0 && (
               <div className="review-batch-actions">
                 <button
@@ -172,7 +211,9 @@ export function ReviewDesk({
                     })
                   }
                 >
-                  {allVisibleSelected ? "Quitar selección" : `Seleccionar ${selectable.length} visibles`}
+                  {allVisibleSelected
+                    ? "Quitar selección"
+                    : `Seleccionar ${selectable.length} visibles`}
                 </button>
                 <button
                   type="button"
@@ -181,14 +222,21 @@ export function ReviewDesk({
                   onClick={() =>
                     void run(
                       "batch",
-                      () => post("/reviews/batch", { observationIds: selectedIds, action: "separate" }),
-                      `${selectedIds.length} ${selectedIds.length === 1 ? "movimiento guardado" : "movimientos guardados"} por separado.`,
+                      () =>
+                        post("/reviews/batch", {
+                          observationIds: selectedIds,
+                          action: "separate",
+                        }),
+                      `${selectedIds.length} ${selectedIds.length === 1 ? "pista resuelta y retirada" : "pistas resueltas y retiradas"} de pendientes. Ahora ves ${selectedIds.length === 1 ? "la siguiente" : "las siguientes"}.`,
+                      selectedIds,
                     ).then((saved) => {
                       if (saved) setSelected(new Set());
                     })
                   }
                 >
-                  {busy === "batch" ? "Guardando selección…" : `Registrar ${selectedIds.length || "selección"} como distintos`}
+                  {busy === "batch"
+                    ? "Guardando selección…"
+                    : `Registrar ${selectedIds.length || "selección"} como distintos`}
                 </button>
               </div>
             )}
@@ -216,7 +264,7 @@ export function ReviewDesk({
                 <SourceTag source={o.source} />
                 <div className="clue-header-actions">
                   <span className="clue-state">
-                    Pista {index + 1} de {pending.length}
+                    Pista {resolved + index + 1} de {total.current}
                   </span>
                   {canSeparate(o) && (
                     <label className="clue-select">
@@ -328,7 +376,8 @@ export function ReviewDesk({
                                   observationId: o.id,
                                   transactionId: t.id,
                                 }),
-                              "Pistas unidas. El movimiento quedó actualizado.",
+                              "Pistas unidas y retiradas de pendientes. El movimiento quedó actualizado.",
+                              [o.id],
                             )
                           }
                         >
@@ -356,12 +405,19 @@ export function ReviewDesk({
                       onClick={() =>
                         void run(
                           o.id,
-                          () => post("/reviews", { observationId: o.id, action: "separate" }),
-                          "Movimiento distinto guardado. La pista quedó resuelta.",
+                          () =>
+                            post("/reviews", {
+                              observationId: o.id,
+                              action: "separate",
+                            }),
+                          "Pista resuelta y retirada de pendientes. Ahora ves la siguiente.",
+                          [o.id],
                         )
                       }
                     >
-                      {busy === o.id ? "Guardando…" : "Registrar como movimiento distinto"}
+                      {busy === o.id
+                        ? "Guardando…"
+                        : "Registrar como movimiento distinto"}
                     </button>
                     <button
                       className="text-button"
@@ -391,7 +447,8 @@ export function ReviewDesk({
                           observationId: o.id,
                           action: "ignore",
                         }),
-                      "Evidencia descartada. Puedes deshacerlo en el historial.",
+                      "Evidencia descartada y retirada de pendientes. Puedes deshacerlo en el historial.",
+                      [o.id],
                     )
                   }
                 >

@@ -1525,6 +1525,11 @@ td small {
   color: var(--color-success);
   font-size: 11px;
 }
+.review-progress .review-action-error {
+  grid-column: 1 / -1;
+  color: var(--color-danger);
+  font-weight: 650;
+}
 .review-batch-actions {
   display: flex;
   justify-content: flex-end;
