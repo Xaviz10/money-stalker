@@ -46,6 +46,8 @@ The dashboard's available amount is global. Selecting a rail account filters act
 
 Source/candidate review must show amount/date/account context, explain statement-driven amount changes, require an explicit decision, preserve failure state, and offer correction undo. Initial loading, incomplete evidence, and stale refresh are distinct from an empty ledger or a zero balance.
 
+Large review queues keep a sticky count of pending and session-resolved evidence, render at most ten clues at once, and confirm saves beside that count. Complete evidence can be registered as a distinct movement in one step. Users may explicitly select up to ten visible clues and register them atomically as separate movements; this is intended for legitimate repeated purchases such as same-value tolls. Never batch-merge evidence or infer that equal amount/date means one purchase.
+
 The Movements route is a product register. Scope it to one account or card, show that product’s balance or debt and movement count, and use the account rail or its mobile disclosure as the single scope control. Keep the ledger structure visible when the selected product has no movements. Search, import, export, and new movements use the current product; transfers use their direction relative to it. Import opens as a modal with a required preview and confirmation. On phones, rows keep merchant and amount visible together and place date, category, and status beneath them.
 
 An account opening balance is a dated snapshot. Movements before that date remain visible in the product register and exports, but do not change the current balance, available amount, card debt, or unconfirmed card amount. Import help must explain this before confirmation.

@@ -333,10 +333,11 @@ export function App() {
     setNotice("");
     try {
       await fn();
-      setNotice(message);
+      if (message) setNotice(message);
       await refresh();
     } catch (e) {
       setError((e as Error).message);
+      throw e;
     }
   };
   const title = nav.find((n) => n[0] === page)?.[1] ?? "Resumen";

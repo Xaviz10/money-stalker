@@ -44,6 +44,21 @@ describe('authorization and capture', () => {
     const s = await repo.read('owner'); expect(s.observations[0]).toMatchObject({ accountId: 'bank', status: 'linked', location }); expect(s.transactions).toHaveLength(1);
   });
   it('discards the entire mutation when validation fails', async () => { const { repo } = await setup(); await expect(repo.mutate('owner', s => { s.accounts.length = 0; throw new Error('failure'); })).rejects.toThrow(); expect((await repo.read('owner')).accounts).toHaveLength(1); });
+  it('registers a selected review batch as separate movements atomically', async () => {
+    const { repo, send } = await setup();
+    await repo.mutate('owner', s => {
+      for (const id of ['toll-1', 'toll-2', 'toll-3']) s.observations.push({
+        id, source: 'statement', observedAt: now, receivedAt: now, date: '2026-10-10', accountId: 'bank',
+        amountMinor: '1500000', currency: 'COP', merchant: 'Peaje', kind: 'expense', status: 'review',
+        candidates: [], parserVersion: 'test',
+      });
+    });
+    expect((await send('POST', '/reviews/batch', { observationIds: ['toll-1', 'toll-2', 'toll-3'], action: 'separate' })).status).toBe(200);
+    const state = await repo.read('owner');
+    expect(state.observations.every(o => o.status === 'linked')).toBe(true);
+    expect(state.transactions).toHaveLength(3);
+    expect(state.audit.filter(a => a.action === 'separate')).toHaveLength(3);
+  });
 });
 describe('import lifecycle and retries', () => {
   it('allows more than ten import files in one day', async () => {

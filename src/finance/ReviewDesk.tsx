@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { State, Observation, Transaction } from "../../domain/model";
 import { formatCOP } from "../../domain/money";
 import { api, post } from "../api";
@@ -74,11 +74,30 @@ export function ReviewDesk({
   stale: boolean;
 }) {
   const pending = state.observations.filter((o) => o.status === "review");
+  const total = useRef(pending.length);
+  if (pending.length > total.current) total.current = pending.length;
+  const resolved = Math.max(0, total.current - pending.length);
+  const visible = pending.slice(0, 10);
   const history = state.audit
     .filter((a) => a.beforeObservation || a.beforeTransaction)
     .slice(-10)
     .reverse();
   const [busy, setBusy] = useState<string>();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [lastAction, setLastAction] = useState("");
+  const canSeparate = (o: Observation) =>
+    Boolean(
+      o.accountId &&
+        o.amountMinor &&
+        o.date &&
+        (o.kind !== "transfer" || o.counterAccountId),
+    );
+  const selectable = visible.filter(canSeparate).map((o) => o.id);
+  const selectedIds = [...selected].filter((id) =>
+    pending.some((o) => o.id === id && canSeparate(o)),
+  );
+  const allVisibleSelected =
+    selectable.length > 0 && selectable.every((id) => selected.has(id));
   const run = async (
     id: string,
     fn: () => Promise<unknown>,
@@ -86,7 +105,11 @@ export function ReviewDesk({
   ) => {
     setBusy(id);
     try {
-      await act(fn, message);
+      await act(fn, "");
+      setLastAction(message);
+      return true;
+    } catch {
+      return false;
     } finally {
       setBusy(undefined);
     }
@@ -120,15 +143,68 @@ export function ReviewDesk({
           decisión.
         </p>
       )}
-      {pending.length > 0 && (
-        <p className="review-guidance">
-          <Glyph name="shield" size={18} />
-          Las coincidencias son sugerencias. Une solo evidencias de la misma
-          compra; puedes deshacerlo desde el historial.
-        </p>
+      {(pending.length > 0 || lastAction) && (
+        <>
+          <section className="review-progress" aria-label="Progreso de revisión">
+            <div className="review-progress-numbers">
+              <span><strong>{pending.length}</strong> pendientes</span>
+              <span><strong>{resolved}</strong> resueltas en esta sesión</span>
+            </div>
+            <progress max={Math.max(total.current, 1)} value={resolved}>
+              {resolved} de {total.current}
+            </progress>
+            <p role="status" aria-live="polite">
+              {lastAction || `Mostrando ${visible.length} de ${pending.length} pistas pendientes.`}
+            </p>
+            {selectable.length > 0 && (
+              <div className="review-batch-actions">
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={Boolean(busy) || stale}
+                  onClick={() =>
+                    setSelected((current) => {
+                      const next = new Set(current);
+                      for (const id of selectable)
+                        if (allVisibleSelected) next.delete(id);
+                        else next.add(id);
+                      return next;
+                    })
+                  }
+                >
+                  {allVisibleSelected ? "Quitar selección" : `Seleccionar ${selectable.length} visibles`}
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={!selectedIds.length || Boolean(busy) || stale}
+                  onClick={() =>
+                    void run(
+                      "batch",
+                      () => post("/reviews/batch", { observationIds: selectedIds, action: "separate" }),
+                      `${selectedIds.length} ${selectedIds.length === 1 ? "movimiento guardado" : "movimientos guardados"} por separado.`,
+                    ).then((saved) => {
+                      if (saved) setSelected(new Set());
+                    })
+                  }
+                >
+                  {busy === "batch" ? "Guardando selección…" : `Registrar ${selectedIds.length || "selección"} como distintos`}
+                </button>
+              </div>
+            )}
+          </section>
+          {pending.length > 0 && (
+            <p className="review-guidance">
+              <Glyph name="shield" size={18} />
+              Las coincidencias son sugerencias. Une solo evidencias de la misma
+              compra. Si son peajes u otras compras repetidas, regístralas como
+              movimientos distintos; puedes seleccionar hasta 10 a la vez.
+            </p>
+          )}
+        </>
       )}
       <div className="clue-list">
-        {pending.map((o) => {
+        {visible.map((o, index) => {
           const candidates = o.candidates
             .map((id) =>
               state.transactions.find((t) => t.id === id && !t.voided),
@@ -138,7 +214,29 @@ export function ReviewDesk({
             <article className="clue" key={o.id}>
               <div className="clue-header">
                 <SourceTag source={o.source} />
-                <span className="clue-state">Pendiente de tu revisión</span>
+                <div className="clue-header-actions">
+                  <span className="clue-state">
+                    Pista {index + 1} de {pending.length}
+                  </span>
+                  {canSeparate(o) && (
+                    <label className="clue-select">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(o.id)}
+                        disabled={Boolean(busy) || stale}
+                        onChange={(event) =>
+                          setSelected((current) => {
+                            const next = new Set(current);
+                            if (event.target.checked) next.add(o.id);
+                            else next.delete(o.id);
+                            return next;
+                          })
+                        }
+                      />
+                      Seleccionar
+                    </label>
+                  )}
+                </div>
               </div>
               <div className="clue-comparison">
                 <div className="source-evidence">
@@ -250,15 +348,38 @@ export function ReviewDesk({
                 </div>
               </div>
               <div className="clue-actions">
-                <button
-                  className="button secondary"
-                  disabled={Boolean(busy) || stale}
-                  onClick={() => edit(o)}
-                >
-                  {!o.amountMinor || !o.date || !o.accountId
-                    ? "Completar datos"
-                    : "Registrar por separado"}
-                </button>
+                {canSeparate(o) ? (
+                  <>
+                    <button
+                      className="button secondary"
+                      disabled={Boolean(busy) || stale}
+                      onClick={() =>
+                        void run(
+                          o.id,
+                          () => post("/reviews", { observationId: o.id, action: "separate" }),
+                          "Movimiento distinto guardado. La pista quedó resuelta.",
+                        )
+                      }
+                    >
+                      {busy === o.id ? "Guardando…" : "Registrar como movimiento distinto"}
+                    </button>
+                    <button
+                      className="text-button"
+                      disabled={Boolean(busy) || stale}
+                      onClick={() => edit(o)}
+                    >
+                      Editar antes de registrar
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="button secondary"
+                    disabled={Boolean(busy) || stale}
+                    onClick={() => edit(o)}
+                  >
+                    Completar datos
+                  </button>
+                )}
                 <button
                   className="text-button discard-clue"
                   disabled={Boolean(busy) || stale}

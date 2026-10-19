@@ -157,7 +157,9 @@ test("review explains amount changes, preserves a failed match, confirms success
   await expect(
     page.getByRole("heading", { name: "Todo en su lugar" }),
   ).toBeVisible();
-  await expect(page.locator(".action-notice")).toContainText("Pistas unidas");
+  await expect(page.locator(".review-progress [role=status]")).toContainText(
+    "Pistas unidas",
+  );
   await page.getByRole("button", { name: "Deshacer", exact: true }).click();
   await expect(page.locator(".clue")).toHaveCount(1);
   expect(control.writes).toBe(2);

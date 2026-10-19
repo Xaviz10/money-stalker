@@ -162,6 +162,22 @@ export function createAPI(repo: Repository, files: Files) {
         );
         return { status: 200, body: { saved: true } };
       }
+      if (method === "POST" && path === "/reviews/batch") {
+        const b = z
+          .object({
+            observationIds: z.array(id).min(1).max(10).refine(
+              (values) => new Set(values).size === values.length,
+              "No repitas evidencias en el lote",
+            ),
+            action: z.literal("separate"),
+          })
+          .parse(body);
+        await repo.mutate(h, (s) => {
+          for (const observationId of b.observationIds)
+            resolveObservation(s, observationId, b.action, now);
+        });
+        return { status: 200, body: { saved: true, resolved: b.observationIds.length } };
+      }
       if (method === "POST" && path === "/undo") {
         const b = z.object({ auditId: z.string().max(300) }).parse(body);
         await repo.mutate(h, (s) => undo(s, b.auditId, now));

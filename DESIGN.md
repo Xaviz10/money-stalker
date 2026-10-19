@@ -267,6 +267,8 @@ The labeled funds-minus-commitments equation leads to a citron global available-
 
 Review compares source/candidate amount, account, and date. Show discrepancies and statement-driven amount changes next to an explicit match action. Keep separate/complete, discard, and correction undo identifiable. On phones, source precedes candidate; the narrow dashboard preview also stacks its values.
 
+For long evidence queues, keep pending count, progress for the current session, and the latest save confirmation visible while the user works. Show ten clues at a time. Complete evidence supports direct separate registration and an explicit selection of up to ten clues for atomic separate registration. Equal amount and date remain suggestions only; batch merging is never offered.
+
 ### Icon and Eyes
 
 `Icon` supplies typed inline SVG line icons with a (24-unit) viewBox and rounded strokes. Its SVG is decorative; the enclosing control supplies accessible text. `Eyes` supplies the geometric brand companion and happy variant. Reuse them for brand, money, setup, and review contexts while keeping the financial information literal.
