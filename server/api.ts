@@ -10,7 +10,7 @@ import {
   undo,
 } from "../domain/ledger";
 import { bogotaDate } from "../domain/money";
-import { DomainError, id } from "../domain/model";
+import { DomainError, id, normalizeUnlinkedTransfers } from "../domain/model";
 import {
   exportRecords,
   MAX_FILE_BYTES,
@@ -57,6 +57,7 @@ export function createAPI(repo: Repository, files: Files) {
       const h = request.subject;
       if (method === "GET" && path === "/state") {
         const state = await repo.read(h);
+        normalizeUnlinkedTransfers(state);
         // The journal remains server-side. Keep review evidence plus linked location
         // evidence so the owner can remember where a movement was captured.
         return {

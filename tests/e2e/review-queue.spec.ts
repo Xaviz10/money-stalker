@@ -70,6 +70,13 @@ test("review queue shows progress and registers repeated purchases individually 
     "2 pistas resueltas y retiradas de pendientes",
   );
 
+  await page.goto("./#/movimientos");
+  await page.goto("./#/revisar");
+  await expect(
+    page.getByText("2 resueltas en esta sesión", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".clue-state")).toHaveText("Pista 3 de 3");
+
   await page
     .getByRole("button", { name: "Registrar como movimiento distinto" })
     .click();

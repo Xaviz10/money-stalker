@@ -83,6 +83,18 @@ export function normalizeDefaultCategories(state: State) {
     else state.categories.push({ ...category });
   }
 }
+export function normalizeUnlinkedTransfer(state: State, observation: Observation) {
+  const accountIds = new Set(state.accounts.map(account => account.id));
+  if (observation.status === 'review' && observation.kind === 'transfer'
+    && (!observation.counterAccountId || !accountIds.has(observation.counterAccountId))) {
+    observation.kind = 'expense';
+    delete observation.counterAccountId;
+    observation.reason = 'No se encontró una cuenta propia destino; se tratará como gasto';
+  }
+}
+export function normalizeUnlinkedTransfers(state: State) {
+  for (const observation of state.observations) normalizeUnlinkedTransfer(state, observation);
+}
 export function emptyState(): State {
   return { accounts: [], instruments: [], categories: defaultCategories.map(category => ({ ...category })),
     bills: [], transactions: [], observations: [], audit: [], aliases: [], settings: { payday: 1, reserveMinor: '0' } };

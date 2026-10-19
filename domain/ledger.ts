@@ -1,5 +1,5 @@
 import { accountSchema, billSchema, categorySchema, instrumentSchema, settingsSchema, transactionInput,
-  DomainError, requireValue, type State, type Transaction, type TransactionInput, type Observation, type Entry, type Account } from './model';
+  DomainError, normalizeUnlinkedTransfer, requireValue, type State, type Transaction, type TransactionInput, type Observation, type Entry, type Account } from './model';
 import { bogotaDate, nextPayday } from './money';
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -105,6 +105,7 @@ export function ingest(state: State, input: Observation, at: string): Observatio
 }
 export function mergeObservation(state: State, observationId: string, transactionId: string, at: string) {
   const observation = requireValue(state.observations.find(o => o.id === observationId), 'Evidencia desconocida');
+  normalizeUnlinkedTransfer(state, observation);
   if (observation.status !== 'review') throw new DomainError('La evidencia ya fue revisada', 409);
   const t = requireValue(state.transactions.find(t => t.id === transactionId && !t.voided), 'Movimiento desconocido');
   if (observation.accountId && observation.accountId !== t.accountId) throw new DomainError('No se pueden unir cuentas distintas');
@@ -124,6 +125,7 @@ export function mergeObservation(state: State, observationId: string, transactio
 }
 export function resolveObservation(state: State, observationId: string, action: 'separate' | 'ignore', at: string, details?: unknown) {
   const o = requireValue(state.observations.find(o => o.id === observationId), 'Evidencia desconocida');
+  normalizeUnlinkedTransfer(state, o);
   if (o.status !== 'review') throw new DomainError('La evidencia ya fue revisada', 409);
   const beforeObservation = clone(o);
   if (action === 'ignore') { o.status = 'ignored'; state.audit.push({ id: `ignore:${o.id}:${state.audit.length}`, at, action, beforeObservation }); return; }

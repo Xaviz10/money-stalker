@@ -82,20 +82,19 @@ const bancolombiaMovement = (
       ? normalizedAccountMatch(accounts, network, "credit")
       : undefined;
     const creditAccounts = accounts.filter((a) => a.kind === "credit");
-    return {
-      kind: "transfer" as const,
-      merchant: description,
-      counterAccountId:
-        byNetwork ??
-        (creditAccounts.length === 1 ? creditAccounts[0].id : undefined),
-    };
+    const counterAccountId =
+      byNetwork ??
+      (creditAccounts.length === 1 ? creditAccounts[0].id : undefined);
+    return counterAccountId
+      ? { kind: "transfer" as const, merchant: description, counterAccountId }
+      : { kind: "expense" as const, merchant: description };
   }
-  if (/^transferencias? a nequi\b/.test(key))
-    return {
-      kind: "transfer" as const,
-      merchant: description,
-      counterAccountId: normalizedAccountMatch(accounts, "nequi"),
-    };
+  if (/^transferencias? a nequi\b/.test(key)) {
+    const counterAccountId = normalizedAccountMatch(accounts, "nequi");
+    return counterAccountId
+      ? { kind: "transfer" as const, merchant: description, counterAccountId }
+      : { kind: "expense" as const, merchant: description };
+  }
   return { kind: "expense" as const, merchant: description };
 };
 const bancolombiaCreditMovement = (

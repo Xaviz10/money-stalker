@@ -1317,8 +1317,9 @@ function ImportDialog({
           </p>
           <p className="small-note">
             Los pagos de tarjeta y las transferencias a Nequi se conservan como
-            transferencias cuando podemos identificar la cuenta destino. Si
-            falta, aparecerán en Revisión. No se evalúan fórmulas.
+            transferencias cuando podemos identificar una cuenta propia como
+            destino. Sin esa cuenta, se registran como gastos. No se evalúan
+            fórmulas.
           </p>
         </div>
       </details>

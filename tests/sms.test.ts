@@ -81,6 +81,52 @@ describe("Bancolombia SMS parsing", () => {
 });
 
 describe("Bancolombia SMS capture", () => {
+  it("records a transfer-shaped SMS as an expense when no owned destination account exists", async () => {
+    const state = emptyState();
+    configure(state, "accounts", {
+      id: "bank",
+      name: "Ahorros",
+      institution: "Bancolombia",
+      kind: "bank",
+      openingMinor: "200000000",
+      openingDate: "2026-01-01",
+      eligible: true,
+    });
+    configure(state, "instruments", {
+      id: "bank-sms",
+      name: "Cuenta *1122",
+      accountId: "bank",
+      aliases: ["1122"],
+    });
+    const repo = new MemoryRepository();
+    const files = new MemoryFiles();
+    repo.states.set("owner", state);
+    const job = captureJob(
+      "owner",
+      "phone",
+      {
+        eventId: "external-nequi",
+        source: "sms",
+        observedAt: now,
+        message:
+          "Bancolombia: Transferiste $45,678.90 desde tu cuenta *1122 a NEQUI *0000005566 el 06/09/26 a las 10:00.",
+      },
+      now,
+    );
+    await repo.putJob(job);
+    await processJob(repo, files, "owner", job.id);
+
+    const result = await repo.read("owner");
+    expect(result.transactions).toHaveLength(1);
+    expect(result.transactions[0]).toMatchObject({
+      accountId: "bank",
+      amountMinor: "4567890",
+      kind: "expense",
+      merchant: "Transferencia a Nequi",
+    });
+    expect(result.transactions[0].counterAccountId).toBeUndefined();
+  });
+
   it("maps account and card suffixes, then records transfers without counting them as spending", async () => {
     const state = emptyState();
     configure(state, "accounts", {

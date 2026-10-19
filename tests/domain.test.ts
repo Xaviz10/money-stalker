@@ -29,6 +29,14 @@ describe('exact COP amounts and dates', () => {
       { id: 'utilities', name: 'Servicios' },
     ]));
   });
+  it('resolves pending transfers without an owned destination as expenses', () => {
+    const state = setup();
+    state.observations.push(observation('external-transfer', { accountId: 'bank', kind: 'transfer', counterAccountId: 'missing-nequi', merchant: 'Transferencia a Nequi' }));
+    resolveObservation(state, 'external-transfer', 'separate', at);
+    expect(state.observations[0]).toMatchObject({ kind: 'expense', merchant: 'Transferencia a Nequi', status: 'linked' });
+    expect(state.observations[0].counterAccountId).toBeUndefined();
+    expect(state.transactions[0]).toMatchObject({ kind: 'expense', merchant: 'Transferencia a Nequi', accountId: 'bank' });
+  });
   it('keeps cents and large amounts exact', () => { expect(parseCOP('$ 1.234.567,89')).toBe('123456789'); expect(formatCOP('123456789')).toBe('$ 1.234.567,89'); expect(parseCOP('90071992547409,91')).toBe('9007199254740991'); });
   it('rejects malformed values and USD-style decimals', () => { for (const v of ['1.23', 'NaN', '1,000.00', '2,222', 'USD 2']) expect(() => parseCOP(v)).toThrow(); });
   it('uses Bogota dates and clamps payday at month end', () => { expect(bogotaDate(new Date('2026-10-01T02:00:00Z'))).toBe('2026-09-30'); expect(nextPayday('2026-02-10', 31)).toBe('2026-02-28'); expect(nextPayday('2026-12-31', 31)).toBe('2027-01-31'); });

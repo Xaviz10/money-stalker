@@ -72,6 +72,7 @@ export async function processJob(
         const counterAccountId =
           input.counterAccountId ??
           (parsed ? resolveCapturedDestination(state, parsed) : undefined);
+        const parsedKind = parsed?.kind ?? input.kind;
         const observation: Observation = {
           id: job.id,
           source: input.source,
@@ -82,7 +83,10 @@ export async function processJob(
           amountMinor: input.amountMinor ?? parsed?.amountMinor,
           currency: "COP",
           merchant: input.merchant || parsed?.merchant || "",
-          kind: parsed?.kind ?? input.kind,
+          kind:
+            parsedKind === "transfer" && !counterAccountId
+              ? "expense"
+              : parsedKind,
           counterAccountId,
           reference: input.reference,
           // No bank-reference parser is verified yet. Client-supplied strings cannot establish strong identity.

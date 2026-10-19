@@ -245,6 +245,21 @@ describe("CSV/XLSX parsing", () => {
       kind: "income",
       amountMinor: "150000000",
     });
+
+    const withoutNequi = parseImport(
+      bytes,
+      "extracto.xlsx",
+      "bank",
+      "auto",
+      now,
+      profiles,
+      accounts.filter((account) => account.id !== "nequi"),
+    );
+    expect(withoutNequi.rows[1].observation).toMatchObject({
+      kind: "expense",
+      amountMinor: "2000000",
+    });
+    expect(withoutNequi.rows[1].observation?.counterAccountId).toBeUndefined();
   });
   it("detects Bancolombia Visa purchases and maps card payments back to the linked bank", () => {
     const rows = [

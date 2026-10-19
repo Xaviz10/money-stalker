@@ -1,8 +1,33 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { State, Observation, Transaction } from "../../domain/model";
 import { formatCOP } from "../../domain/money";
 import { api, post } from "../api";
 import { Icon as Glyph, Eyes as SidekickMark } from "../design-system/ui";
+
+const REVIEW_SESSION_KEY = "money-stalker.review-session.v1";
+
+function loadReviewSession(fallback: string[]) {
+  try {
+    const parsed = JSON.parse(
+      sessionStorage.getItem(REVIEW_SESSION_KEY) ?? "null",
+    );
+    if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string"))
+      return [...new Set<string>(parsed)];
+    saveReviewSession(fallback);
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveReviewSession(ids: string[]) {
+  try {
+    sessionStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(ids));
+  } catch {
+    // The queue still works when private browsing blocks web storage.
+  }
+}
+
 function shortDate(value?: string) {
   if (!value) return "Sin fecha";
   return new Intl.DateTimeFormat("es-CO", {
@@ -74,6 +99,10 @@ export function ReviewDesk({
   stale: boolean;
 }) {
   const rawPending = state.observations.filter((o) => o.status === "review");
+  const rawPendingIds = rawPending.map((o) => o.id);
+  const [sessionIds, setSessionIds] = useState<string[]>(() =>
+    loadReviewSession(rawPendingIds),
+  );
   const [resolvedLocally, setResolvedLocally] = useState<Set<string>>(
     new Set(),
   );
@@ -84,11 +113,25 @@ export function ReviewDesk({
       );
       return next.size === current.size ? current : next;
     });
+    setSessionIds((current) => {
+      const pendingIds = new Set(rawPendingIds);
+      const currentIds = new Set(current);
+      const unresolved = current.filter((id) => pendingIds.has(id));
+      const incoming = rawPendingIds.filter((id) => !currentIds.has(id));
+      const next =
+        !current.length || (!unresolved.length && incoming.length)
+          ? rawPendingIds
+          : incoming.length
+            ? [...current, ...incoming]
+            : current;
+      if (next !== current) saveReviewSession(next);
+      return next;
+    });
   }, [state.observations]);
   const pending = rawPending.filter((o) => !resolvedLocally.has(o.id));
-  const total = useRef(rawPending.length);
-  if (rawPending.length > total.current) total.current = rawPending.length;
-  const resolved = Math.max(0, total.current - pending.length);
+  const unresolvedSession = new Set(pending.map((o) => o.id));
+  const resolved = sessionIds.filter((id) => !unresolvedSession.has(id)).length;
+  const total = Math.max(sessionIds.length, resolved + pending.length);
   const visible = pending.slice(0, 10);
   const history = state.audit
     .filter((a) => a.beforeObservation || a.beforeTransaction)
@@ -183,12 +226,12 @@ export function ReviewDesk({
                 <strong>{resolved}</strong> resueltas en esta sesión
               </span>
             </div>
-            <progress max={Math.max(total.current, 1)} value={resolved}>
-              {resolved} de {total.current}
+            <progress max={Math.max(total, 1)} value={resolved}>
+              {resolved} de {total}
             </progress>
             <p role="status" aria-live="polite">
               {lastAction ||
-                `Mostrando pistas ${resolved + 1}–${resolved + visible.length} de ${total.current}.`}
+                `Mostrando pistas ${resolved + 1}–${resolved + visible.length} de ${total}.`}
             </p>
             {actionError && (
               <p className="review-action-error" role="alert">
@@ -264,7 +307,7 @@ export function ReviewDesk({
                 <SourceTag source={o.source} />
                 <div className="clue-header-actions">
                   <span className="clue-state">
-                    Pista {resolved + index + 1} de {total.current}
+                    Pista {resolved + index + 1} de {total}
                   </span>
                   {canSeparate(o) && (
                     <label className="clue-select">
