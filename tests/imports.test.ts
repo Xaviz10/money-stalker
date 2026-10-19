@@ -7,7 +7,7 @@ import {
   profiles,
   safeCell,
 } from "../server/imports";
-import { addTransaction, configure } from "../domain/ledger";
+import { addTransaction, configure, ingest } from "../domain/ledger";
 import { emptyState } from "../domain/model";
 const now = "2026-10-17T18:00:00Z";
 const fixture = readFileSync("tests/fixtures/interchange.csv");
@@ -244,6 +244,110 @@ describe("CSV/XLSX parsing", () => {
     expect(result.rows[3].observation).toMatchObject({
       kind: "income",
       amountMinor: "150000000",
+    });
+  });
+  it("detects Bancolombia Visa purchases and maps card payments back to the linked bank", () => {
+    const rows = [
+      ["Información de la Tarjeta", "************8645"],
+      [],
+      ["Movimientos durante el periodo"],
+      [
+        "Número de autorización",
+        "Fecha",
+        "Movimientos",
+        "Valor Movimiento",
+        "Número de cuotas",
+        "Valor cuota/abono",
+        "Interés mensual (%)",
+        "Interés anual (%)",
+        "Saldo pendiente",
+      ],
+      [
+        "123456",
+        "13/09/2026",
+        "TIENDAS ARA",
+        "180.389,00",
+        "1/1",
+        "180.389,00",
+        "0,0000",
+        "0,0000",
+        "0,00",
+      ],
+      [
+        "050077",
+        "02/09/2026",
+        "ABONO SUCURSAL VIRTUAL",
+        "-5.895.956,00",
+        "",
+        "-5.895.956,00",
+        "",
+        "",
+        "0,00",
+      ],
+    ];
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), "PESOS");
+    const bytes = XLSX.write(book, { type: "buffer", bookType: "xlsx" });
+    const accounts = [
+      {
+        id: "bank",
+        name: "Ahorros",
+        kind: "bank" as const,
+        openingMinor: "0",
+        openingDate: "2026-01-01",
+        eligible: true,
+      },
+      {
+        id: "visa",
+        name: "Visa",
+        kind: "credit" as const,
+        openingMinor: "0",
+        openingDate: "2026-01-01",
+        eligible: false,
+        parentAccountId: "bank",
+      },
+    ];
+    const result = parseImport(
+      bytes,
+      "visa.xlsx",
+      "visa",
+      "auto",
+      now,
+      profiles,
+      accounts,
+    );
+    expect(result.profile).toBe("bancolombia-visa-detailed-v1");
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[0].observation).toMatchObject({
+      accountId: "visa",
+      kind: "expense",
+      amountMinor: "18038900",
+      date: "2026-09-13",
+    });
+    expect(result.rows[1].observation).toMatchObject({
+      accountId: "bank",
+      counterAccountId: "visa",
+      kind: "transfer",
+      amountMinor: "589595600",
+      date: "2026-09-02",
+    });
+    const state = emptyState();
+    for (const account of accounts) configure(state, "accounts", account);
+    const cardPayment = result.rows[1].observation!;
+    ingest(
+      state,
+      {
+        ...cardPayment,
+        id: "bank-statement-payment",
+        merchant: "PAGO SUC VIRT TC VISA",
+      },
+      now,
+    );
+    ingest(state, cardPayment, now);
+    expect(state.transactions).toHaveLength(1);
+    expect(state.observations[1]).toMatchObject({
+      status: "review",
+      candidates: [state.transactions[0].id],
     });
   });
 });

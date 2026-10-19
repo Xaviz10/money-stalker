@@ -42,7 +42,11 @@ export type Profile = {
     merchant: string,
     amountMinor: string,
     accounts: Account[],
-  ) => Pick<Observation, "kind" | "merchant"> & { counterAccountId?: string };
+    accountId: string,
+  ) => Pick<Observation, "kind" | "merchant"> & {
+    accountId?: string;
+    counterAccountId?: string;
+  };
 };
 const normalizedAccountMatch = (
   accounts: Account[],
@@ -94,6 +98,32 @@ const bancolombiaMovement = (
     };
   return { kind: "expense" as const, merchant: description };
 };
+const bancolombiaCreditMovement = (
+  merchant: string,
+  amountMinor: string,
+  accounts: Account[],
+  accountId: string,
+) => {
+  const description = merchant.trim().replace(/\s+/g, " ");
+  if (BigInt(amountMinor) >= 0n)
+    return { kind: "expense" as const, merchant: description };
+  if (/^(abono|pago)\b/i.test(description)) {
+    const card = accounts.find(
+      (account) => account.id === accountId && account.kind === "credit",
+    );
+    const bankAccounts = accounts.filter((account) => account.kind === "bank");
+    const bank =
+      bankAccounts.find((account) => account.id === card?.parentAccountId) ??
+      (bankAccounts.length === 1 ? bankAccounts[0] : undefined);
+    return {
+      kind: "transfer" as const,
+      merchant: description,
+      accountId: bank?.id ?? accountId,
+      counterAccountId: bank ? accountId : undefined,
+    };
+  }
+  return { kind: "refund" as const, merchant: description };
+};
 export const profiles: Profile[] = [
   {
     id: "bancolombia-savings-quarterly-v1",
@@ -114,6 +144,35 @@ export const profiles: Profile[] = [
     extensions: ["xlsx"],
     datedRowsOnly: true,
     classify: bancolombiaMovement,
+  },
+  {
+    id: "bancolombia-visa-detailed-v1",
+    label: "Bancolombia · Visa detallada (XLSX)",
+    verified: true,
+    header: [
+      "Número de autorización",
+      "Fecha",
+      "Movimientos",
+      "Valor Movimiento",
+      "Número de cuotas",
+      "Valor cuota/abono",
+      "Interés mensual (%)",
+      "Interés anual (%)",
+      "Saldo pendiente",
+    ],
+    columns: {
+      date: "Fecha",
+      merchant: "Movimientos",
+      amount: "Valor Movimiento",
+      reference: "Número de autorización",
+    },
+    strongReference: false,
+    dateFormat: "dmy",
+    signed: true,
+    fixedCurrency: "COP",
+    extensions: ["xlsx"],
+    datedRowsOnly: true,
+    classify: bancolombiaCreditMovement,
   },
   {
     id: "cop-interchange-v1",
@@ -300,6 +359,14 @@ export function parseImport(
     throw new DomainError(
       "El extracto Bancolombia de ahorros debe importarse en una cuenta bancaria",
     );
+  if (
+    profile.id === "bancolombia-visa-detailed-v1" &&
+    accounts.length &&
+    accounts.find((a) => a.id === accountId)?.kind !== "credit"
+  )
+    throw new DomainError(
+      "El extracto Visa detallado debe importarse en una tarjeta de crédito",
+    );
   const headerIndex = grid.findIndex((row) =>
     profile.header.every((h) => row.some((v) => normalize(v) === normalize(h))),
   );
@@ -335,9 +402,12 @@ export function parseImport(
     }
     if (
       profile.datedRowsOnly &&
-      !/^\d{1,2}\/\d{1,2}$/.test(
-        String(read(row, profile.columns.date) ?? "").trim(),
-      )
+      !(profile.dateFormat === "dm-statement-range"
+        ? /^\d{1,2}\/\d{1,2}$/
+        : profile.dateFormat === "dmy"
+          ? /^\d{2}\/\d{2}\/\d{4}$/
+          : /^\d{4}-\d{2}-\d{2}$/
+      ).test(String(read(row, profile.columns.date) ?? "").trim())
     ) {
       skippedRows.push(i + 1);
       continue;
@@ -397,7 +467,12 @@ export function parseImport(
       const merchant = String(read(row, profile.columns.merchant) ?? "")
         .trim()
         .slice(0, 200);
-      const classified = profile.classify?.(merchant, amount, accounts);
+      const classified = profile.classify?.(
+        merchant,
+        amount,
+        accounts,
+        accountId,
+      );
       const kind =
         classified?.kind ??
         kinds[rawKind] ??
@@ -423,7 +498,7 @@ export function parseImport(
           observedAt: now,
           receivedAt: now,
           date: day,
-          accountId,
+          accountId: classified?.accountId ?? accountId,
           amountMinor: absolute,
           currency: "COP",
           merchant: classified?.merchant ?? merchant,

@@ -50,6 +50,8 @@ An account opening balance is a dated snapshot. Movements before that date remai
 
 Signed interchange imports follow the selected product. Bank and cash accounts interpret positive values as income and negative values as expenses. Credit cards interpret positive values as purchases and negative values as refunds. An explicit transaction type overrides sign inference so payments and transfers keep their real meaning.
 
+The verified Bancolombia Visa detailed XLSX profile reads `Valor Movimiento`: positive rows are purchases, negative non-payment rows are refunds, and negative rows labeled as an abono or payment become bank-to-card transfers. Use the card's linked bank account, or the only configured bank account when unambiguous; otherwise leave the transfer for review instead of guessing.
+
 ## Responsive behavior and accessibility
 
 Desktop has top navigation, an account rail, main ledger, and right insights workspace. Below 1100px the insights move below the ledger. At 850px and below the rail is an in-flow, scrollable disclosure opened by “Mis cuentas y tarjetas.” It closes after selection. Narrow transactions keep merchant and amount together and move account/date beneath the name.

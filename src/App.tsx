@@ -1206,7 +1206,8 @@ function ImportDialog({
         <div>
           <p>
             <strong>Bancolombia:</strong> extracto trimestral XLSX de cuenta de
-            ahorros, con fechas por página y valores firmados.
+            ahorros o extracto Visa detallado XLSX. En Visa, las compras
+            positivas aumentan la deuda y los abonos negativos la reducen.
           </p>
           <p>
             <strong>Intercambio:</strong> encabezados{" "}
