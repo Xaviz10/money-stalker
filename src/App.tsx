@@ -87,6 +87,51 @@ function Badge({
     </SystemBadge>
   );
 }
+type FlowRecord = Pick<
+  Observation,
+  "kind" | "accountId" | "counterAccountId"
+>;
+function isIncoming(record: FlowRecord, selectedAccount: string) {
+  return (
+    record.kind === "income" ||
+    record.kind === "refund" ||
+    (record.kind === "transfer" &&
+      record.counterAccountId === selectedAccount)
+  );
+}
+function flowLabel(record: FlowRecord, selectedAccount: string, state: State) {
+  const selected = state.accounts.find(
+    (account) => account.id === selectedAccount,
+  );
+  if (record.kind === "income") return "Ingreso";
+  if (record.kind === "refund") return "Devolución";
+  if (record.kind === "expense")
+    return selected?.kind === "credit" ? "Compra" : "Gasto";
+  const incoming = isIncoming(record, selectedAccount);
+  if (incoming && selected?.kind === "credit") return "Pago recibido";
+  const destination = state.accounts.find(
+    (account) => account.id === record.counterAccountId,
+  );
+  if (!incoming && destination?.kind === "credit") return "Pago de tarjeta";
+  return incoming ? "Transferencia recibida" : "Transferencia enviada";
+}
+function FlowIndicator({
+  record,
+  selectedAccount,
+  state,
+}: {
+  record: FlowRecord;
+  selectedAccount: string;
+  state: State;
+}) {
+  const incoming = isIncoming(record, selectedAccount);
+  return (
+    <span className={`transaction-flow ${incoming ? "incoming" : "outgoing"}`}>
+      <Icon name={incoming ? "incoming" : "outgoing"} size={12} />
+      {flowLabel(record, selectedAccount, state)}
+    </span>
+  );
+}
 function AppForm({
   children,
   onSubmit,
@@ -543,11 +588,7 @@ function TransactionTable({
         <tbody>
           {transactions.length ? (
             transactions.map((t) => {
-              const incoming =
-                t.kind === "income" ||
-                t.kind === "refund" ||
-                (t.kind === "transfer" &&
-                  t.counterAccountId === selectedAccount);
+              const incoming = isIncoming(t, selectedAccount);
               const selectedProduct = state.accounts.find(
                 (account) => account.id === selectedAccount,
               );
@@ -583,6 +624,11 @@ function TransactionTable({
                         }[t.kind]}
                     </button>
                     {t.note && <small>{t.note}</small>}
+                    <FlowIndicator
+                      record={t}
+                      selectedAccount={selectedAccount}
+                      state={state}
+                    />
                   </td>
                   <td className="register-category">
                     {t.kind === "transfer"
@@ -615,7 +661,7 @@ function TransactionTable({
                     </Badge>
                   </td>
                   <td
-                    className={`number amount register-value ${incoming ? "positive" : ""}`}
+                    className={`number amount register-value ${incoming ? "positive" : "negative"}`}
                   >
                     {incoming ? "+" : "−"}
                     {formatCOP(t.amountMinor)}
@@ -1268,7 +1314,8 @@ function ImportDialog({
                   <th>Fila</th>
                   <th>Comercio</th>
                   <th>Fecha</th>
-                  <th>Valor</th>
+                  <th>Tipo</th>
+                  <th className="number">Valor</th>
                   <th>Resultado</th>
                 </tr>
               </thead>
@@ -1279,14 +1326,31 @@ function ImportDialog({
                       row.observation?.date &&
                       row.observation.date < account.openingDate,
                   );
+                  const incoming = Boolean(
+                    row.observation &&
+                      isIncoming(row.observation, accountId),
+                  );
                   return (
                     <tr key={row.row}>
                       <td>{row.row}</td>
                       <td>{row.observation?.merchant ?? "—"}</td>
                       <td>{row.observation?.date ?? "—"}</td>
                       <td>
+                        {row.observation ? (
+                          <FlowIndicator
+                            record={row.observation}
+                            selectedAccount={accountId}
+                            state={state}
+                          />
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td
+                        className={`number amount ${row.observation ? (incoming ? "positive" : "negative") : ""}`}
+                      >
                         {row.observation?.amountMinor
-                          ? formatCOP(row.observation.amountMinor)
+                          ? `${incoming ? "+" : "−"}${formatCOP(row.observation.amountMinor)}`
                           : "—"}
                       </td>
                       <td>

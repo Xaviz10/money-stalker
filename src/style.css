@@ -1952,6 +1952,28 @@ input[type="checkbox"] {
   color: var(--color-primary);
   text-decoration: underline;
 }
+.register-movement .transaction-flow {
+  margin-top: 2px;
+}
+.transaction-flow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.transaction-flow.incoming {
+  color: var(--color-success);
+}
+.transaction-flow.outgoing {
+  color: var(--color-danger);
+}
+.transaction-flow svg {
+  flex: 0 0 auto;
+}
 .amount {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -2239,6 +2261,9 @@ input[type="checkbox"] {
 }
 .import-preview .section-heading h2 {
   font-size: 18px;
+}
+.import-preview td .transaction-flow {
+  min-width: max-content;
 }
 .token {
   display: block;

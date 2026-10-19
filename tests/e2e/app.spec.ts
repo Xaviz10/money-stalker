@@ -79,6 +79,14 @@ test("account → capture → import → review → export works on the project 
     ),
   });
   await page.getByRole("button", { name: "Subir y previsualizar" }).click();
+  const preview = importDialog.getByRole("table");
+  await expect(
+    preview.getByRole("columnheader", { name: "Tipo" }),
+  ).toBeVisible();
+  await expect(preview.getByText("Gasto", { exact: true })).toBeVisible();
+  await expect(preview.locator("tbody tr").first()).toContainText(
+    "−$ 12.500",
+  );
   await page
     .getByRole("button", { name: "Confirmar 1 filas aceptadas" })
     .click();
@@ -107,6 +115,7 @@ test("account → capture → import → review → export works on the project 
     name: "Movimientos del producto seleccionado",
   });
   await expect(ledger.locator("tbody tr")).toHaveCount(1);
+  await expect(ledger.getByText("Gasto", { exact: true })).toBeVisible();
   if (isMobile)
     await page.getByRole("button", { name: /Ahorros de prueba/ }).click();
   await page

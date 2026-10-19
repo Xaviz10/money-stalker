@@ -239,6 +239,8 @@ The generic COP import accepts signed values. For bank and cash products, positi
 
 The Bancolombia Visa detailed XLSX format uses positive purchases and negative abonos. Present the abono as a bank-to-card transfer when the linked bank is known so importing both statements produces a reconciliation candidate rather than duplicate financial activity.
 
+Movement rows and import previews expose financial direction separately from status. Show a compact directional label and signed amount for income, expense, purchase, refund, card payment, and transfers. A card abono reads `Pago recibido` with a positive amount when viewed from the card; it remains a transfer in the ledger. `Histórico` only communicates that the row predates the opening-balance snapshot.
+
 The accounts route shows saved products first. Creation, margin/categories, automatic capture, and bills live in a single `Administrar` hub made from native disclosures. Keep these sections collapsed until requested, except `Agregar producto` on an empty account list. A disclosure summary names the job and describes its contents; do not expose every form at once. Automatic capture is one two-step job: associate the cards seen in SMS or Wallet, then create the iPhone access used by Shortcuts.
 
 ### Navigation
