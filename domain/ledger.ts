@@ -4,6 +4,21 @@ import { bogotaDate, nextPayday } from './money';
 
 const clone = <T>(value: T): T => structuredClone(value);
 export const merchantKey = (value: string) => value.normalize('NFKC').trim().toLocaleLowerCase('es-CO').replace(/\s+/g, ' ');
+type ComparableMovement = Pick<TransactionInput, 'accountId' | 'counterAccountId' | 'date' | 'amountMinor' | 'kind' | 'merchant' | 'reference'>;
+export function duplicateTransactions(state: State, movement: ComparableMovement): Transaction[] {
+  return state.transactions.filter(t => !t.voided && t.accountId === movement.accountId
+    && t.counterAccountId === movement.counterAccountId && t.amountMinor === movement.amountMinor && t.kind === movement.kind
+    && ((movement.reference && t.reference === movement.reference) || (t.date === movement.date
+      && (movement.kind === 'transfer' || merchantKey(t.merchant) === merchantKey(movement.merchant)))));
+}
+function captureCandidates(state: State, observation: Observation): Transaction[] {
+  if (!observation.accountId || !observation.amountMinor || !observation.date) return [];
+  return state.transactions.filter(t => !t.voided && t.accountId === observation.accountId && (
+    (observation.reference && t.reference === observation.reference) ||
+    (t.amountMinor === observation.amountMinor && t.kind === observation.kind
+      && Math.abs(Date.parse(t.date) - Date.parse(observation.date!)) <= 7 * 86400000)
+  ));
+}
 const findAccount = (state: State, id: string) => requireValue(state.accounts.find(a => a.id === id), 'Cuenta desconocida');
 function entries(state: State, t: TransactionInput): Entry[] {
   const account = findAccount(state, t.accountId);
@@ -77,7 +92,8 @@ export function configure(state: State, kind: string, input: unknown) {
 }
 function upsert<T extends { id: string }>(list: T[], item: T) { const index = list.findIndex(i => i.id === item.id); if (index < 0) list.push(item); else list[index] = item; }
 
-export function ingest(state: State, input: Observation, at: string): Observation {
+export function ingestCapture(state: State, input: Observation): Observation {
+  if (input.source === 'statement') throw new DomainError('Los extractos se confirman durante la importación');
   const existing = state.observations.find(o => o.id === input.id);
   if (existing) return existing;
   const observation = clone(input);
@@ -87,22 +103,31 @@ export function ingest(state: State, input: Observation, at: string): Observatio
     observation.reason = 'Faltan datos para registrar el movimiento'; return observation;
   }
   if (!state.accounts.some(a => a.id === observation.accountId)) { observation.reason = 'Cuenta sin configurar'; return observation; }
-  const candidates = state.transactions.filter(t => !t.voided && t.accountId === observation.accountId && (
-    (observation.reference && t.reference === observation.reference) ||
-    (t.amountMinor === observation.amountMinor && t.kind === observation.kind && Math.abs(Date.parse(t.date) - Date.parse(observation.date!)) <= 7 * 86400000)
-  ));
-  const exact = candidates.filter(t => observation.reference && t.reference === observation.reference);
-  if (exact.length === 1 && exact[0].amountMinor === observation.amountMinor && exact[0].kind === observation.kind && exact[0].counterAccountId === observation.counterAccountId) {
-    mergeObservation(state, observation.id, exact[0].id, at); return observation;
+  const candidates = captureCandidates(state, observation);
+  observation.candidates = candidates.map(t => t.id);
+  observation.reason = candidates.length ? 'Posible coincidencia: confirma antes de unir' : 'Captura de Shortcut pendiente de confirmación';
+  return observation;
+}
+export function refreshCaptureCandidates(state: State) {
+  for (const observation of state.observations.filter(o => o.status === 'review' && o.source !== 'statement')) {
+    if (!observation.accountId || !observation.amountMinor || !observation.date) continue;
+    observation.candidates = captureCandidates(state, observation).map(t => t.id);
+    if (observation.candidates.length) observation.reason = 'Posible coincidencia: confirma antes de unir';
   }
-  if (candidates.length) { observation.candidates = candidates.map(t => t.id); observation.reason = exact.length ? 'Referencia con datos en conflicto' : 'Posible coincidencia: confirma antes de unir'; return observation; }
-  let t: Transaction;
-  try { t = addTransaction(state, { id: `obs:${observation.id}`, accountId: observation.accountId,
-    counterAccountId: observation.counterAccountId, date: observation.date, amountMinor: observation.amountMinor,
-    kind: observation.kind, merchant: observation.merchant, reference: observation.reference,
-    status: observation.source === 'statement' ? 'posted' : 'provisional' }, at, observation.id); }
-  catch (error) { if (error instanceof DomainError) { observation.reason = error.message; return observation; } throw error; }
-  observation.status = 'linked'; observation.transactionId = t.id; return observation;
+}
+export function recordStatement(state: State, input: Observation, at: string): Observation {
+  if (input.source !== 'statement') throw new DomainError('Solo los extractos se registran como confirmados');
+  const existing = state.observations.find(o => o.id === input.id);
+  if (existing) return existing;
+  const transaction = addTransaction(state, { id: `obs:${input.id}`,
+    accountId: requireValue(input.accountId, 'El extracto no identifica la cuenta'),
+    counterAccountId: input.counterAccountId, date: requireValue(input.date, 'El extracto no contiene una fecha'),
+    amountMinor: requireValue(input.amountMinor, 'El extracto no contiene un valor'), kind: input.kind,
+    merchant: input.merchant, reference: input.reference, status: 'posted' }, at, input.id);
+  const observation = clone(input);
+  observation.status = 'linked'; observation.candidates = []; observation.transactionId = transaction.id;
+  state.observations.push(observation);
+  return observation;
 }
 export function mergeObservation(state: State, observationId: string, transactionId: string, at: string) {
   const observation = requireValue(state.observations.find(o => o.id === observationId), 'Evidencia desconocida');

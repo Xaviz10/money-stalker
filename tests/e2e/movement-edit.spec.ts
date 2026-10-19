@@ -109,3 +109,56 @@ test("movement category and note persist, including all movements from the same 
     ),
   ).toMatchObject({ categoryId: "salary", note: "Nómina de octubre" });
 });
+
+test("manual duplicates require confirmation without creating a review clue", async ({
+  page,
+  request,
+}) => {
+  await request.post(`${apiBase}/accounts`, {
+    data: {
+      id: "bank",
+      name: "Ahorros",
+      kind: "bank",
+      openingMinor: "100000000",
+      openingDate: "2026-01-01",
+      eligible: true,
+    },
+  });
+  await request.post(`${apiBase}/transactions`, {
+    data: {
+      id: "existing",
+      accountId: "bank",
+      date: "2026-10-10",
+      amountMinor: "2500000",
+      kind: "expense",
+      merchant: "Tienda repetida",
+    },
+  });
+
+  await page.goto("./#/movimientos");
+  await page.getByRole("button", { name: "Nuevo movimiento" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[name="date"]').fill("2026-10-10");
+  await dialog.locator('select[name="accountId"]').selectOption("bank");
+  await dialog.locator('input[name="amount"]').fill("25000");
+  await dialog.locator('input[name="merchant"]').fill("Tienda repetida");
+  await dialog.getByRole("button", { name: "Registrar movimiento" }).click();
+
+  const confirmation = dialog.getByRole("alertdialog", {
+    name: "Confirmar movimiento repetido",
+  });
+  await expect(confirmation).toContainText(
+    "Este movimiento parece estar registrado",
+  );
+  await expect(confirmation).toContainText("Tienda repetida");
+  await confirmation
+    .getByRole("button", { name: "Guardar de todos modos" })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "Movimiento repetido guardado",
+  );
+
+  const state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.transactions).toHaveLength(2);
+  expect(state.observations).toHaveLength(0);
+});

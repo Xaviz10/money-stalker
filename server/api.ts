@@ -4,20 +4,29 @@ import {
   addTransaction,
   configure,
   dashboard,
+  duplicateTransactions,
   editTransaction,
   merchantKey,
   mergeObservation,
   resolveObservation,
+  refreshCaptureCandidates,
   undo,
 } from "../domain/ledger";
 import { bogotaDate } from "../domain/money";
-import { DomainError, id, normalizeUnlinkedTransfers } from "../domain/model";
+import {
+  DomainError,
+  id,
+  normalizeUnlinkedTransfers,
+  transactionInput,
+} from "../domain/model";
 import {
   exportRecords,
   MAX_FILE_BYTES,
+  MAX_ROWS,
   parseImport,
   profiles,
 } from "./imports";
+import type { ImportRow } from "./imports";
 import type { Repository, Batch } from "./repository";
 import type { Files } from "./storage";
 import { captureJob, enqueueImport } from "./processing";
@@ -59,6 +68,7 @@ export function createAPI(repo: Repository, files: Files) {
       if (method === "GET" && path === "/state") {
         const state = await repo.read(h);
         normalizeUnlinkedTransfers(state);
+        refreshCaptureCandidates(state);
         // The journal remains server-side. Keep review evidence plus linked location
         // evidence so the owner can remember where a movement was captured.
         return {
@@ -116,11 +126,28 @@ export function createAPI(repo: Repository, files: Files) {
         await repo.mutate(h, (s) => configure(s, path.slice(1), body));
         return { status: 200, body: { saved: true } };
       }
-      if (method === "POST" && path === "/transactions")
+      if (method === "POST" && path === "/transactions") {
+        const submitted = z
+          .object({ duplicateConfirmed: z.boolean().optional() })
+          .passthrough()
+          .parse(body);
+        const { duplicateConfirmed, ...input } = submitted;
         return {
           status: 201,
-          body: await repo.mutate(h, (s) => addTransaction(s, body, now)),
+          body: await repo.mutate(h, (s) => {
+            const movement = transactionInput.parse(input);
+            if (
+              !duplicateConfirmed &&
+              duplicateTransactions(s, movement).length
+            )
+              throw new DomainError(
+                "Este movimiento parece estar registrado. Confirma si deseas guardarlo otra vez.",
+                409,
+              );
+            return addTransaction(s, movement, now);
+          }),
         };
+      }
       const transaction = path.match(/^\/transactions\/([^/]+)$/);
       if (transaction && method === "PATCH") {
         const b = z
@@ -242,10 +269,14 @@ export function createAPI(repo: Repository, files: Files) {
       if (method === "POST" && path === "/reviews/batch") {
         const b = z
           .object({
-            observationIds: z.array(id).min(1).max(500).refine(
-              (values) => new Set(values).size === values.length,
-              "No repitas evidencias en el lote",
-            ),
+            observationIds: z
+              .array(id)
+              .min(1)
+              .max(500)
+              .refine(
+                (values) => new Set(values).size === values.length,
+                "No repitas evidencias en el lote",
+              ),
             action: z.literal("separate"),
           })
           .parse(body);
@@ -256,7 +287,11 @@ export function createAPI(repo: Repository, files: Files) {
         // each repository mutation below DynamoDB's 100-action transaction
         // limit, including the household revision item.
         const chunkSize = 20;
-        for (let offset = 0; offset < b.observationIds.length; offset += chunkSize) {
+        for (
+          let offset = 0;
+          offset < b.observationIds.length;
+          offset += chunkSize
+        ) {
           const chunk = b.observationIds.slice(offset, offset + chunkSize);
           resolved += await repo.mutate(h, (s) => {
             let saved = 0;
@@ -397,6 +432,24 @@ export function createAPI(repo: Repository, files: Files) {
             profiles,
             state.accounts,
           );
+          for (const row of preview.rows) {
+            if (row.status !== "accepted" || !row.observation) continue;
+            const candidates = duplicateTransactions(state, {
+              accountId: row.observation.accountId!,
+              counterAccountId: row.observation.counterAccountId,
+              date: row.observation.date!,
+              amountMinor: row.observation.amountMinor!,
+              kind: row.observation.kind,
+              merchant: row.observation.merchant,
+              reference: row.observation.reference,
+            });
+            if (candidates.length) {
+              row.status = "duplicate";
+              row.duplicateCandidates = candidates.map(
+                (candidate) => candidate.id,
+              );
+            }
+          }
           const duplicate = (await repo.batches(h)).find(
             (b) =>
               b.id !== batch.id &&
@@ -413,7 +466,12 @@ export function createAPI(repo: Repository, files: Files) {
           batch.accepted = preview.rows.filter(
             (r) => r.status === "accepted",
           ).length;
-          batch.rejected = batch.total - batch.accepted;
+          batch.duplicates = preview.rows.filter(
+            (r) => r.status === "duplicate",
+          ).length;
+          batch.rejected = preview.rows.filter(
+            (r) => r.status === "rejected",
+          ).length;
           batch.skipped = preview.skippedRows.length;
           batch.status = "preview";
           await files.put(
@@ -424,9 +482,52 @@ export function createAPI(repo: Repository, files: Files) {
           return { status: 200, body: batch };
         }
         if (method === "POST" && imported[2] === "commit") {
+          const commit = z
+            .object({
+              includeDuplicateRows: z
+                .array(z.number().int().positive())
+                .max(MAX_ROWS)
+                .default([]),
+            })
+            .parse(body ?? {});
           if (!["preview", "committing", "done"].includes(batch.status))
             throw new DomainError("Genera primero la vista previa");
-          if (!batch.accepted) throw new DomainError("No hay filas aceptadas");
+          if (batch.status === "preview" && batch.previewKey) {
+            const preview = JSON.parse(
+              Buffer.from(await files.get(batch.previewKey)).toString("utf8"),
+            ) as { rows: ImportRow[]; [key: string]: unknown };
+            const included = new Set(commit.includeDuplicateRows);
+            const duplicateRows = new Set(
+              preview.rows
+                .filter((row) => row.status === "duplicate")
+                .map((row) => row.row),
+            );
+            if ([...included].some((row) => !duplicateRows.has(row)))
+              throw new DomainError(
+                "La selección de duplicados no corresponde a esta vista previa",
+              );
+            for (const row of preview.rows) {
+              if (row.status !== "duplicate") continue;
+              row.status = included.has(row.row) ? "accepted" : "skipped";
+              if (row.status === "skipped")
+                row.error = "Omitido porque ya estaba registrado";
+            }
+            batch.accepted = preview.rows.filter(
+              (row) => row.status === "accepted",
+            ).length;
+            batch.omittedDuplicates = preview.rows.filter(
+              (row) => row.status === "skipped",
+            ).length;
+            await files.put(
+              batch.previewKey,
+              Buffer.from(JSON.stringify(preview)),
+            );
+          }
+          if (!batch.accepted) {
+            batch.status = "done";
+            await repo.saveBatch(batch);
+            return { status: 200, body: batch };
+          }
           if (batch.status !== "done") {
             batch.status = "committing";
             await repo.saveBatch(batch);

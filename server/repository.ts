@@ -7,6 +7,7 @@ export type Job = { id: string; householdId: string; kind: 'capture' | 'import';
 export type Device = { id: string; householdId: string; name: string; tokenHash: string; createdAt: string; revoked: boolean };
 export type Batch = { id: string; householdId: string; filename: string; accountId: string; profile: string; status: 'uploading' | 'preview' | 'committing' | 'done' | 'error';
   originalKey: string; previewKey?: string; hash?: string; total?: number; accepted?: number; rejected?: number; skipped?: number;
+  duplicates?: number; omittedDuplicates?: number;
   next: number; createdAt: string; error?: string };
 export interface Repository {
   read(h: string): Promise<State>;

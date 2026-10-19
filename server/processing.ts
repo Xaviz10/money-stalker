@@ -4,7 +4,7 @@ import {
   type Capture,
   type Observation,
 } from "../domain/model";
-import { ingest } from "../domain/ledger";
+import { ingestCapture, recordStatement } from "../domain/ledger";
 import type { Repository, Job } from "./repository";
 import { digest } from "./repository";
 import type { Files } from "./storage";
@@ -97,7 +97,7 @@ export async function processJob(
             ? parsed.parserVersion
             : "structured-capture-v1",
         };
-        ingest(state, observation, job.createdAt);
+        ingestCapture(state, observation);
       });
     } else {
       const { batchId, offset } = job.payload as {
@@ -127,7 +127,8 @@ export async function processJob(
         throw new DomainError("Lote fuera de secuencia");
       const part = rows.slice(offset, offset + 20);
       await repo.mutate(householdId, (state) => {
-        for (const row of part) ingest(state, row.observation!, job.createdAt);
+        for (const row of part)
+          recordStatement(state, row.observation!, job.createdAt);
       });
       batch.next = offset + part.length;
       batch.status = batch.next >= rows.length ? "done" : "committing";

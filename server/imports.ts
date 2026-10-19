@@ -13,8 +13,9 @@ export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_ROWS = 5000;
 export type ImportRow = {
   row: number;
-  status: "accepted" | "rejected";
+  status: "accepted" | "rejected" | "duplicate" | "skipped";
   error?: string;
+  duplicateCandidates?: string[];
   observation?: Observation;
 };
 export type Profile = {

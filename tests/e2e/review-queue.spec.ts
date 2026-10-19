@@ -51,64 +51,65 @@ test("review queue shows progress and registers repeated purchases individually 
         return `${dashboard.pending}:${dashboard.balances.bank}`;
       })
       .toBe(
-        ["0:98500000", "1:98500000", "2:98500000", "2:97300000", "3:97300000"][index],
+        [
+          `1:100000000`,
+          `2:100000000`,
+          `3:100000000`,
+          `4:100000000`,
+          `5:100000000`,
+        ][index],
       );
   }
 
   await page.goto("./#/revisar");
-  await expect(page.getByText("3 pendientes", { exact: true })).toBeVisible();
+  await expect(page.getByText("5 pendientes", { exact: true })).toBeVisible();
+  await expect(page.getByText("0 resueltas", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Peaje.*3 pistas/ }).click();
+  await page.getByRole("button", { name: "Preparar 3 como distintos" }).click();
   await expect(
-    page.getByText("0 resueltas", { exact: true }),
+    page.getByText("Registrar 3 pistas como 3 movimientos distintos"),
   ).toBeVisible();
-  await page.getByRole("button", { name: /Peaje.*2 pistas/ }).click();
-  await page.getByRole("button", { name: "Preparar 2 como distintos" }).click();
-  await expect(page.getByText("Registrar 2 pistas como 2 movimientos distintos")).toBeVisible();
-  await page.getByRole("button", { name: "Confirmar 2" }).click();
-  await expect(page.getByText("1 pendientes", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("2 resueltas", { exact: true }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar 3" }).click();
+  await expect(page.getByText("2 pendientes", { exact: true })).toBeVisible();
+  await expect(page.getByText("3 resueltas", { exact: true })).toBeVisible();
   await expect(page.locator(".clue")).toHaveCount(1);
-  await expect(page.locator(".clue-state")).toHaveText("1 de 1 en este grupo");
+  await expect(page.locator(".clue-state")).toHaveText("1 de 2 en este grupo");
   await expect(page.locator(".review-progress [role=status]")).toContainText(
-    "2 pistas registradas como movimientos distintos",
+    "3 pistas registradas como movimientos distintos",
   );
 
   await page.goto("./#/movimientos");
   await page.goto("./#/revisar");
-  await expect(
-    page.getByText("2 resueltas", { exact: true }),
-  ).toBeVisible();
-  await expect(page.locator(".clue-state")).toHaveText("1 de 1 en este grupo");
+  await expect(page.getByText("3 resueltas", { exact: true })).toBeVisible();
+  await expect(page.locator(".clue-state")).toHaveText("1 de 2 en este grupo");
 
+  await page
+    .getByRole("button", { name: "Registrar como movimiento distinto" })
+    .click();
+  await expect(page.getByText("1 pendientes", { exact: true })).toBeVisible();
+  await expect(page.getByText("4 resueltas", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "Registrar como movimiento distinto" })
     .click();
   await expect(
     page.getByRole("heading", { name: "Todo en su lugar" }),
   ).toBeVisible();
-  await expect(
-    page.getByText("3 resueltas", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("5 resueltas", { exact: true })).toBeVisible();
   await expect(page.locator(".review-progress [role=status]")).toHaveText(
     "Pista resuelta. La revisión quedó al día.",
   );
 
   await page.goto("./#/movimientos");
   await page.goto("./#/revisar");
-  await expect(
-    page.getByText("3 resueltas", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("5 resueltas", { exact: true })).toBeVisible();
   await expect(page.locator(".review-progress [role=status]")).toContainText(
-    "3 de 3 pistas resueltas",
+    "5 de 5 pistas resueltas",
   );
 
   await page.reload();
-  await expect(
-    page.getByText("3 resueltas", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("5 resueltas", { exact: true })).toBeVisible();
   await expect(page.locator(".review-progress [role=status]")).toContainText(
-    "3 de 3 pistas resueltas",
+    "5 de 5 pistas resueltas",
   );
   const state = await (await request.get(`${apiBase}/state`)).json();
   expect(state.transactions).toHaveLength(5);

@@ -14,7 +14,7 @@ import {
   type Transaction,
   type TransactionPlace,
 } from "../domain/model";
-import { dashboard } from "../domain/ledger";
+import { dashboard, duplicateTransactions } from "../domain/ledger";
 import { bogotaDate, decimalCOP, formatCOP, parseCOP } from "../domain/money";
 import { api, download, post } from "./api";
 import {
@@ -52,6 +52,8 @@ type Batch = {
   accepted?: number;
   rejected?: number;
   skipped?: number;
+  duplicates?: number;
+  omittedDuplicates?: number;
   next: number;
   duplicate?: boolean;
   error?: string;
@@ -59,6 +61,7 @@ type Batch = {
     row: number;
     status: string;
     error?: string;
+    duplicateCandidates?: string[];
     observation?: Observation;
   }[];
   offset?: number;
@@ -203,8 +206,8 @@ function AppForm({
     setBusy(true);
     setError("");
     try {
-      await onSubmit(new FormData(form));
-      form.reset();
+      const result = await onSubmit(new FormData(form));
+      if (result !== false) form.reset();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -1000,6 +1003,10 @@ function TransactionDialog({
   const initial = value === "new" ? undefined : value;
   const [kind, setKind] = useState(initial?.kind ?? "expense");
   const [merchant, setMerchant] = useState(initial?.merchant ?? "");
+  const [pendingDuplicate, setPendingDuplicate] = useState<{
+    data: Record<string, unknown>;
+    matches: Transaction[];
+  }>();
   const transaction =
     value !== "new" && !isObservation ? (value as Transaction) : undefined;
   const [place, setPlace] = useState<TransactionPlace | undefined>(
@@ -1041,6 +1048,52 @@ function TransactionDialog({
           <Icon name="close" />
         </button>
       </div>
+      {pendingDuplicate && (
+        <section
+          className="duplicate-confirmation"
+          role="alertdialog"
+          aria-label="Confirmar movimiento repetido"
+        >
+          <div>
+            <strong>Este movimiento parece estar registrado</strong>
+            <p>
+              Encontramos {pendingDuplicate.matches.length} coincidencia
+              {pendingDuplicate.matches.length === 1 ? "" : "s"} con la misma
+              cuenta, fecha, valor y tipo.
+            </p>
+            {pendingDuplicate.matches.slice(0, 3).map((match) => (
+              <small key={match.id}>
+                {match.merchant || "Movimiento"} · {displayDate(match.date)} ·{" "}
+                {formatCOP(match.amountMinor)}
+              </small>
+            ))}
+          </div>
+          <div className="button-row">
+            <button
+              type="button"
+              className="button quiet"
+              onClick={() => setPendingDuplicate(undefined)}
+            >
+              Volver a editar
+            </button>
+            <button
+              type="button"
+              className="button primary"
+              onClick={async () => {
+                await post("/transactions", {
+                  ...pendingDuplicate.data,
+                  duplicateConfirmed: true,
+                });
+                await saved(
+                  "Movimiento repetido guardado por tu confirmación.",
+                );
+              }}
+            >
+              Guardar de todos modos
+            </button>
+          </div>
+        </section>
+      )}
       <AppForm
         submit={transaction ? "Guardar cambios" : "Registrar movimiento"}
         onSubmit={async (f) => {
@@ -1085,13 +1138,20 @@ function TransactionDialog({
                 : undefined,
             );
             return;
-          } else
-            await post(
-              "/transactions",
-              Object.fromEntries(
-                Object.entries(data).filter(([, v]) => v !== null),
-              ),
+          } else {
+            const cleaned = Object.fromEntries(
+              Object.entries(data).filter(([, v]) => v !== null),
             );
+            const matches = duplicateTransactions(
+              state,
+              cleaned as Parameters<typeof duplicateTransactions>[1],
+            );
+            if (matches.length) {
+              setPendingDuplicate({ data: cleaned, matches });
+              return false;
+            }
+            await post("/transactions", cleaned);
+          }
           await saved();
         }}
       >
@@ -1268,7 +1328,10 @@ function ImportDialog({
     [profiles, setProfiles] = useState<ImportProfile[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [fileName, setFileName] = useState("");
+    [fileName, setFileName] = useState(""),
+    [includedDuplicates, setIncludedDuplicates] = useState<Set<number>>(
+      new Set(),
+    );
   const account = state.accounts.find((a) => a.id === accountId);
   const load = useCallback(
     async () => setList(await api<Batch[]>("/imports")),
@@ -1285,6 +1348,9 @@ function ImportDialog({
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
+  useEffect(() => {
+    setIncludedDuplicates(new Set());
+  }, [batch?.id]);
   useEffect(() => {
     if (batch?.status === "committing") {
       const timer = setInterval(() => {
@@ -1341,6 +1407,7 @@ function ImportDialog({
       ...(await api<Batch>(`/imports/${preview.id}`)),
       duplicate: preview.duplicate,
     });
+    setIncludedDuplicates(new Set());
     await load();
   }
   const accountImports = list.filter(
@@ -1440,8 +1507,9 @@ function ImportDialog({
             <div>
               <h2>Vista previa · {batch.filename}</h2>
               <p>
-                {batch.accepted ?? 0} aceptadas · {batch.rejected ?? 0}{" "}
-                rechazadas · {batch.skipped ?? 0} filas de encabezado/vacías
+                {batch.accepted ?? 0} listas · {batch.duplicates ?? 0} posibles
+                duplicados · {batch.rejected ?? 0} rechazadas ·{" "}
+                {batch.skipped ?? 0} filas de encabezado/vacías
               </p>
               {batch.profile && (
                 <p className="small-note">
@@ -1461,6 +1529,16 @@ function ImportDialog({
           {batch.duplicate && (
             <div className="notice">
               Este archivo ya estaba registrado. No se agregó de nuevo.
+            </div>
+          )}
+          {(batch.duplicates ?? 0) > 0 && batch.status === "preview" && (
+            <div className="notice import-duplicate-note">
+              <strong>Revisa las coincidencias antes de terminar.</strong>
+              <span>
+                Solo comparamos con movimientos guardados antes de subir este
+                archivo. Filas iguales dentro del mismo CSV o Excel se
+                conservarán por separado.
+              </span>
             </div>
           )}
           <div className="table-scroll">
@@ -1509,10 +1587,42 @@ function ImportDialog({
                           : "—"}
                       </td>
                       <td>
-                        {row.error ??
+                        {row.status === "duplicate" ? (
+                          <label className="import-duplicate-choice">
+                            <input
+                              type="checkbox"
+                              checked={includedDuplicates.has(row.row)}
+                              onChange={(event) =>
+                                setIncludedDuplicates((current) => {
+                                  const next = new Set(current);
+                                  if (event.target.checked) next.add(row.row);
+                                  else next.delete(row.row);
+                                  return next;
+                                })
+                              }
+                            />
+                            <span>
+                              <strong>Posible duplicado</strong>
+                              <small>
+                                {row.duplicateCandidates?.length ?? 0}{" "}
+                                coincidencia
+                                {row.duplicateCandidates?.length === 1
+                                  ? ""
+                                  : "s"}{" "}
+                                previa
+                                {row.duplicateCandidates?.length === 1
+                                  ? ""
+                                  : "s"}
+                                . Márcalo para importarlo también.
+                              </small>
+                            </span>
+                          </label>
+                        ) : (
+                          (row.error ??
                           (historical
                             ? "Histórico · no cambia el saldo"
-                            : "Lista para conciliar")}
+                            : "Lista para importar"))
+                        )}
                       </td>
                     </tr>
                   );
@@ -1548,12 +1658,17 @@ function ImportDialog({
             {batch.status === "preview" && (
               <button
                 className="button primary"
-                disabled={busy || !batch.accepted}
+                disabled={
+                  busy ||
+                  Number(batch.accepted ?? 0) + includedDuplicates.size === 0
+                }
                 onClick={async () => {
                   setBusy(true);
                   try {
                     setBatch(
-                      await post<Batch>(`/imports/${batch.id}/commit`, {}),
+                      await post<Batch>(`/imports/${batch.id}/commit`, {
+                        includeDuplicateRows: [...includedDuplicates],
+                      }),
                     );
                   } catch (e) {
                     setError((e as Error).message);
@@ -1562,7 +1677,9 @@ function ImportDialog({
                   }
                 }}
               >
-                Confirmar {batch.accepted} filas aceptadas
+                Confirmar{" "}
+                {Number(batch.accepted ?? 0) + includedDuplicates.size}{" "}
+                movimientos
               </button>
             )}
           </div>

@@ -61,8 +61,11 @@ test("account → capture → import → review → export works on the project 
   await expect
     .poll(
       async () =>
-        (await (await request.get(`${apiBase}/state`)).json()).transactions
-          .length,
+        (
+          await (await request.get(`${apiBase}/state`)).json()
+        ).observations.filter(
+          (observation: { status: string }) => observation.status === "review",
+        ).length,
     )
     .toBe(1);
   await page.getByRole("link", { name: "Movimientos", exact: true }).click();
@@ -89,9 +92,7 @@ test("account → capture → import → review → export works on the project 
   ).toBeVisible();
   await expect(preview.getByText("Gasto", { exact: true })).toBeVisible();
   await expect(preview.locator("tbody tr").first()).toContainText("−$ 12.500");
-  await page
-    .getByRole("button", { name: "Confirmar 1 filas aceptadas" })
-    .click();
+  await page.getByRole("button", { name: "Confirmar 1 movimientos" }).click();
   await expect(
     page.getByText("Completado", { exact: true }).first(),
   ).toBeVisible();

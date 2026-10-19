@@ -2933,6 +2933,61 @@ input[type="checkbox"] {
 .import-preview td .transaction-flow {
   min-width: max-content;
 }
+.import-duplicate-note {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.import-duplicate-note span {
+  color: var(--color-muted);
+}
+.import-duplicate-choice {
+  display: grid;
+  grid-template-columns: 18px minmax(180px, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+  min-width: 250px;
+  cursor: pointer;
+}
+.import-duplicate-choice input {
+  margin-top: 3px;
+}
+.import-duplicate-choice span {
+  display: grid;
+  gap: 2px;
+}
+.import-duplicate-choice strong {
+  color: var(--color-ink);
+  font-size: 12px;
+}
+.import-duplicate-choice small {
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+.duplicate-confirmation {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid #ebc863;
+  border-radius: var(--radius-control);
+  background: #fff8dd;
+  color: var(--color-text);
+}
+.duplicate-confirmation > div:first-child {
+  display: grid;
+  gap: var(--space-1);
+}
+.duplicate-confirmation p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.duplicate-confirmation small {
+  display: block;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
 .token {
   display: block;
   word-break: break-all;

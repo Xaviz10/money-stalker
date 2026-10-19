@@ -7,7 +7,12 @@ import {
   profiles,
   safeCell,
 } from "../server/imports";
-import { addTransaction, configure, ingest } from "../domain/ledger";
+import {
+  addTransaction,
+  configure,
+  duplicateTransactions,
+  recordStatement,
+} from "../domain/ledger";
 import { emptyState } from "../domain/model";
 const now = "2026-10-17T18:00:00Z";
 const fixture = readFileSync("tests/fixtures/interchange.csv");
@@ -349,7 +354,7 @@ describe("CSV/XLSX parsing", () => {
     const state = emptyState();
     for (const account of accounts) configure(state, "accounts", account);
     const cardPayment = result.rows[1].observation!;
-    ingest(
+    recordStatement(
       state,
       {
         ...cardPayment,
@@ -358,12 +363,19 @@ describe("CSV/XLSX parsing", () => {
       },
       now,
     );
-    ingest(state, cardPayment, now);
-    expect(state.transactions).toHaveLength(1);
-    expect(state.observations[1]).toMatchObject({
-      status: "review",
-      candidates: [state.transactions[0].id],
+    const duplicates = duplicateTransactions(state, {
+      accountId: cardPayment.accountId!,
+      counterAccountId: cardPayment.counterAccountId,
+      date: cardPayment.date!,
+      amountMinor: cardPayment.amountMinor!,
+      kind: cardPayment.kind,
+      merchant: cardPayment.merchant,
+      reference: cardPayment.reference,
     });
+    expect(state.transactions).toHaveLength(1);
+    expect(duplicates.map((transaction) => transaction.id)).toEqual([
+      state.transactions[0].id,
+    ]);
   });
 });
 describe("safe exports", () => {

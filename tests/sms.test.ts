@@ -117,14 +117,15 @@ describe("Bancolombia SMS capture", () => {
     await processJob(repo, files, "owner", job.id);
 
     const result = await repo.read("owner");
-    expect(result.transactions).toHaveLength(1);
-    expect(result.transactions[0]).toMatchObject({
+    expect(result.transactions).toHaveLength(0);
+    expect(result.observations[0]).toMatchObject({
       accountId: "bank",
       amountMinor: "4567890",
       kind: "expense",
       merchant: "Transferencia a Nequi",
+      status: "review",
     });
-    expect(result.transactions[0].counterAccountId).toBeUndefined();
+    expect(result.observations[0].counterAccountId).toBeUndefined();
   });
 
   it("maps account and card suffixes, then records transfers without counting them as spending", async () => {
@@ -196,22 +197,22 @@ describe("Bancolombia SMS capture", () => {
       await processJob(repo, files, "owner", job.id);
     }
     const result = await repo.read("owner");
-    expect(result.transactions).toHaveLength(3);
+    expect(result.transactions).toHaveLength(0);
     expect(
-      result.transactions.find((t) => t.id.includes("purchase")),
+      result.observations.find((t) => t.id.includes("purchase")),
     ).toMatchObject({
       accountId: "card",
       amountMinor: "1234567",
       kind: "expense",
-      status: "provisional",
+      status: "review",
     });
-    expect(result.transactions.find((t) => t.id.includes("qr"))).toMatchObject({
+    expect(result.observations.find((t) => t.id.includes("qr"))).toMatchObject({
       accountId: "bank",
       amountMinor: "2345678",
       kind: "expense",
     });
     expect(
-      result.transactions.find((t) => t.id.includes("transfer")),
+      result.observations.find((t) => t.id.includes("transfer")),
     ).toMatchObject({
       accountId: "bank",
       counterAccountId: "nequi",
@@ -221,7 +222,7 @@ describe("Bancolombia SMS capture", () => {
     expect(
       result.observations.every(
         (o) =>
-          o.parserVersion === "bancolombia-sms-v1" && o.status === "linked",
+          o.parserVersion === "bancolombia-sms-v1" && o.status === "review",
       ),
     ).toBe(true);
   });

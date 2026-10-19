@@ -59,9 +59,9 @@ describe('authorization and capture', () => {
     const accepted = await api(request); expect(accepted.status).toBe(202); expect((await repo.read('owner')).transactions).toHaveLength(0);
     expect((await api(request)).status).toBe(202); expect((await api({ ...request, body: { ...body, amountMinor: '1' } })).status).toBe(409);
     const id = (accepted.body as { eventId: string }).eventId; await processJob(repo, files, 'owner', id); await processJob(repo, files, 'owner', id);
-    expect((await repo.read('owner')).transactions).toHaveLength(1); expect((await repo.job('owner', id))?.status).toBe('done');
+    expect((await repo.read('owner')).transactions).toHaveLength(0); expect((await repo.job('owner', id))?.status).toBe('done');
     const visible = (await send('GET', '/state')).body as State;
-    expect(visible.observations[0]).toMatchObject({ status: 'linked', location: { latitude: 5.12345, longitude: -73.12345, accuracy: 18, observedAt: now } });
+    expect(visible.observations[0]).toMatchObject({ status: 'review', location: { latitude: 5.12345, longitude: -73.12345, accuracy: 18, observedAt: now } });
     expect((await api({ method: 'GET', path: '/state', token })).status).toBe(401);
   });
   it('revokes tokens and excludes security messages before persistence', async () => {
@@ -75,7 +75,7 @@ describe('authorization and capture', () => {
     const location = { latitude: 4.60971, longitude: -74.08175, accuracy: 24, observedAt: now };
     const job = captureJob('owner', 'device', { eventId: 'w', source: 'wallet', observedAt: now, instrumentHint: 'Wallet Debit', date: '2026-10-10', amountMinor: '2500000', merchant: 'Tienda', location }, now);
     await repo.putJob(job); await processJob(repo, files, 'owner', job.id);
-    const s = await repo.read('owner'); expect(s.observations[0]).toMatchObject({ accountId: 'bank', status: 'linked', location }); expect(s.transactions).toHaveLength(1);
+    const s = await repo.read('owner'); expect(s.observations[0]).toMatchObject({ accountId: 'bank', status: 'review', location }); expect(s.transactions).toHaveLength(0);
   });
   it('stores an owner-confirmed Google Place on a transaction', async () => {
     const { send } = await setup();
@@ -83,6 +83,14 @@ describe('authorization and capture', () => {
     expect((await send('POST', '/transactions', { id: 'with-place', accountId: 'bank', date: '2026-10-10', amountMinor: '2500000', kind: 'expense', merchant: place.name, place })).status).toBe(201);
     const visible = (await send('GET', '/state')).body as State;
     expect(visible.transactions[0]).toMatchObject({ merchant: place.name, place });
+  });
+  it('requires inline confirmation before saving a duplicate manual movement', async () => {
+    const { send, repo } = await setup();
+    const movement = { accountId: 'bank', date: '2026-10-10', amountMinor: '2500000', kind: 'expense', merchant: 'Tienda repetida' };
+    expect((await send('POST', '/transactions', { ...movement, id: 'manual-one' })).status).toBe(201);
+    expect((await send('POST', '/transactions', { ...movement, id: 'manual-two' })).status).toBe(409);
+    expect((await send('POST', '/transactions', { ...movement, id: 'manual-two', duplicateConfirmed: true })).status).toBe(201);
+    expect((await repo.read('owner')).transactions).toHaveLength(2); expect((await repo.read('owner')).observations).toHaveLength(0);
   });
   it('persists category and note across every movement from the same merchant', async () => {
     const { repo, send } = await setup();
@@ -141,8 +149,18 @@ describe('import lifecycle and retries', () => {
     await send('POST', `/imports/${batch.id}/commit`, {});
     for (const j of await repo.pendingJobs()) await processJob(repo, files, 'owner', j.id);
     expect((await repo.batch('owner', batch.id))?.status).toBe('done');
-    const s = await repo.read('owner'); expect(s.transactions).toHaveLength(2); expect(s.observations.filter(o => o.status === 'review')).toHaveLength(1);
-    await send('POST', `/imports/${batch.id}/commit`, {}); expect((await repo.read('owner')).transactions).toHaveLength(2);
+    const s = await repo.read('owner'); expect(s.transactions).toHaveLength(3); expect(s.observations.filter(o => o.status === 'review')).toHaveLength(0);
+    await send('POST', `/imports/${batch.id}/commit`, {}); expect((await repo.read('owner')).transactions).toHaveLength(3);
+    const overlap = Buffer.from('Fecha;Descripcion;Valor;Moneda;Tipo\n2026-10-05;Café de ejemplo;12.500,00;COP;gasto\n2026-10-07;Movimiento nuevo;7.000,00;COP;gasto');
+    const overlapResponse = await send('POST', '/imports', { filename: 'overlap.csv', size: overlap.length, accountId: 'bank', profile: 'cop-interchange-v1' });
+    const overlapBatch = (overlapResponse.body as { batch: { id: string; originalKey: string } }).batch; await files.put(overlapBatch.originalKey, overlap);
+    expect((await send('POST', `/imports/${overlapBatch.id}/preview`, {})).body).toMatchObject({ accepted: 1, duplicates: 1 });
+    const overlapPreview = (await send('GET', `/imports/${overlapBatch.id}`)).body as { rows: { row: number; status: string }[] };
+    expect(overlapPreview.rows.map(row => row.status)).toEqual(['duplicate', 'accepted']);
+    await send('POST', `/imports/${overlapBatch.id}/commit`, { includeDuplicateRows: [] });
+    for (const job of await repo.pendingJobs()) await processJob(repo, files, 'owner', job.id);
+    expect((await repo.read('owner')).transactions).toHaveLength(4);
+    expect((await repo.read('owner')).observations.every(observation => observation.status === 'linked')).toBe(true);
     const second = await send('POST', '/imports', { filename: 'again.csv', size: bytes.length, accountId: 'bank', profile: 'cop-interchange-v1' });
     const b = (second.body as { batch: { id: string; originalKey: string } }).batch; await files.put(b.originalKey, bytes);
     expect((await send('POST', `/imports/${b.id}/preview`, {})).body).toMatchObject({ id: batch.id, duplicate: true });

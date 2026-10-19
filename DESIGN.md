@@ -241,7 +241,9 @@ The opening-balance date is the account's financial snapshot. Older imported mov
 
 The generic COP import accepts signed values. For bank and cash products, positive means money in and negative means money out. Credit cards reverse that interpretation: positive means a purchase and negative means a refund. An explicit type overrides the sign, especially for transfers and card payments. State these rules in the compatible-format help.
 
-The Bancolombia Visa detailed XLSX format uses positive purchases and negative abonos. Present the abono as a bank-to-card transfer when the linked bank is known so importing both statements produces a reconciliation candidate rather than duplicate financial activity.
+The Bancolombia Visa detailed XLSX format uses positive purchases and negative abonos. Present the abono as a bank-to-card transfer when the linked bank is known. The import preview compares it with movements saved before the current file so the owner can omit the matching second record before commit.
+
+The import preview owns statement duplicate decisions. Compare each row only with transactions that existed before the current file, never with another row in the same CSV/XLSX. Show prior matches as explicit opt-in rows: unchecked omits the duplicate, while checked preserves it as another real movement. Statement rows leave the preview as confirmed transactions and never enter Pistas.
 
 Movement rows and import previews expose financial direction separately from status. Show a compact directional label and signed amount for income, expense, purchase, refund, card payment, and transfers. A card abono reads `Pago recibido` with a positive amount when viewed from the card; it remains a transfer in the ledger. `Histórico` only communicates that the row predates the opening-balance snapshot.
 
@@ -269,7 +271,7 @@ Debit instruments indent under their bank account and explain that they use its 
 
 The labeled funds-minus-commitments equation leads to a citron global available-total surface with attached freshness/incomplete-evidence context. Selected-account scope belongs to the ledger and category work areas.
 
-Review compares source/candidate amount, account, and date. Show discrepancies and statement-driven amount changes next to an explicit match action. Keep separate/complete, discard, and correction undo identifiable. On phones, source precedes candidate; the narrow dashboard preview also stacks its values.
+Pistas contains only unconfirmed SMS and Wallet Shortcut captures. It compares source/candidate amount, account, and date. Show discrepancies next to an explicit match action. Keep separate/complete, discard, and correction undo identifiable. On phones, source precedes candidate; the narrow dashboard preview also stacks its values. Exact duplicate manual movements use an inline confirmation in the movement form and never create a Pista.
 
 For long evidence queues, keep the durable pending count, resolved count, active filters, resume point, and latest save confirmation visible while the user works. Use a compact, filterable inbox grouped by normalized merchant, amount, account, movement type, and review reason; open one focused comparison at a time. Repeated complete evidence can be previewed and registered in groups of up to 500 as individual movements, with backend writes chunked below storage transaction limits. Equal amount and date remain suggestions only; batch merging is never offered. When candidate evidence conflicts on date, account, or value, emphasize separate registration over merging.
 

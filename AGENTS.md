@@ -30,9 +30,11 @@ Money Stalker is a Spanish, COP, America/Bogota personal-finance app for Colombi
 
 - A source observation is evidence; a transaction is the canonical financial event.
 - Wallet, SMS and statement observations may describe one purchase. Never count them as separate expenses after reconciliation.
+- Only SMS and Wallet captures from iPhone Shortcuts may enter Review. Statement rows are confirmed in the import preview, and manual movements resolve possible duplicates inside the movement form.
+- Compare an imported row only with transactions that existed before its file was uploaded. Preserve repeated equal rows inside one CSV/XLSX because they can represent separate real movements.
 - A credit-card purchase creates expense plus card debt. Paying the card is a transfer that reduces cash and debt.
 - Moving money between the owner's Bancolombia, Nequi or other accounts is a transfer. Paying another person or merchant through those rails is an expense unless the owner confirms an internal destination.
-- Uncertain destinations, matches or incomplete captures go to Review. Do not invent missing values or silently merge ambiguous observations.
+- Uncertain matches or incomplete Shortcut captures go to Review. A Shortcut transfer without a configured owned destination becomes an expense. Do not invent missing values or silently merge ambiguous observations.
 - Store COP in integer minor units and preserve date-only financial dates separately from received and location timestamps.
 
 ## Privacy and verification

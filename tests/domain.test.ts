@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addTransaction, configure, dashboard, editTransaction, ingest, mergeObservation, resolveObservation, undo } from '../domain/ledger';
+import { addTransaction, configure, dashboard, editTransaction, ingestCapture, mergeObservation, recordStatement, refreshCaptureCandidates, resolveObservation, undo } from '../domain/ledger';
 import { emptyState, normalizeDefaultCategories, type Observation, type State } from '../domain/model';
 import { bogotaDate, formatCOP, nextPayday, parseCOP } from '../domain/money';
 const at = '2026-10-17T18:00:00Z';
@@ -65,9 +65,9 @@ describe('commitments and balanced journal', () => {
   });
   it('does not reserve pre-opening evidence that still needs review', () => {
     const s = setup();
-    ingest(s, observation('historical-review', { date: '2025-12-20' }), at);
-    ingest(s, observation('historical-match', { date: '2025-12-21' }), at);
-    expect(s.transactions).toHaveLength(1);
+    ingestCapture(s, observation('historical-review', { date: '2025-12-20' }));
+    ingestCapture(s, observation('historical-match', { date: '2025-12-21' }));
+    expect(s.transactions).toHaveLength(0);
     expect(s.observations[1].status).toBe('review');
     expect(dashboard(s, '2026-10-17').uncertainMinor).toBe('0');
   });
@@ -96,18 +96,19 @@ describe('commitments and balanced journal', () => {
   it('rejects a duplicate transaction ID with altered financial intent', () => { const s = setup(); addTransaction(s, purchase('p'), at); expect(() => addTransaction(s, { ...purchase('p'), amountMinor: '1' }, at)).toThrow(/Identificador/); });
 });
 describe('evidence reconciliation and corrections', () => {
-  it('is idempotent and leaves similar purchases for review', () => {
-    const s = setup(); ingest(s, observation('sms'), at); ingest(s, observation('sms'), at); ingest(s, observation('wallet', { source: 'wallet' }), at);
-    expect(s.transactions).toHaveLength(1); expect(s.observations).toHaveLength(2); expect(s.observations[1].status).toBe('review');
-    expect(dashboard(s, '2026-10-17').uncertainMinor).toBe('20000000');
+  it('keeps Shortcut captures pending until the owner confirms them', () => {
+    const s = setup(); ingestCapture(s, observation('sms')); ingestCapture(s, observation('sms')); ingestCapture(s, observation('wallet', { source: 'wallet' }));
+    expect(s.transactions).toHaveLength(0); expect(s.observations).toHaveLength(2); expect(s.observations.every(item => item.status === 'review')).toBe(true);
+    resolveObservation(s, 'sms', 'separate', at); refreshCaptureCandidates(s);
+    expect(s.transactions).toHaveLength(1); expect(s.observations[1].candidates).toEqual([s.transactions[0].id]);
     mergeObservation(s, 'wallet', s.transactions[0].id, at); expect(s.transactions[0].observationIds).toEqual(['sms', 'wallet']);
     expect(dashboard(s, '2026-10-17').uncertainMinor).toBe('0');
     undo(s, s.audit.at(-1)!.id, at); expect(s.observations[1].status).toBe('review'); expect(s.transactions[0].observationIds).toEqual(['sms']);
   });
-  it('preserves two real equal-value purchases', () => { const s = setup(); ingest(s, observation('one'), at); ingest(s, observation('two'), at); resolveObservation(s, 'two', 'separate', at); expect(s.transactions).toHaveLength(2); expect(dashboard(s, '2026-10-17').spendingMinor).toBe('40000000'); });
-  it('automatically links strong references but reviews amount conflicts', () => { const s = setup(); ingest(s, observation('one', { reference: 'bank-unique' }), at); ingest(s, observation('two', { source: 'statement', reference: 'bank-unique' }), at); expect(s.transactions).toHaveLength(1); expect(s.transactions[0].status).toBe('posted'); ingest(s, observation('three', { reference: 'bank-unique', amountMinor: '25000000' }), at); expect(s.observations[2].status).toBe('review'); });
-  it('keeps merchant and category edits when a statement confirms the purchase', () => { const s = setup(); ingest(s, observation('sms'), at); editTransaction(s, s.transactions[0].id, { merchant: 'Comercio recordado', categoryId: 'food' }, at); ingest(s, observation('bank', { source: 'statement', merchant: 'POS XYZ' }), at); mergeObservation(s, 'bank', s.transactions[0].id, at); expect(s.transactions[0].merchant).toBe('Comercio recordado'); expect(s.transactions[0].categoryId).toBe('food'); });
+  it('preserves two real equal-value Shortcut purchases', () => { const s = setup(); ingestCapture(s, observation('one')); ingestCapture(s, observation('two')); resolveObservation(s, 'one', 'separate', at); resolveObservation(s, 'two', 'separate', at); expect(s.transactions).toHaveLength(2); expect(dashboard(s, '2026-10-17').spendingMinor).toBe('40000000'); });
+  it('records statements as posted movements without sending them to review', () => { const s = setup(); recordStatement(s, observation('statement', { source: 'statement', reference: 'bank-unique' }), at); expect(s.transactions).toHaveLength(1); expect(s.transactions[0].status).toBe('posted'); expect(s.observations[0]).toMatchObject({ status: 'linked', candidates: [] }); });
+  it('keeps merchant and category edits when a Shortcut is joined to a posted statement', () => { const s = setup(); recordStatement(s, observation('bank', { source: 'statement', merchant: 'POS XYZ' }), at); editTransaction(s, s.transactions[0].id, { merchant: 'Comercio recordado', categoryId: 'food' }, at); ingestCapture(s, observation('sms')); refreshCaptureCandidates(s); mergeObservation(s, 'sms', s.transactions[0].id, at); expect(s.transactions[0].merchant).toBe('Comercio recordado'); expect(s.transactions[0].categoryId).toBe('food'); });
   it('remembers category and note for the same merchant', () => { const s = setup(); addTransaction(s, { ...purchase('first'), merchant: 'Tienda repetida' }, at); editTransaction(s, 'first', { categoryId: 'restaurants', note: 'Almuerzo de trabajo' }, at, true); const next = addTransaction(s, { ...purchase('next'), merchant: '  TIENDA   REPETIDA  ' }, at); expect(next).toMatchObject({ categoryId: 'restaurants', note: 'Almuerzo de trabajo' }); });
-  it('stores incomplete evidence without inventing a purchase', () => { const s = setup(); ingest(s, observation('missing', { amountMinor: undefined }), at); expect(s.transactions).toHaveLength(0); expect(dashboard(s, '2026-10-17').incomplete).toBe(1); });
-  it('rejects cross-account merges and undo over later edits', () => { const s = setup(); ingest(s, observation('one'), at); ingest(s, observation('missing', { accountId: 'bank', amountMinor: undefined }), at); expect(() => mergeObservation(s, 'missing', s.transactions[0].id, at)).toThrow(); editTransaction(s, s.transactions[0].id, { merchant: 'A' }, at); const audit = s.audit.at(-1)!.id; editTransaction(s, s.transactions[0].id, { merchant: 'B' }, at); expect(() => undo(s, audit, at)).toThrow(/posteriores/); });
+  it('stores incomplete evidence without inventing a purchase', () => { const s = setup(); ingestCapture(s, observation('missing', { amountMinor: undefined })); expect(s.transactions).toHaveLength(0); expect(dashboard(s, '2026-10-17').incomplete).toBe(1); });
+  it('rejects cross-account merges and undo over later edits', () => { const s = setup(); ingestCapture(s, observation('one')); resolveObservation(s, 'one', 'separate', at); ingestCapture(s, observation('missing', { accountId: 'bank', amountMinor: undefined })); expect(() => mergeObservation(s, 'missing', s.transactions[0].id, at)).toThrow(); editTransaction(s, s.transactions[0].id, { merchant: 'A' }, at); const audit = s.audit.at(-1)!.id; editTransaction(s, s.transactions[0].id, { merchant: 'B' }, at); expect(() => undo(s, audit, at)).toThrow(/posteriores/); });
 });
