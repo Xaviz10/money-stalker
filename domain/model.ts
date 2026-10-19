@@ -8,11 +8,17 @@ export const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => {
 export const minor = z.string().regex(/^(0|[1-9]\d{0,16})$/);
 export const positive = minor.refine(v => BigInt(v) > 0n, 'El valor debe ser mayor que cero');
 const text = z.string().trim().max(200);
+const institutionUrl = z.url({ protocol: /^https$/ }).max(500).refine(value => {
+  const parsed = new URL(value);
+  return !parsed.username && !parsed.password;
+}, 'Usa una URL HTTPS sin credenciales');
+const accountImage = z.string().max(14000).regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/);
 export const accountSchema = z.object({
   id, name: text.min(1), kind: z.enum(['bank', 'cash', 'credit']), openingMinor: minor,
   openingDate: date, closingDay: z.number().int().min(1).max(31).optional(),
   dueDay: z.number().int().min(1).max(31).optional(), eligible: z.boolean().default(true),
-  institution: text.optional(), parentAccountId: id.optional(),
+  institution: text.optional(), institutionUrl: institutionUrl.optional(), imageDataUrl: accountImage.optional(),
+  parentAccountId: id.optional(),
 });
 export const instrumentSchema = z.object({ id, name: text.min(1), accountId: id, aliases: z.array(text.min(1)).max(10) });
 export const categorySchema = z.object({ id, name: text.min(1) });
@@ -56,12 +62,30 @@ export type State = {
   transactions: Transaction[]; observations: Observation[]; audit: Audit[];
   aliases: { id: string; merchant: string; categoryId: string }[]; settings: Settings;
 };
+export const defaultCategories: Category[] = [
+  { id: 'uncategorized', name: 'Sin categoría' },
+  // Keep the existing ID so movements previously classified as food become Mercado.
+  { id: 'food', name: 'Mercado' },
+  { id: 'restaurants', name: 'Restaurantes' },
+  { id: 'car', name: 'Carro' },
+  { id: 'delivery', name: 'Domicilios' },
+  { id: 'utilities', name: 'Servicios' },
+  { id: 'home', name: 'Hogar' },
+  { id: 'transport', name: 'Transporte' },
+  { id: 'health', name: 'Salud' },
+  { id: 'leisure', name: 'Ocio' },
+  { id: 'other', name: 'Otros' },
+];
+export function normalizeDefaultCategories(state: State) {
+  for (const category of defaultCategories) {
+    const existing = state.categories.find(c => c.id === category.id);
+    if (existing) existing.name = category.name;
+    else state.categories.push({ ...category });
+  }
+}
 export function emptyState(): State {
-  return { accounts: [], instruments: [], categories: [
-    { id: 'uncategorized', name: 'Sin categoría' }, { id: 'food', name: 'Alimentación' },
-    { id: 'home', name: 'Hogar' }, { id: 'transport', name: 'Transporte' },
-    { id: 'health', name: 'Salud' }, { id: 'leisure', name: 'Ocio' }, { id: 'other', name: 'Otros' },
-  ], bills: [], transactions: [], observations: [], audit: [], aliases: [], settings: { payday: 1, reserveMinor: '0' } };
+  return { accounts: [], instruments: [], categories: defaultCategories.map(category => ({ ...category })),
+    bills: [], transactions: [], observations: [], audit: [], aliases: [], settings: { payday: 1, reserveMinor: '0' } };
 }
 export class DomainError extends Error { constructor(message: string, public status = 400) { super(message); } }
 export const requireValue = <T>(value: T | undefined, message: string): T => { if (value === undefined) throw new DomainError(message); return value; };

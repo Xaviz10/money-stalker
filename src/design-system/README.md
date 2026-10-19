@@ -38,6 +38,8 @@ On the accounts route, keep saved products visible above the `Administrar` hub. 
 
 `AccountRail` uses `domain/account-groups.ts`; do not infer an institution from a display name. `institution` is an optional explicit group name. Bank accounts hold cash balances; debit instruments point to those accounts. Credit accounts have separate debt and optional `parentAccountId` pointing to a bank account. Omitting that association creates an independent credit card. Cash accounts stay separate.
 
+Product artwork follows one fallback chain: a user-uploaded, browser-reduced raster; for bank accounts, the favicon at the explicitly saved HTTPS institution URL; then the built-in bank, card, or cash symbol. Favicon requests use no referrer. Uploaded artwork is restricted to JPG, PNG, or WebP, reduced to a small data image in the browser, and remains inside the owner's private account state. Category symbols come from `CategoryIcon`; built-in categories each have a stable icon while custom categories use `other`.
+
 Grouping never changes money calculations. Do not add debit instrument balances, sum debt into cash, or infer that linking a credit account pays it. Existing accounts without new metadata remain valid. The accounts screen can organize an existing card without changing its opening balance.
 
 The dashboard's available amount is global. Selecting a rail account filters activity and category spending; show that scope explicitly. The net-worth rail summary means all account balances minus credit debt, including accounts excluded from spendable cash. Use the existing exact minor-unit helpers, never floating-point currency math.

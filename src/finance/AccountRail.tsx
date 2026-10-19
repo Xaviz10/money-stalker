@@ -2,6 +2,7 @@ import type { Account, State } from "../../domain/model";
 import { groupAccounts, netWorthMinor } from "../../domain/account-groups";
 import { formatCOP } from "../../domain/money";
 import { Icon } from "../design-system/ui";
+import { AccountArtwork } from "./AccountArtwork";
 
 export function AccountRail({
   state,
@@ -26,12 +27,7 @@ export function AccountRail({
       onClick={() => onSelect(a.id)}
     >
       <span className={`rail-account-symbol ${a.kind}`}>
-        <Icon
-          name={
-            a.kind === "credit" ? "card" : a.kind === "cash" ? "wallet" : "bank"
-          }
-          size={nested ? 17 : 21}
-        />
+        <AccountArtwork account={a} size={nested ? 17 : 21} />
       </span>
       <span className="rail-account-info">
         <strong>{a.name}</strong>
@@ -71,7 +67,7 @@ export function AccountRail({
           <details className="institution-group" key={g.id} open>
             <summary>
               <span className="institution-monogram">
-                {g.name.slice(0, 1).toLocaleUpperCase("es-CO")}
+                <AccountArtwork account={g.accounts[0].account} size={15} />
               </span>
               <strong>{g.name}</strong>
               <Icon name="chevron" size={14} />

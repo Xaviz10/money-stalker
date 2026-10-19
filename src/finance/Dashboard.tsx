@@ -9,18 +9,9 @@ import {
   Eyes,
   Icon,
   Panel,
-  type IconName,
 } from "../design-system/ui";
+import { CategoryIcon, categoryIcons } from "./CategoryIcon";
 type Summary = ReturnType<typeof dashboard>;
-const categoryIcons: Record<string, IconName> = {
-  food: "food",
-  home: "home",
-  transport: "transport",
-  health: "heart",
-  leisure: "leisure",
-  other: "other",
-  uncategorized: "other",
-};
 const categoryColors = [
   "#2356db",
   "#25826c",
@@ -484,7 +475,7 @@ export function Dashboard({
             categories.map((c, i) => (
               <div className="expense-category" key={c.id}>
                 <span className={`category-symbol category-${i % 7}`}>
-                  <Icon name={categoryIcons[c.id] ?? "other"} size={18} />
+                  <CategoryIcon categoryId={c.id} size={18} />
                 </span>
                 <div>
                   <div className="expense-category-title">

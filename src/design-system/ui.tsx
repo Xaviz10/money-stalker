@@ -21,6 +21,11 @@ export type IconName =
   | "refresh"
   | "calendar"
   | "food"
+  | "groceries"
+  | "restaurant"
+  | "car"
+  | "delivery"
+  | "utilities"
   | "home"
   | "transport"
   | "heart"
@@ -104,6 +109,32 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
     food: (
       <path d="M5 3v7m3-7v7M3 7h7m-4 3v11M17 3c-4 5-4 9 0 9h2V3h-2Zm2 9v9" />
     ),
+    groceries: (
+      <>
+        <path d="M4 9h16l-2 11H6L4 9Z" />
+        <path d="m8 9 4-6 4 6M8 13v3m4-3v3m4-3v3" />
+      </>
+    ),
+    restaurant: (
+      <>
+        <path d="M4 4v5a3 3 0 0 0 3 3V4m-3 4h6M7 12v8" />
+        <path d="M17 4c-3 3-3 8 0 8h2V4h-2Zm2 8v8" />
+      </>
+    ),
+    car: (
+      <>
+        <path d="m5 11 2-5h10l2 5M4 11h16v7H4v-7Z" />
+        <path d="M7 18v2m10-2v2M7 14h2m6 0h2" />
+      </>
+    ),
+    delivery: (
+      <>
+        <path d="M3 7h10v10H3V7Zm10 4h4l3 3v3h-7v-6Z" />
+        <circle cx="7" cy="19" r="2" />
+        <circle cx="17" cy="19" r="2" />
+      </>
+    ),
+    utilities: <path d="M13 2 5 14h7l-1 8 8-12h-7l1-8Z" />,
     home: (
       <>
         <path d="m3 11 9-8 9 8M5 10v11h14V10M10 21v-7h4v7" />

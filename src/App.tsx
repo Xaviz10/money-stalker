@@ -27,6 +27,8 @@ import {
 import { Dashboard, displayDate, SurfaceLoading } from "./finance/Dashboard";
 import { ReviewDesk } from "./finance/ReviewDesk";
 import { AccountRail } from "./finance/AccountRail";
+import { AccountArtwork } from "./finance/AccountArtwork";
+import { CategoryIcon } from "./finance/CategoryIcon";
 import { DesignSystem } from "./design-system/DesignSystem";
 import {
   Icon,
@@ -61,6 +63,58 @@ type Batch = {
   more?: boolean;
 };
 type ImportProfile = { id: string; label: string; verified: boolean };
+const MAX_ACCOUNT_IMAGE_BYTES = 5 * 1024 * 1024;
+async function prepareAccountArtwork(file: File) {
+  if (!file.size) return undefined;
+  if (
+    file.size > MAX_ACCOUNT_IMAGE_BYTES ||
+    !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+  )
+    throw new Error("Elige una imagen JPG, PNG o WebP de hasta 5 MB");
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = objectUrl;
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("No pudimos leer esa imagen"));
+    });
+    for (const [side, quality] of [
+      [96, 0.82],
+      [72, 0.74],
+      [56, 0.68],
+    ] as const) {
+      const canvas = document.createElement("canvas");
+      canvas.width = side;
+      canvas.height = side;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Tu navegador no pudo preparar la imagen");
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      const inset = Math.round(side * 0.08);
+      const scale = Math.min(
+        (side - inset * 2) / image.naturalWidth,
+        (side - inset * 2) / image.naturalHeight,
+      );
+      const width = image.naturalWidth * scale;
+      const height = image.naturalHeight * scale;
+      context.drawImage(
+        image,
+        (side - width) / 2,
+        (side - height) / 2,
+        width,
+        height,
+      );
+      const data = canvas.toDataURL("image/webp", quality);
+      if (data.length <= 14000) return data;
+    }
+    throw new Error(
+      "La imagen sigue siendo demasiado compleja; elige una más simple",
+    );
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
 const nav = [
   ["resumen", "Resumen", "overview"],
   ["movimientos", "Movimientos", "arrows"],
@@ -87,16 +141,12 @@ function Badge({
     </SystemBadge>
   );
 }
-type FlowRecord = Pick<
-  Observation,
-  "kind" | "accountId" | "counterAccountId"
->;
+type FlowRecord = Pick<Observation, "kind" | "accountId" | "counterAccountId">;
 function isIncoming(record: FlowRecord, selectedAccount: string) {
   return (
     record.kind === "income" ||
     record.kind === "refund" ||
-    (record.kind === "transfer" &&
-      record.counterAccountId === selectedAccount)
+    (record.kind === "transfer" && record.counterAccountId === selectedAccount)
   );
 }
 function flowLabel(record: FlowRecord, selectedAccount: string, state: State) {
@@ -631,10 +681,15 @@ function TransactionTable({
                     />
                   </td>
                   <td className="register-category">
-                    {t.kind === "transfer"
-                      ? (otherAccount?.name ?? "Transferencia")
-                      : (state.categories.find((c) => c.id === t.categoryId)
-                          ?.name ?? "Sin categoría")}
+                    {t.kind === "transfer" ? (
+                      (otherAccount?.name ?? "Transferencia")
+                    ) : (
+                      <span className="register-category-label">
+                        <CategoryIcon categoryId={t.categoryId} size={14} />
+                        {state.categories.find((c) => c.id === t.categoryId)
+                          ?.name ?? "Sin categoría"}
+                      </span>
+                    )}
                   </td>
                   <td
                     className="register-status"
@@ -742,17 +797,10 @@ function Movements({
         Mostrando movimientos de {account.name}
       </p>
       <header className="register-product-header">
-        <div className={`register-product-icon ${account.kind}`}>
-          <Icon
-            name={
-              account.kind === "credit"
-                ? "card"
-                : account.kind === "cash"
-                  ? "wallet"
-                  : "bank"
-            }
-            size={23}
-          />
+        <div
+          className={`register-product-icon account-artwork ${account.kind}`}
+        >
+          <AccountArtwork account={account} size={23} />
         </div>
         <div className="register-product-name">
           <span>
@@ -1327,8 +1375,7 @@ function ImportDialog({
                       row.observation.date < account.openingDate,
                   );
                   const incoming = Boolean(
-                    row.observation &&
-                      isIncoming(row.observation, accountId),
+                    row.observation && isIncoming(row.observation, accountId),
                   );
                   return (
                     <tr key={row.row}>
@@ -1464,6 +1511,13 @@ function AccountEditor({
       <AppForm
         submit="Guardar cambios"
         onSubmit={async (f) => {
+          const artwork = f.get("artwork") as File;
+          const uploadedArtwork = await prepareAccountArtwork(artwork);
+          const imageDataUrl =
+            uploadedArtwork ??
+            (f.get("removeArtwork") === "on"
+              ? undefined
+              : account.imageDataUrl);
           await save({
             id: account.id,
             name: str(f, "name"),
@@ -1477,6 +1531,10 @@ function AccountEditor({
             ...(str(f, "institution").trim()
               ? { institution: str(f, "institution").trim() }
               : {}),
+            ...(str(f, "institutionUrl").trim()
+              ? { institutionUrl: str(f, "institutionUrl").trim() }
+              : {}),
+            ...(imageDataUrl ? { imageDataUrl } : {}),
             ...(kind === "credit"
               ? {
                   closingDay: Number(f.get("closing")),
@@ -1505,6 +1563,38 @@ function AccountEditor({
             maxLength={200}
           />
         </Field>
+        {kind === "bank" && (
+          <Field label="Sitio web del banco (opcional)">
+            <input
+              name="institutionUrl"
+              type="url"
+              inputMode="url"
+              placeholder="https://www.bancolombia.com"
+              defaultValue={account.institutionUrl ?? ""}
+              maxLength={500}
+            />
+            <small>
+              Usaremos su favicon directamente; si no carga, verás el icono de
+              banco.
+            </small>
+          </Field>
+        )}
+        <Field label="Imagen del producto (opcional)">
+          <input
+            name="artwork"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+          />
+          <small>
+            JPG, PNG o WebP. La reducimos antes de guardarla de forma privada.
+          </small>
+        </Field>
+        {account.imageDataUrl && (
+          <label className="checkbox">
+            <input name="removeArtwork" type="checkbox" /> Usar de nuevo el
+            icono predeterminado
+          </label>
+        )}
         <Field label="Tipo de cuenta">
           <select
             value={kind}
@@ -1736,8 +1826,8 @@ function Settings({
         </div>
         {state.accounts.map((a) => (
           <div className="account-row" key={a.id}>
-            <span className="stat-icon income">
-              <Icon name="wallet" />
+            <span className={`stat-icon account-artwork ${a.kind}`}>
+              <AccountArtwork account={a} />
             </span>
             <div>
               <strong>{a.name}</strong>
@@ -1757,7 +1847,7 @@ function Settings({
               {formatCOP(summary?.balances[a.id] ?? a.openingMinor)}
             </strong>
             <AccountEditor
-              key={`${a.id}:${a.name}:${a.kind}:${a.openingMinor}:${a.openingDate}:${a.institution ?? ""}:${a.parentAccountId ?? ""}:${a.closingDay ?? ""}:${a.dueDay ?? ""}:${a.eligible}`}
+              key={`${a.id}:${a.name}:${a.kind}:${a.openingMinor}:${a.openingDate}:${a.institution ?? ""}:${a.institutionUrl ?? ""}:${a.imageDataUrl?.length ?? 0}:${a.parentAccountId ?? ""}:${a.closingDay ?? ""}:${a.dueDay ?? ""}:${a.eligible}`}
               account={a}
               state={state}
               save={(data) => save("/accounts", data)}
@@ -1788,8 +1878,11 @@ function Settings({
           open={!state.accounts.length}
         >
           <AppForm
-            onSubmit={(f) =>
-              save("/accounts", {
+            onSubmit={async (f) => {
+              const artwork = await prepareAccountArtwork(
+                f.get("artwork") as File,
+              );
+              await save("/accounts", {
                 id: freshId(),
                 name: str(f, "name"),
                 kind: accountKind,
@@ -1799,6 +1892,10 @@ function Settings({
                 ...(str(f, "institution").trim()
                   ? { institution: str(f, "institution").trim() }
                   : {}),
+                ...(str(f, "institutionUrl").trim()
+                  ? { institutionUrl: str(f, "institutionUrl").trim() }
+                  : {}),
+                ...(artwork ? { imageDataUrl: artwork } : {}),
                 ...(accountKind === "credit"
                   ? {
                       closingDay: Number(f.get("closing")),
@@ -1808,8 +1905,8 @@ function Settings({
                         : {}),
                     }
                   : {}),
-              })
-            }
+              });
+            }}
           >
             <Field label="Nombre de la cuenta">
               <input
@@ -1825,6 +1922,26 @@ function Settings({
                 placeholder="Bancolombia, Nu…"
                 maxLength={200}
               />
+            </Field>
+            {accountKind === "bank" && (
+              <Field label="Sitio web del banco (opcional)">
+                <input
+                  name="institutionUrl"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://www.bancolombia.com"
+                  maxLength={500}
+                />
+                <small>Intentaremos mostrar su favicon directamente.</small>
+              </Field>
+            )}
+            <Field label="Imagen del producto (opcional)">
+              <input
+                name="artwork"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+              />
+              <small>Úsala para personalizar una cuenta o tarjeta.</small>
             </Field>
             {accountKind === "credit" && (
               <Field label="Cuenta bancaria vinculada (opcional)">

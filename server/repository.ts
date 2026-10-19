@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { emptyState, DomainError, type State } from '../domain/model';
+import { emptyState, normalizeDefaultCategories, DomainError, type State } from '../domain/model';
 
 export type Job = { id: string; householdId: string; kind: 'capture' | 'import'; payload: unknown; digest: string; status: 'pending' | 'done'; createdAt: string; error?: string };
 export type Device = { id: string; householdId: string; name: string; tokenHash: string; createdAt: string; revoked: boolean };
@@ -22,8 +22,8 @@ export const tokenHash = (token: string) => createHash('sha256').update(token).d
 export class MemoryRepository implements Repository {
   states = new Map<string, State>(); jobs = new Map<string, Job>(); deviceRows = new Map<string, Device>(); batchRows = new Map<string, Batch>();
   private key(h: string, id: string) { return `${h}/${id}`; }
-  async read(h: string) { return structuredClone(this.states.get(h) ?? emptyState()); }
-  async mutate<T>(h: string, fn: (state: State) => T) { const s = structuredClone(this.states.get(h) ?? emptyState()); const result = fn(s); this.states.set(h, s); return structuredClone(result); }
+  async read(h: string) { const state = structuredClone(this.states.get(h) ?? emptyState()); normalizeDefaultCategories(state); return state; }
+  async mutate<T>(h: string, fn: (state: State) => T) { const s = structuredClone(this.states.get(h) ?? emptyState()); normalizeDefaultCategories(s); const result = fn(s); this.states.set(h, s); return structuredClone(result); }
   async putJob(job: Job) { const k = this.key(job.householdId, job.id), old = this.jobs.get(k); if (old && old.digest !== job.digest) throw new DomainError('Evento reutilizado con datos distintos', 409); if (!old) this.jobs.set(k, structuredClone(job)); }
   async job(h: string, id: string) { return structuredClone(this.jobs.get(this.key(h, id))); }
   async finishJob(h: string, id: string, error?: string) { const j = this.jobs.get(this.key(h, id)); if (j) { j.status = error ? 'pending' : 'done'; j.error = error; } }
@@ -69,12 +69,14 @@ export class DynamoRepository implements Repository {
         if (old < 0) array.push(item); else array[old] = item;
       } }
     }
-    return { state, revision: meta?.revision ?? 0 };
+    const persisted = stateItems(state);
+    normalizeDefaultCategories(state);
+    return { state, persisted, revision: meta?.revision ?? 0 };
   }
   async read(h: string) { return (await this.snapshot(h)).state; }
   async mutate<T>(h: string, fn: (state: State) => T): Promise<T> {
     for (let attempt = 0; attempt < 4; attempt++) {
-      const { state, revision } = await this.snapshot(h), before = stateItems(state), result = fn(state), after = stateItems(state);
+      const { state, persisted: before, revision } = await this.snapshot(h), result = fn(state), after = stateItems(state);
       const changed = [...after].filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(before.get(k)));
       const deleted = [...before.keys()].filter(k => !after.has(k));
       if (changed.length + deleted.length > 95) throw new DomainError('Operación demasiado grande; utiliza lotes pequeños', 413);

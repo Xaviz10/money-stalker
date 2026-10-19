@@ -165,6 +165,8 @@ The palette pairs deep ultramarine structure with white working space and a conc
 
 **The Global Amount Rule.** Keep the citron amount explicitly labeled as available across all accounts. Account selection scopes activity and category spending, while the global amount remains global.
 
+**The Product Artwork Rule.** Prefer user-uploaded artwork, then an explicitly configured bank favicon, then the built-in product symbol. Credit cards use the card symbol by default. Keep artwork square, contained, private, and decorative; the adjacent product name remains the accessible label. Built-in spending categories use distinct line icons consistently in summaries and ledgers.
+
 ## Typography
 
 **Display Font:** self-hosted Inter variable, with the platform fallback stack recorded in frontmatter. **Body Font:** the same family. The application disables synthesized fonts.

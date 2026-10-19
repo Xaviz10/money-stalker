@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addTransaction, configure, dashboard, editTransaction, ingest, mergeObservation, resolveObservation, undo } from '../domain/ledger';
-import { emptyState, type Observation } from '../domain/model';
+import { emptyState, normalizeDefaultCategories, type Observation, type State } from '../domain/model';
 import { bogotaDate, formatCOP, nextPayday, parseCOP } from '../domain/money';
 const at = '2026-10-17T18:00:00Z';
 export function setup() {
@@ -14,6 +14,21 @@ function observation(id: string, extra: Partial<Observation> = {}): Observation 
   return { id, source: 'sms', observedAt: at, receivedAt: at, date: '2026-10-10', accountId: 'card', amountMinor: '20000000', currency: 'COP', kind: 'expense', merchant: 'Tienda', status: 'review', candidates: [], parserVersion: 'test', ...extra };
 }
 describe('exact COP amounts and dates', () => {
+  it('uses the current built-in categories and upgrades the legacy food label', () => {
+    const state = emptyState();
+    expect(state.categories.map(category => category.name)).toEqual([
+      'Sin categoría', 'Mercado', 'Restaurantes', 'Carro', 'Domicilios', 'Servicios', 'Hogar', 'Transporte', 'Salud', 'Ocio', 'Otros',
+    ]);
+    state.categories = [{ id: 'food', name: 'Alimentación' }];
+    normalizeDefaultCategories(state as State);
+    expect(state.categories.find(category => category.id === 'food')?.name).toBe('Mercado');
+    expect(state.categories).toEqual(expect.arrayContaining([
+      { id: 'car', name: 'Carro' },
+      { id: 'restaurants', name: 'Restaurantes' },
+      { id: 'delivery', name: 'Domicilios' },
+      { id: 'utilities', name: 'Servicios' },
+    ]));
+  });
   it('keeps cents and large amounts exact', () => { expect(parseCOP('$ 1.234.567,89')).toBe('123456789'); expect(formatCOP('123456789')).toBe('$ 1.234.567,89'); expect(parseCOP('90071992547409,91')).toBe('9007199254740991'); });
   it('rejects malformed values and USD-style decimals', () => { for (const v of ['1.23', 'NaN', '1,000.00', '2,222', 'USD 2']) expect(() => parseCOP(v)).toThrow(); });
   it('uses Bogota dates and clamps payday at month end', () => { expect(bogotaDate(new Date('2026-10-01T02:00:00Z'))).toBe('2026-09-30'); expect(nextPayday('2026-02-10', 31)).toBe('2026-02-28'); expect(nextPayday('2026-12-31', 31)).toBe('2027-01-31'); });

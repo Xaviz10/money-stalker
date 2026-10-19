@@ -9,6 +9,7 @@ import {
   Icon,
   Panel,
 } from "./ui";
+import { CategoryIcon } from "../finance/CategoryIcon";
 const swatches = [
   ["Primary", "--color-primary"],
   ["Account rail", "--color-rail"],
@@ -138,6 +139,32 @@ export function DesignSystem() {
         <p className="small-note">
           Estructura de ejemplo. El diseño agrupa; los saldos se calculan una
           sola vez.
+        </p>
+      </Panel>
+      <Panel title="Product and category symbols">
+        <div className="catalog-symbol-grid">
+          {[
+            ["food", "Mercado"],
+            ["restaurants", "Restaurantes"],
+            ["car", "Carro"],
+            ["delivery", "Domicilios"],
+            ["utilities", "Servicios"],
+            ["home", "Hogar"],
+            ["transport", "Transporte"],
+            ["health", "Salud"],
+            ["leisure", "Ocio"],
+            ["other", "Otros"],
+          ].map(([id, label]) => (
+            <span key={id}>
+              <CategoryIcon categoryId={id} size={18} />
+              {label}
+            </span>
+          ))}
+        </div>
+        <p className="small-note">
+          Las cuentas bancarias pueden usar el favicon de una URL HTTPS. Las
+          tarjetas conservan el símbolo de tarjeta; una imagen privada subida
+          por el usuario reemplaza ambos.
         </p>
       </Panel>
       <Panel title="Inline settings editor">
