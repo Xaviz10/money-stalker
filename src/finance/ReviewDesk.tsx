@@ -4,15 +4,21 @@ import { formatCOP } from "../../domain/money";
 import { api, post } from "../api";
 import { Icon as Glyph, Eyes as SidekickMark } from "../design-system/ui";
 
-const REVIEW_SESSION_KEY = "money-stalker.review-session.v1";
+const REVIEW_PROGRESS_KEY = "money-stalker.review-progress.v2";
+const LEGACY_REVIEW_SESSION_KEY = "money-stalker.review-session.v1";
 
 function loadReviewSession(fallback: string[]) {
   try {
     const parsed = JSON.parse(
-      sessionStorage.getItem(REVIEW_SESSION_KEY) ?? "null",
+      localStorage.getItem(REVIEW_PROGRESS_KEY) ??
+        sessionStorage.getItem(LEGACY_REVIEW_SESSION_KEY) ??
+        "null",
     );
-    if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string"))
-      return [...new Set<string>(parsed)];
+    if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+      const ids = [...new Set<string>(parsed)];
+      saveReviewSession(ids);
+      return ids;
+    }
     saveReviewSession(fallback);
     return fallback;
   } catch {
@@ -22,7 +28,7 @@ function loadReviewSession(fallback: string[]) {
 
 function saveReviewSession(ids: string[]) {
   try {
-    sessionStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(ids));
+    localStorage.setItem(REVIEW_PROGRESS_KEY, JSON.stringify(ids));
   } catch {
     // The queue still works when private browsing blocks web storage.
   }
@@ -212,7 +218,7 @@ export function ReviewDesk({
           decisión.
         </p>
       )}
-      {(pending.length > 0 || lastAction) && (
+      {(pending.length > 0 || resolved > 0 || lastAction) && (
         <>
           <section
             className="review-progress"
@@ -223,7 +229,7 @@ export function ReviewDesk({
                 <strong>{pending.length}</strong> pendientes
               </span>
               <span>
-                <strong>{resolved}</strong> resueltas en esta sesión
+                <strong>{resolved}</strong> resueltas en esta revisión
               </span>
             </div>
             <progress max={Math.max(total, 1)} value={resolved}>
@@ -231,7 +237,9 @@ export function ReviewDesk({
             </progress>
             <p role="status" aria-live="polite">
               {lastAction ||
-                `Mostrando pistas ${resolved + 1}–${resolved + visible.length} de ${total}.`}
+                (pending.length
+                  ? `Mostrando pistas ${resolved + 1}–${resolved + visible.length} de ${total}.`
+                  : `${resolved} de ${total} pistas resueltas. Puedes cambiar de sección sin perder este progreso.`)}
             </p>
             {actionError && (
               <p className="review-action-error" role="alert">
@@ -270,7 +278,9 @@ export function ReviewDesk({
                           observationIds: selectedIds,
                           action: "separate",
                         }),
-                      `${selectedIds.length} ${selectedIds.length === 1 ? "pista resuelta y retirada" : "pistas resueltas y retiradas"} de pendientes. Ahora ves ${selectedIds.length === 1 ? "la siguiente" : "las siguientes"}.`,
+                      selectedIds.length === pending.length
+                        ? `${selectedIds.length} ${selectedIds.length === 1 ? "pista resuelta" : "pistas resueltas"}. La revisión quedó al día.`
+                        : `${selectedIds.length} ${selectedIds.length === 1 ? "pista resuelta y retirada" : "pistas resueltas y retiradas"} de pendientes. Ahora ves ${selectedIds.length === 1 ? "la siguiente" : "las siguientes"}.`,
                       selectedIds,
                     ).then((saved) => {
                       if (saved) setSelected(new Set());
@@ -453,7 +463,9 @@ export function ReviewDesk({
                               observationId: o.id,
                               action: "separate",
                             }),
-                          "Pista resuelta y retirada de pendientes. Ahora ves la siguiente.",
+                          pending.length === 1
+                            ? "Pista resuelta. La revisión quedó al día."
+                            : "Pista resuelta y retirada de pendientes. Ahora ves la siguiente.",
                           [o.id],
                         )
                       }

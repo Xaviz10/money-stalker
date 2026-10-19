@@ -53,7 +53,7 @@ test("review queue shows progress and registers repeated purchases individually 
   await page.goto("./#/revisar");
   await expect(page.getByText("3 pendientes", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("0 resueltas en esta sesión", { exact: true }),
+    page.getByText("0 resueltas en esta revisión", { exact: true }),
   ).toBeVisible();
   await page.locator(".clue-select input").nth(0).check();
   await page.locator(".clue-select input").nth(1).check();
@@ -62,7 +62,7 @@ test("review queue shows progress and registers repeated purchases individually 
     .click();
   await expect(page.getByText("1 pendientes", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("2 resueltas en esta sesión", { exact: true }),
+    page.getByText("2 resueltas en esta revisión", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".clue")).toHaveCount(1);
   await expect(page.locator(".clue-state")).toHaveText("Pista 3 de 3");
@@ -73,7 +73,7 @@ test("review queue shows progress and registers repeated purchases individually 
   await page.goto("./#/movimientos");
   await page.goto("./#/revisar");
   await expect(
-    page.getByText("2 resueltas en esta sesión", { exact: true }),
+    page.getByText("2 resueltas en esta revisión", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".clue-state")).toHaveText("Pista 3 de 3");
 
@@ -83,6 +83,29 @@ test("review queue shows progress and registers repeated purchases individually 
   await expect(
     page.getByRole("heading", { name: "Todo en su lugar" }),
   ).toBeVisible();
+  await expect(
+    page.getByText("3 resueltas en esta revisión", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".review-progress [role=status]")).toHaveText(
+    "Pista resuelta. La revisión quedó al día.",
+  );
+
+  await page.goto("./#/movimientos");
+  await page.goto("./#/revisar");
+  await expect(
+    page.getByText("3 resueltas en esta revisión", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".review-progress [role=status]")).toContainText(
+    "3 de 3 pistas resueltas",
+  );
+
+  await page.reload();
+  await expect(
+    page.getByText("3 resueltas en esta revisión", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".review-progress [role=status]")).toContainText(
+    "3 de 3 pistas resueltas",
+  );
   const state = await (await request.get(`${apiBase}/state`)).json();
   expect(state.transactions).toHaveLength(4);
   expect(
