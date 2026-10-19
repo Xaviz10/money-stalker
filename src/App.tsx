@@ -339,6 +339,15 @@ export function App() {
       await refresh();
     } catch (e) {
       setError((e as Error).message);
+      // Some server operations intentionally span several bounded DynamoDB
+      // transactions. If a later chunk fails, reload the durable state so the
+      // interface reflects every chunk that did finish.
+      try {
+        await refresh();
+      } catch {
+        // Preserve the mutation error; the regular stale-state UI handles a
+        // refresh failure separately.
+      }
       throw e;
     }
   };

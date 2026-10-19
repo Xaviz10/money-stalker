@@ -153,7 +153,11 @@ export function ReviewDesk({ state, act, edit, stale }: {
       await act(fn, "");
       if (resolvedIds.length) setResolvedLocally((current) => { const next = new Set(current); for (const item of resolvedIds) next.add(item); return next; });
       setLastAction(message); setBatchPreview([]); return true;
-    } catch (error) { setActionError((error as Error).message || "No se pudo guardar. La pista continúa pendiente."); return false; }
+    } catch (error) {
+      const message = (error as Error).message || "No se pudo guardar.";
+      setActionError(`${message} ${resolvedIds.length > 1 ? "Actualizamos la lista con lo que sí alcanzó a guardarse." : "La pista continúa pendiente."}`);
+      return false;
+    }
     finally { setBusy(undefined); }
   };
   const clearFilters = () => setFilters(emptyFilters);
@@ -175,7 +179,7 @@ export function ReviewDesk({ state, act, edit, stale }: {
       <span className="review-progress-saved">{busy ? "Guardando…" : "Progreso guardado"}</span>
       <progress max={Math.max(total, 1)} value={resolved}>{resolved} de {total}</progress>
       <p role="status" aria-live="polite">{lastAction || (pending.length ? `${resolved} de ${total} resueltas. Puedes salir y continuar después.` : `${resolved} de ${total} pistas resueltas. Puedes cambiar de sección sin perder este progreso.`)}</p>
-      {actionError && <p className="review-action-error" role="alert">{actionError} La pista continúa pendiente.</p>}
+      {actionError && <p className="review-action-error" role="alert">{actionError}</p>}
     </section>}
 
     {pending.length > 0 && <section className="review-inbox" aria-label="Bandeja de pistas">

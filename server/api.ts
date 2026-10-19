@@ -251,11 +251,13 @@ export function createAPI(repo: Repository, files: Files) {
           .parse(body);
         let resolved = 0;
         const batchId = randomUUID();
-        // Each separate review changes the observation and creates a movement
-        // plus an audit row. Chunks stay below DynamoDB's transaction limit
-        // while allowing a repeated historical group to contain hundreds.
-        for (let offset = 0; offset < b.observationIds.length; offset += 30) {
-          const chunk = b.observationIds.slice(offset, offset + 30);
+        // Resolving one clue writes four items: its observation, the new
+        // movement, the movement creation audit, and the review audit. Keep
+        // each repository mutation below DynamoDB's 100-action transaction
+        // limit, including the household revision item.
+        const chunkSize = 20;
+        for (let offset = 0; offset < b.observationIds.length; offset += chunkSize) {
+          const chunk = b.observationIds.slice(offset, offset + chunkSize);
           resolved += await repo.mutate(h, (s) => {
             let saved = 0;
             for (const observationId of chunk) {

@@ -12,6 +12,25 @@ async function setup() {
   await repo.mutate('owner', s => configure(s, 'accounts', { id: 'bank', name: 'Prueba', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01' }));
   return { repo, files, api, send: (method: string, path: string, body?: unknown, subject = 'owner') => api({ method, path, body, subject }) };
 }
+
+class DynamoLimitMemoryRepository extends MemoryRepository {
+  largestMutation = 0;
+
+  override async mutate<T>(householdId: string, fn: (state: State) => T) {
+    return super.mutate(householdId, state => {
+      const before = persistedStateItems(state);
+      const result = fn(state);
+      const after = persistedStateItems(state);
+      const changed = [...after].filter(([key, value]) =>
+        JSON.stringify(value) !== JSON.stringify(before.get(key))).length;
+      const deleted = [...before.keys()].filter(key => !after.has(key)).length;
+      const actions = changed + deleted + 1; // The household revision item.
+      this.largestMutation = Math.max(this.largestMutation, actions);
+      if (actions > 100) throw new Error(`DynamoDB transaction has ${actions} actions`);
+      return result;
+    });
+  }
+}
 describe('authorization and capture', () => {
   it('keeps an immutable persistence snapshot when existing records mutate in place', () => {
     const state = emptyState();
@@ -80,10 +99,12 @@ describe('authorization and capture', () => {
   });
   it('discards the entire mutation when validation fails', async () => { const { repo } = await setup(); await expect(repo.mutate('owner', s => { s.accounts.length = 0; throw new Error('failure'); })).rejects.toThrow(); expect((await repo.read('owner')).accounts).toHaveLength(1); });
   it('registers more than one hundred repeated review clues in safe chunks', async () => {
-    const { repo, send } = await setup();
+    const repo = new DynamoLimitMemoryRepository(), files = new MemoryFiles(), api = createAPI(repo, files);
+    await repo.mutate('owner', state => configure(state, 'accounts', { id: 'bank', name: 'Prueba', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01' }));
+    const send = (method: string, path: string, body?: unknown) => api({ method, path, body, subject: 'owner' });
     const ids = Array.from({ length: 103 }, (_, index) => `toll-${index}`);
-    await repo.mutate('owner', s => {
-      for (const id of ids) s.observations.push({
+    for (let offset = 0; offset < ids.length; offset += 50) await repo.mutate('owner', s => {
+      for (const id of ids.slice(offset, offset + 50)) s.observations.push({
         id, source: 'statement', observedAt: now, receivedAt: now, date: '2026-10-10', accountId: 'bank',
         amountMinor: '1500000', currency: 'COP', merchant: 'Peaje', kind: 'expense', status: 'review',
         candidates: [], parserVersion: 'test',
@@ -91,6 +112,7 @@ describe('authorization and capture', () => {
     });
     const response = await send('POST', '/reviews/batch', { observationIds: ids, action: 'separate' });
     expect(response).toMatchObject({ status: 200, body: { saved: true, resolved: 103 } });
+    expect(repo.largestMutation).toBeLessThanOrEqual(100);
     const state = await repo.read('owner');
     expect(state.observations.every(o => o.status === 'linked')).toBe(true);
     expect(state.transactions).toHaveLength(103);
