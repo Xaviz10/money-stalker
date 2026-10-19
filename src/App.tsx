@@ -2176,14 +2176,137 @@ function Settings({
             })}
           </div>
           <hr />
-          <h3>2. Conecta tu iPhone</h3>
+          <h3>2. Comprueba qué entrega tu iPhone</h3>
+          <p className="small-note shortcut-guide-intro">
+            Apple permite activar automatizaciones con Mensajes y Wallet, pero
+            no documenta que siempre entreguen el texto, el valor o el comercio.
+            Haz estas pruebas antes de conectar datos reales.
+          </p>
+          <div
+            className="shortcut-guide"
+            aria-label="Guía de Atajos para iPhone"
+          >
+            <details open>
+              <summary>
+                <span>Prueba el SMS</span>
+                <small>Primero · 3 minutos</small>
+              </summary>
+              <div className="shortcut-guide-body">
+                <ol>
+                  <li>
+                    En <strong>Atajos → Automatización → + → Mensaje</strong>,
+                    usa temporalmente un remitente de confianza y el filtro
+                    <code>MS-TEST</code>.
+                  </li>
+                  <li>
+                    Elige <strong>Ejecutar inmediatamente</strong> y crea una
+                    automatización en blanco.
+                  </li>
+                  <li>
+                    Agrega <strong>Texto</strong>. Toca su campo, elige
+                    <strong>Seleccionar variable</strong> y busca
+                    <strong>Entrada del atajo</strong>.
+                  </li>
+                  <li>
+                    Agrega <strong>Mostrar alerta</strong> y envía
+                    <code>MS-TEST 123</code> desde el remitente elegido.
+                  </li>
+                </ol>
+                <p className="shortcut-result">
+                  <strong>Continúa solo si ves el mensaje completo.</strong> Si
+                  la variable no aparece o llega vacía, el disparador no puede
+                  alimentar el lector automático en ese iPhone.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                <span>Prueba Wallet</span>
+                <small>Antes de activarlo</small>
+              </summary>
+              <div className="shortcut-guide-body">
+                <ol>
+                  <li>
+                    Crea <strong>Automatización → Transacción</strong> y elige
+                    una tarjeta.
+                  </li>
+                  <li>
+                    Agrega <strong>Texto</strong>, intenta insertar
+                    <strong>Entrada del atajo</strong> y después agrega
+                    <strong>Mostrar alerta</strong>.
+                  </li>
+                  <li>
+                    Haz un pago normal y revisa si aparecen valor, comercio,
+                    fecha, moneda y tarjeta.
+                  </li>
+                </ol>
+                <p className="shortcut-result">
+                  Si faltan esos datos, deja Wallet desactivado. Los SMS y los
+                  extractos seguirán registrando y conciliando el movimiento.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                <span>Prueba la ubicación</span>
+                <small>Opcional</small>
+              </summary>
+              <div className="shortcut-guide-body">
+                <ol>
+                  <li>
+                    Agrega <strong>Obtener ubicación actual</strong> y luego una
+                    acción <strong>Texto</strong>.
+                  </li>
+                  <li>
+                    Inserta la variable azul de ubicación, tócala y revisa las
+                    propiedades disponibles en tu iPhone.
+                  </li>
+                  <li>
+                    Comprueba que existan latitud, longitud y precisión antes de
+                    agregarlas al envío.
+                  </li>
+                </ol>
+                <p className="shortcut-result">
+                  La ubicación es una pista opcional. Nunca uses coordenadas
+                  cero ni dejes que una falla de Localización borre el
+                  movimiento.
+                </p>
+              </div>
+            </details>
+            <p className="shortcut-guide-sources">
+              Validado con la documentación oficial de Apple sobre{" "}
+              <a
+                href="https://support.apple.com/guide/shortcuts/communication-triggers-apdd711f9dff/ios"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Mensajes
+              </a>
+              ,{" "}
+              <a
+                href="https://support.apple.com/guide/shortcuts/apd65c67538a/ios"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Transacciones
+              </a>{" "}
+              y{" "}
+              <a
+                href="https://support.apple.com/guide/shortcuts/apda36b9018b/ios"
+                target="_blank"
+                rel="noreferrer"
+              >
+                variables
+              </a>
+              .
+            </p>
+          </div>
+          <hr />
+          <h3>3. Conecta las pruebas que funcionaron</h3>
           <p>
-            Crea un acceso para tu dispositivo y úsalo en dos automatizaciones
-            de Atajos: una para el texto del SMS Bancolombia y otra para los
-            datos de Wallet. En ambas, ejecuta{" "}
-            <strong>Obtener ubicación actual</strong> antes de enviar el evento.
-            Si la ubicación falla, envía la transacción de todos modos. No
-            necesitas capturas de pantalla.
+            Crea un acceso privado para este iPhone. El token se guarda solo en
+            Atajos y permite enviar capturas; no da acceso a tu sesión ni a tus
+            credenciales bancarias.
           </p>
           <AppForm
             submit="Crear acceso para mi iPhone"
@@ -2204,29 +2327,50 @@ function Settings({
               />
             </Field>
           </AppForm>
-          <div className="shortcut-location-help">
-            <h4>Agregar ubicación a los dos Atajos</h4>
-            <ol>
-              <li>
-                Después de recibir el SMS o pago, ejecuta{" "}
-                <strong>Obtener ubicación actual</strong>.
-              </li>
-              <li>Obtén latitud, longitud y precisión horizontal.</li>
-              <li>
-                Agrega esos valores y la fecha actual dentro de{" "}
-                <code>location</code> en el JSON.
-              </li>
-              <li>
-                Si Ubicación falla o tarda, continúa y envía la transacción sin{" "}
-                <code>location</code>.
-              </li>
-            </ol>
-            <p className="small-note">
-              Hazlo tanto en el Atajo de SMS como en el de Wallet. La app
-              conservará la hora y la precisión para advertirte si la pista
-              pudo llegar tarde.
-            </p>
-          </div>
+          <details className="shortcut-api-guide">
+            <summary>Configurar el envío a Money Stalker</summary>
+            <div>
+              <p>
+                Hazlo únicamente en cada prueba que sí entregó datos. Usa las
+                acciones <strong>Formatear fecha</strong>,{" "}
+                <strong>Diccionario</strong> y{" "}
+                <strong>Obtener contenido de URL</strong>.
+              </p>
+              <ol>
+                <li>
+                  En la automatización de SMS, cambia el remitente de prueba a
+                  <code>85540</code> y usa el filtro
+                  <code>Bancolombia:</code>.
+                </li>
+                <li>
+                  Crea un identificador con <strong>Fecha actual</strong>
+                  formateada como <code>yyyyMMddHHmmssSSS</code> y antepone
+                  <code>sms-</code> o <code>wallet-</code>.
+                </li>
+                <li>
+                  Para SMS, crea un diccionario con <code>eventId</code>,
+                  <code>source</code> = <code>sms</code>,<code>observedAt</code>{" "}
+                  en ISO 8601 y <code>message</code>
+                  usando la entrada validada.
+                </li>
+                <li>
+                  En <strong>Obtener contenido de URL</strong>, usa el endpoint
+                  mostrado abajo, método <code>POST</code> y cuerpo
+                  <code>JSON</code> con ese diccionario.
+                </li>
+                <li>
+                  Agrega las cabeceras <code>Authorization</code> =
+                  <code>Bearer TU_TOKEN</code> y <code>Content-Type</code> =
+                  <code>application/json</code>.
+                </li>
+              </ol>
+              <p className="small-note">
+                Si la prueba de ubicación mostró todas las propiedades, agrega
+                <code>location</code> con latitud, longitud, precisión y su
+                propia fecha ISO 8601. Si no, omite el objeto completo.
+              </p>
+            </div>
+          </details>
           {token && (
             <div className="notice">
               <div>
@@ -2267,14 +2411,14 @@ function Settings({
             </div>
           ))}
           <p className="small-note">
-            Los SMS Bancolombia de compra con tarjeta, pago QR, pago desde
-            cuenta y transferencia se leen automáticamente. Si faltan datos, el
-            movimiento aparecerá en Revisión.
+            Cuando el iPhone entrega el texto, Money Stalker reconoce SMS
+            Bancolombia de compra con tarjeta, pago QR, pago desde cuenta y
+            transferencia. Si faltan datos, la captura aparecerá en Revisión.
           </p>
           <p className="small-note">
-            Ambos atajos deben intentar obtener la ubicación actual. Si
-            Localización está desactivada o tarda demasiado, el movimiento se
-            envía de todas formas.
+            Agrega ubicación únicamente si la prueba mostró todas sus
+            propiedades. Si Localización está desactivada o incompleta, omite el
+            objeto <code>location</code> completo.
           </p>
           {health?.pending.length ? (
             <div className="notice">

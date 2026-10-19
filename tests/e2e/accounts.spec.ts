@@ -43,7 +43,7 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   const instrument = page.locator(".settings-section").filter({
     has: page.getByText("Configurar capturas automáticas", { exact: true }),
   });
-  await instrument.locator("summary").click();
+  await instrument.locator(":scope > summary").click();
   await instrument.getByLabel("Nombre de tarjeta").fill("Visa débito");
   await instrument.getByLabel("Cuenta asociada").selectOption(bank.id);
   await instrument.getByLabel("Alias separados por comas").fill("1234");
