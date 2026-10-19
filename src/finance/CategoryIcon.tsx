@@ -10,6 +10,7 @@ export const categoryIcons: Record<string, IconName> = {
   transport: "transport",
   health: "heart",
   leisure: "leisure",
+  salary: "incoming",
   other: "other",
   uncategorized: "other",
 };

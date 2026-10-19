@@ -3,7 +3,7 @@ import { createAPI } from '../server/api';
 import { MemoryRepository } from '../server/repository';
 import { MemoryFiles } from '../server/storage';
 import { captureJob, processJob } from '../server/processing';
-import { configure } from '../domain/ledger';
+import { addTransaction, configure } from '../domain/ledger';
 import type { State } from '../domain/model';
 import { readFileSync } from 'node:fs';
 const now = '2026-10-17T18:00:00Z';
@@ -49,6 +49,19 @@ describe('authorization and capture', () => {
     expect((await send('POST', '/transactions', { id: 'with-place', accountId: 'bank', date: '2026-10-10', amountMinor: '2500000', kind: 'expense', merchant: place.name, place })).status).toBe(201);
     const visible = (await send('GET', '/state')).body as State;
     expect(visible.transactions[0]).toMatchObject({ merchant: place.name, place });
+  });
+  it('persists category and note across every movement from the same merchant', async () => {
+    const { repo, send } = await setup();
+    await repo.mutate('owner', state => {
+      for (let index = 0; index < 73; index++) addTransaction(state, { id: `same-${index}`, accountId: 'bank', date: '2026-10-10', amountMinor: String(10000 + index), kind: 'expense', merchant: index % 2 ? ' PEaje Central ' : 'Peaje Central' }, now);
+      addTransaction(state, { id: 'different', accountId: 'bank', date: '2026-10-10', amountMinor: '50000', kind: 'expense', merchant: 'Otro comercio' }, now);
+    });
+    const response = await send('PATCH', '/transactions/same-0', { changes: { categoryId: 'car', note: 'Ruta al trabajo' }, expectedRevision: 1, applyToSimilar: true });
+    expect(response).toMatchObject({ status: 200, body: { saved: true, updated: 73 } });
+    const state = await repo.read('owner'), same = state.transactions.filter(transaction => transaction.id.startsWith('same-'));
+    expect(same).toHaveLength(73); expect(same.every(transaction => transaction.categoryId === 'car' && transaction.note === 'Ruta al trabajo')).toBe(true);
+    expect(state.transactions.find(transaction => transaction.id === 'different')).toMatchObject({ categoryId: 'uncategorized', note: '' });
+    expect(state.aliases).toContainEqual({ id: 'peaje central', merchant: 'peaje central', categoryId: 'car', note: 'Ruta al trabajo' });
   });
   it('discards the entire mutation when validation fails', async () => { const { repo } = await setup(); await expect(repo.mutate('owner', s => { s.accounts.length = 0; throw new Error('failure'); })).rejects.toThrow(); expect((await repo.read('owner')).accounts).toHaveLength(1); });
   it('registers a selected review batch as separate movements atomically', async () => {

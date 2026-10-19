@@ -67,7 +67,7 @@ export type Audit = { id: string; at: string; action: string; transactionId?: st
 export type State = {
   accounts: Account[]; instruments: Instrument[]; categories: Category[]; bills: Bill[];
   transactions: Transaction[]; observations: Observation[]; audit: Audit[];
-  aliases: { id: string; merchant: string; categoryId: string }[]; settings: Settings;
+  aliases: { id: string; merchant: string; categoryId: string; note?: string }[]; settings: Settings;
 };
 export const defaultCategories: Category[] = [
   { id: 'uncategorized', name: 'Sin categoría' },
@@ -81,6 +81,7 @@ export const defaultCategories: Category[] = [
   { id: 'transport', name: 'Transporte' },
   { id: 'health', name: 'Salud' },
   { id: 'leisure', name: 'Ocio' },
+  { id: 'salary', name: 'Salario' },
   { id: 'other', name: 'Otros' },
 ];
 export function normalizeDefaultCategories(state: State) {

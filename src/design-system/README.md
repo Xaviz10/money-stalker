@@ -50,6 +50,8 @@ Large review queues keep a sticky count of pending and session-resolved evidence
 
 The Movements route is a product register. Scope it to one account or card, show that product’s balance or debt and movement count, and use the account rail or its mobile disclosure as the single scope control. Keep the ledger structure visible when the selected product has no movements. Search, import, export, and new movements use the current product; transfers use their direction relative to it. Import opens as a modal with a required preview and confirmation. On phones, rows keep merchant and amount visible together and place date, category, and status beneath them.
 
+Movement edits persist before the dialog reports success. “Aplicar esta categoría y nota” updates every existing movement with the same normalized merchant and remembers both values for future movements from that merchant. Large merchant groups are saved in bounded chunks. Income movements can use the built-in `Salario` category.
+
 Location is progressive disclosure inside the movement editor. Show an inline location label in the register when evidence or a confirmed place exists. The map distinguishes the iPhone sample from a Google Place selected by the owner, and loads only when the location disclosure is open.
 
 An account opening balance is a dated snapshot. Movements before that date remain visible in the product register and exports, but do not change the current balance, available amount, card debt, or unconfirmed card amount. Import help must explain this before confirmation.

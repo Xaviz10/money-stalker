@@ -2,6 +2,15 @@
 
 These instructions apply to the whole repository.
 
+## Release approval
+
+- Never push commits, tags or branches to any remote without the owner's explicit approval for that specific push.
+- Never start, trigger or promote a deployment to Vercel, AWS or any other environment without the owner's explicit approval for that specific deployment.
+- A request to implement, fix, test or continue work authorizes local changes and verification only. It does not authorize a push or deployment.
+- Prepare the complete reviewable result first: make the local changes, run the relevant checks, and report the changed files, test results and any material risks. Then ask for approval to push or deploy.
+- Approval from an earlier task does not carry over to a later push or deployment. Automatic deployment from `main` means approval to push to `main` is also approval to trigger that deployment; state this consequence when requesting approval.
+- Local commits are allowed when useful for review, but keep them local until the owner explicitly approves the push.
+
 ## Product context
 
 Money Stalker is a Spanish, COP, America/Bogota personal-finance app for Colombia. Its main job is to capture evidence with very little effort, reconcile it with official statements, and show cash after card debt, bills and reserve commitments. Preserve the Accounts first design, the eye identity and the shared design system in `DESIGN.md`.

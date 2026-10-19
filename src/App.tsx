@@ -249,23 +249,29 @@ export function App() {
   const [refreshedAt, setRefreshedAt] = useState<Date>();
   const [stale, setStale] = useState(false);
   const alive = useRef(true);
+  const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
+    const sequence = ++refreshSequence.current;
     setLoading(true);
     try {
       const [s, d] = await Promise.all([
         api<State>("/state"),
         api<Summary>("/dashboard"),
       ]);
+      if (sequence !== refreshSequence.current) return true;
       setState(s);
       setSummary(d);
       setRefreshedAt(new Date());
       setStale(false);
       setError("");
+      return true;
     } catch (e) {
+      if (sequence !== refreshSequence.current) return false;
       setStale(true);
       setError((e as Error).message);
+      return false;
     } finally {
-      setLoading(false);
+      if (sequence === refreshSequence.current) setLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -584,10 +590,14 @@ export function App() {
             page === "movimientos" ? movementAccount : selectedAccount
           }
           close={() => setEditing(undefined)}
-          saved={async () => {
+          saved={async (message) => {
+            const refreshed = await refresh();
             setEditing(undefined);
-            setNotice("Movimiento guardado. Ya está en tu rastro.");
-            await refresh();
+            setNotice(
+              refreshed
+                ? (message ?? "Movimiento guardado. Ya está en tu rastro.")
+                : "El movimiento quedó guardado, pero no pudimos actualizar la vista. Usa Actualizar datos para verlo.",
+            );
           }}
         />
       )}
@@ -915,7 +925,7 @@ function TransactionDialog({
   state: State;
   preferredAccountId?: string;
   close: () => void;
-  saved: () => Promise<void>;
+  saved: (message?: string) => Promise<void>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const isObservation = value !== "new" && "source" in value;
@@ -988,16 +998,26 @@ function TransactionDialog({
                 Object.entries(data).filter(([, v]) => v !== null),
               ),
             });
-          else if (transaction)
-            await api(`/transactions/${transaction.id}`, {
-              method: "PATCH",
-              body: JSON.stringify({
-                changes: data,
-                remember: f.get("remember") === "on",
-                expectedRevision: transaction.revision,
-              }),
-            });
-          else
+          else if (transaction) {
+            const applyToSimilar = f.get("applyToSimilar") === "on";
+            const result = await api<{ saved: true; updated: number }>(
+              `/transactions/${transaction.id}`,
+              {
+                method: "PATCH",
+                body: JSON.stringify({
+                  changes: data,
+                  applyToSimilar,
+                  expectedRevision: transaction.revision,
+                }),
+              },
+            );
+            await saved(
+              applyToSimilar
+                ? `Categoría y nota guardadas en ${result.updated} ${result.updated === 1 ? "movimiento" : "movimientos"} del mismo comercio.`
+                : undefined,
+            );
+            return;
+          } else
             await post(
               "/transactions",
               Object.fromEntries(
@@ -1147,10 +1167,10 @@ function TransactionDialog({
             defaultValue={transaction?.note}
           />
         </Field>
-        {transaction && (
+        {transaction && merchant.trim() && (
           <label className="checkbox">
-            <input type="checkbox" name="remember" /> Recordar esta categoría
-            para el mismo comercio
+            <input type="checkbox" name="applyToSimilar" /> Aplicar esta
+            categoría y nota a todos los movimientos de este comercio
           </label>
         )}
         {kind === "transfer" && (
@@ -1171,7 +1191,7 @@ function ImportDialog({
 }: {
   state: State;
   accountId: string;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean>;
   close: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -1812,7 +1832,7 @@ function Settings({
 }: {
   state: State;
   summary?: Summary;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean>;
 }) {
   const [accountKind, setAccountKind] = useState("bank"),
     [token, setToken] = useState("");

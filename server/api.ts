@@ -5,6 +5,7 @@ import {
   configure,
   dashboard,
   editTransaction,
+  merchantKey,
   mergeObservation,
   resolveObservation,
   undo,
@@ -126,20 +127,95 @@ export function createAPI(repo: Repository, files: Files) {
           .object({
             changes: z.record(z.string(), z.unknown()),
             remember: z.boolean().default(false),
+            applyToSimilar: z.boolean().default(false),
             expectedRevision: z.number().int().min(1),
           })
           .parse(body);
-        await repo.mutate(h, (s) =>
-          editTransaction(
-            s,
-            transaction[1],
-            b.changes,
-            now,
-            b.remember,
-            b.expectedRevision,
-          ),
+        const applyToSimilar = b.applyToSimilar || b.remember;
+        if (!applyToSimilar) {
+          await repo.mutate(h, (s) =>
+            editTransaction(
+              s,
+              transaction[1],
+              b.changes,
+              now,
+              false,
+              b.expectedRevision,
+            ),
+          );
+          return { status: 200, body: { saved: true, updated: 1 } };
+        }
+
+        const snapshot = await repo.read(h);
+        const selected = snapshot.transactions.find(
+          (item) => item.id === transaction[1] && !item.voided,
         );
-        return { status: 200, body: { saved: true } };
+        if (!selected) throw new DomainError("Movimiento desconocido", 404);
+        if (selected.revision !== b.expectedRevision)
+          throw new DomainError(
+            "El movimiento cambió; actualiza antes de editar",
+            409,
+          );
+        const key = merchantKey(selected.merchant);
+        if (!key)
+          throw new DomainError(
+            "Agrega un comercio o descripción para aplicar el cambio a movimientos similares",
+          );
+        const revisions = new Map(
+          snapshot.transactions.map((item) => [item.id, item.revision]),
+        );
+        const matchingIds = [
+          selected.id,
+          ...snapshot.transactions
+            .filter(
+              (item) =>
+                item.id !== selected.id &&
+                !item.voided &&
+                merchantKey(item.merchant) === key,
+            )
+            .map((item) => item.id),
+        ];
+        const sharedChanges = {
+          categoryId:
+            typeof b.changes.categoryId === "string"
+              ? b.changes.categoryId
+              : selected.categoryId,
+          note:
+            typeof b.changes.note === "string" ? b.changes.note : selected.note,
+        };
+        let updated = 0;
+        // Each edit also writes an audit row. Chunks keep every DynamoDB
+        // transaction comfortably below its 100-item limit.
+        for (let offset = 0; offset < matchingIds.length; offset += 35) {
+          const chunk = matchingIds.slice(offset, offset + 35);
+          updated += await repo.mutate(h, (s) => {
+            let changed = 0;
+            for (const id of chunk) {
+              const current = s.transactions.find(
+                (item) => item.id === id && !item.voided,
+              );
+              if (!current) continue;
+              const changes = id === selected.id ? b.changes : sharedChanges;
+              if (
+                id !== selected.id &&
+                current.categoryId === sharedChanges.categoryId &&
+                current.note === sharedChanges.note
+              )
+                continue;
+              editTransaction(
+                s,
+                id,
+                changes,
+                now,
+                id === selected.id,
+                revisions.get(id),
+              );
+              changed++;
+            }
+            return changed;
+          });
+        }
+        return { status: 200, body: { saved: true, updated } };
       }
       if (method === "POST" && path === "/matches") {
         const b = z

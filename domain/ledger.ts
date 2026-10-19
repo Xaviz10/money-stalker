@@ -3,7 +3,7 @@ import { accountSchema, billSchema, categorySchema, instrumentSchema, settingsSc
 import { bogotaDate, nextPayday } from './money';
 
 const clone = <T>(value: T): T => structuredClone(value);
-const merchantKey = (value: string) => value.normalize('NFKC').trim().toLocaleLowerCase('es-CO').replace(/\s+/g, ' ');
+export const merchantKey = (value: string) => value.normalize('NFKC').trim().toLocaleLowerCase('es-CO').replace(/\s+/g, ' ');
 const findAccount = (state: State, id: string) => requireValue(state.accounts.find(a => a.id === id), 'Cuenta desconocida');
 function entries(state: State, t: TransactionInput): Entry[] {
   const account = findAccount(state, t.accountId);
@@ -37,6 +37,7 @@ export function addTransaction(state: State, input: unknown, at: string, observa
   }
   const rule = state.aliases.find(a => a.merchant === merchantKey(value.merchant));
   if (value.categoryId === 'uncategorized' && rule) value.categoryId = rule.categoryId;
+  if (!value.note && rule?.note) value.note = rule.note;
   const t: Transaction = { ...value, entries: entries(state, value), observationIds: observationId ? [observationId] : [], revision: 1, requestSignature };
   linkBill(state, t);
   state.transactions.push(t);
@@ -145,7 +146,7 @@ export function editTransaction(state: State, transactionId: string, input: unkn
   const journal = entries(state, value);
   for (const bill of state.bills) if (bill.paidTransactionId === t.id) delete bill.paidTransactionId;
   Object.assign(t, value, { entries: journal, revision: t.revision + 1 }); linkBill(state, t);
-  if (remember && t.merchant) upsert(state.aliases, { id: merchantKey(t.merchant), merchant: merchantKey(t.merchant), categoryId: t.categoryId });
+  if (remember && t.merchant) upsert(state.aliases, { id: merchantKey(t.merchant), merchant: merchantKey(t.merchant), categoryId: t.categoryId, note: t.note });
   state.audit.push({ id: `edit:${t.id}:${t.revision}`, at, action: 'edit', transactionId: t.id, beforeTransaction, expectedRevision: t.revision });
 }
 export function undo(state: State, auditId: string, at: string) {

@@ -153,6 +153,7 @@ export function DesignSystem() {
             ["transport", "Transporte"],
             ["health", "Salud"],
             ["leisure", "Ocio"],
+            ["salary", "Salario"],
             ["other", "Otros"],
           ].map(([id, label]) => (
             <span key={id}>

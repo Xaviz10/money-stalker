@@ -17,7 +17,7 @@ describe('exact COP amounts and dates', () => {
   it('uses the current built-in categories and upgrades the legacy food label', () => {
     const state = emptyState();
     expect(state.categories.map(category => category.name)).toEqual([
-      'Sin categoría', 'Mercado', 'Restaurantes', 'Carro', 'Domicilios', 'Servicios', 'Hogar', 'Transporte', 'Salud', 'Ocio', 'Otros',
+      'Sin categoría', 'Mercado', 'Restaurantes', 'Carro', 'Domicilios', 'Servicios', 'Hogar', 'Transporte', 'Salud', 'Ocio', 'Salario', 'Otros',
     ]);
     state.categories = [{ id: 'food', name: 'Alimentación' }];
     normalizeDefaultCategories(state as State);
@@ -107,6 +107,7 @@ describe('evidence reconciliation and corrections', () => {
   it('preserves two real equal-value purchases', () => { const s = setup(); ingest(s, observation('one'), at); ingest(s, observation('two'), at); resolveObservation(s, 'two', 'separate', at); expect(s.transactions).toHaveLength(2); expect(dashboard(s, '2026-10-17').spendingMinor).toBe('40000000'); });
   it('automatically links strong references but reviews amount conflicts', () => { const s = setup(); ingest(s, observation('one', { reference: 'bank-unique' }), at); ingest(s, observation('two', { source: 'statement', reference: 'bank-unique' }), at); expect(s.transactions).toHaveLength(1); expect(s.transactions[0].status).toBe('posted'); ingest(s, observation('three', { reference: 'bank-unique', amountMinor: '25000000' }), at); expect(s.observations[2].status).toBe('review'); });
   it('keeps merchant and category edits when a statement confirms the purchase', () => { const s = setup(); ingest(s, observation('sms'), at); editTransaction(s, s.transactions[0].id, { merchant: 'Comercio recordado', categoryId: 'food' }, at); ingest(s, observation('bank', { source: 'statement', merchant: 'POS XYZ' }), at); mergeObservation(s, 'bank', s.transactions[0].id, at); expect(s.transactions[0].merchant).toBe('Comercio recordado'); expect(s.transactions[0].categoryId).toBe('food'); });
+  it('remembers category and note for the same merchant', () => { const s = setup(); addTransaction(s, { ...purchase('first'), merchant: 'Tienda repetida' }, at); editTransaction(s, 'first', { categoryId: 'restaurants', note: 'Almuerzo de trabajo' }, at, true); const next = addTransaction(s, { ...purchase('next'), merchant: '  TIENDA   REPETIDA  ' }, at); expect(next).toMatchObject({ categoryId: 'restaurants', note: 'Almuerzo de trabajo' }); });
   it('stores incomplete evidence without inventing a purchase', () => { const s = setup(); ingest(s, observation('missing', { amountMinor: undefined }), at); expect(s.transactions).toHaveLength(0); expect(dashboard(s, '2026-10-17').incomplete).toBe(1); });
   it('rejects cross-account merges and undo over later edits', () => { const s = setup(); ingest(s, observation('one'), at); ingest(s, observation('missing', { accountId: 'bank', amountMinor: undefined }), at); expect(() => mergeObservation(s, 'missing', s.transactions[0].id, at)).toThrow(); editTransaction(s, s.transactions[0].id, { merchant: 'A' }, at); const audit = s.audit.at(-1)!.id; editTransaction(s, s.transactions[0].id, { merchant: 'B' }, at); expect(() => undo(s, audit, at)).toThrow(/posteriores/); });
 });
