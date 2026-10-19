@@ -43,6 +43,13 @@ describe('authorization and capture', () => {
     await repo.putJob(job); await processJob(repo, files, 'owner', job.id);
     const s = await repo.read('owner'); expect(s.observations[0]).toMatchObject({ accountId: 'bank', status: 'linked', location }); expect(s.transactions).toHaveLength(1);
   });
+  it('stores an owner-confirmed Google Place on a transaction', async () => {
+    const { send } = await setup();
+    const place = { id: 'google-place-demo', name: 'Café seleccionado', address: 'Bogotá, Colombia', latitude: 4.60971, longitude: -74.08175 };
+    expect((await send('POST', '/transactions', { id: 'with-place', accountId: 'bank', date: '2026-10-10', amountMinor: '2500000', kind: 'expense', merchant: place.name, place })).status).toBe(201);
+    const visible = (await send('GET', '/state')).body as State;
+    expect(visible.transactions[0]).toMatchObject({ merchant: place.name, place });
+  });
   it('discards the entire mutation when validation fails', async () => { const { repo } = await setup(); await expect(repo.mutate('owner', s => { s.accounts.length = 0; throw new Error('failure'); })).rejects.toThrow(); expect((await repo.read('owner')).accounts).toHaveLength(1); });
   it('registers a selected review batch as separate movements atomically', async () => {
     const { repo, send } = await setup();

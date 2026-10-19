@@ -84,9 +84,7 @@ test("account → capture → import → review → export works on the project 
     preview.getByRole("columnheader", { name: "Tipo" }),
   ).toBeVisible();
   await expect(preview.getByText("Gasto", { exact: true })).toBeVisible();
-  await expect(preview.locator("tbody tr").first()).toContainText(
-    "−$ 12.500",
-  );
+  await expect(preview.locator("tbody tr").first()).toContainText("−$ 12.500");
   await page
     .getByRole("button", { name: "Confirmar 1 filas aceptadas" })
     .click();
@@ -151,10 +149,15 @@ test("account → capture → import → review → export works on the project 
   await page
     .getByRole("button", { name: "Café de ejemplo", exact: true })
     .click();
-  await expect(page.getByText("Ubicación guardada por el atajo")).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Abrir en Mapas" }),
-  ).toHaveAttribute("href", "https://maps.apple.com/?ll=4.60971,-74.08175");
+    page.getByText("Ubicación capturada por el atajo"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Abrir en Google Maps" }),
+  ).toHaveAttribute(
+    "href",
+    "https://www.google.com/maps/search/?api=1&query=4.60971%2C-74.08175",
+  );
   await page.getByRole("button", { name: "Cerrar" }).click();
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV", exact: true }).click();

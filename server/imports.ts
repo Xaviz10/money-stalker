@@ -563,6 +563,12 @@ export function exportRecords(
             `${o.location!.latitude.toFixed(5)},${o.location!.longitude.toFixed(5)} ±${Math.round(o.location!.accuracy)}m ${o.location!.observedAt}`,
         )
         .join(" | "),
+      Lugar: t.place?.name ?? "",
+      DireccionLugar: t.place?.address ?? "",
+      UbicacionLugar: t.place
+        ? `${t.place.latitude.toFixed(5)},${t.place.longitude.toFixed(5)}`
+        : "",
+      GooglePlaceID: t.place?.id ?? "",
       Referencia: t.reference ?? "",
       Nota: t.note,
     }));
@@ -579,6 +585,10 @@ export function exportRecords(
     "Estado",
     "Evidencias",
     "Ubicaciones",
+    "Lugar",
+    "DireccionLugar",
+    "UbicacionLugar",
+    "GooglePlaceID",
     "Referencia",
     "Nota",
   ];

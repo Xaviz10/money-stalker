@@ -67,6 +67,16 @@ The Wallet automation sends structured values supplied by the transaction trigge
 
 Each shortcut should request one current-location sample after receiving the financial event. Use a short practical timeout. If permission is denied, the location is slow or the device is offline, send or retain the financial event without location rather than dropping it.
 
+In each iPhone automation, place these actions before **Get Contents of URL**:
+
+1. **Get Current Location** once.
+2. Read **Latitude**, **Longitude** and **Horizontal Accuracy** with **Get Details of Locations**.
+3. Read **Current Date** immediately after the sample and use it as `location.observedAt` in ISO 8601 format.
+4. Add those values to the request dictionary under `location`. Keep the existing transaction `observedAt` separate.
+5. Put the location actions in a path that can fail without stopping the final HTTP request. If no sample is available, omit the complete `location` object; never send zero coordinates.
+
+Set Location access for Shortcuts to **While Using the App** or the most permissive option the installed iOS version offers for personal automations. Run the SMS and Wallet automations without **Ask Before Running** when iOS permits it.
+
 The server preserves the coordinates, accuracy and location timestamp on the source observation. Linked location evidence remains visible when opening the movement and is included in CSV/XLSX exports. It is a memory clue, not proof of merchant identity. SMS delivery can be delayed and online purchases can occur away from the merchant.
 
 ## Device validation still required

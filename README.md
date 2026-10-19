@@ -11,6 +11,7 @@ Current import support includes the verified Bancolombia quarterly savings-accou
 - [Initial product and implementation plan](docs/INITIAL_PLAN.md)
 - [iPhone capture feasibility test](docs/IOS_CAPTURE_SPIKE.md)
 - [iPhone Shortcut capture contract](docs/SHORTCUT_CAPTURE.md)
+- [Google Maps setup](docs/GOOGLE_MAPS.md)
 - [Loan affordability and ChatGPT integration](docs/DECISIONS_AND_CHATGPT.md)
 
 Proposed foundation: React and TypeScript, an installable web app, iPhone Shortcuts, and a small AWS serverless backend. The household operating budget is **less than US$5/month**, with free service allowances preferred. Financial calculations work without AI; a financial-summary export and then an authenticated ChatGPT connection are the preferred conversational interfaces. Embedded paid AI remains optional.

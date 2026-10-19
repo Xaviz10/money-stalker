@@ -367,6 +367,40 @@ describe("CSV/XLSX parsing", () => {
   });
 });
 describe("safe exports", () => {
+  it("exports a confirmed Google Place separately from captured evidence", () => {
+    const s = emptyState();
+    configure(s, "accounts", {
+      id: "bank",
+      name: "Ahorros",
+      kind: "bank",
+      openingMinor: "0",
+      openingDate: "2026-01-01",
+    });
+    addTransaction(
+      s,
+      {
+        id: "placed",
+        accountId: "bank",
+        date: "2026-10-01",
+        kind: "expense",
+        amountMinor: "100000",
+        merchant: "Café seleccionado",
+        place: {
+          id: "google-place-demo",
+          name: "Café seleccionado",
+          address: "Bogotá, Colombia",
+          latitude: 4.60971,
+          longitude: -74.08175,
+        },
+      },
+      now,
+    );
+    const csv = exportRecords(s, "csv").bytes.toString();
+    expect(csv).toContain("Café seleccionado");
+    expect(csv).toContain("google-place-demo");
+    expect(csv).toContain("4.60971,-74.08175");
+  });
+
   it("scopes product exports to direct and incoming transfer movements", () => {
     const s = emptyState();
     configure(s, "accounts", {

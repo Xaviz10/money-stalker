@@ -13,6 +13,12 @@ const institutionUrl = z.url({ protocol: /^https$/ }).max(500).refine(value => {
   return !parsed.username && !parsed.password;
 }, 'Usa una URL HTTPS sin credenciales');
 const accountImage = z.string().max(14000).regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/);
+const coordinate = z.object({
+  latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180),
+});
+export const transactionPlaceSchema = coordinate.extend({
+  id: text.min(1), name: text.min(1), address: z.string().trim().max(500).default(''),
+});
 export const accountSchema = z.object({
   id, name: text.min(1), kind: z.enum(['bank', 'cash', 'credit']), openingMinor: minor,
   openingDate: date, closingDay: z.number().int().min(1).max(31).optional(),
@@ -28,7 +34,7 @@ export const transactionInput = z.object({
   id, accountId: id, counterAccountId: id.optional(), date, amountMinor: positive,
   kind: z.enum(['expense', 'income', 'transfer', 'refund']), merchant: text.default(''),
   categoryId: id.default('uncategorized'), note: z.string().max(1000).default(''), billId: id.optional(),
-  status: z.enum(['provisional', 'posted']).default('posted'), reference: text.optional(),
+  status: z.enum(['provisional', 'posted']).default('posted'), reference: text.optional(), place: transactionPlaceSchema.optional(),
 });
 export const captureSchema = z.object({
   eventId: id, source: z.enum(['sms', 'wallet']), observedAt: z.iso.datetime({ offset: true }),
@@ -45,6 +51,7 @@ export type Category = z.infer<typeof categorySchema>;
 export type Bill = z.infer<typeof billSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type TransactionInput = z.infer<typeof transactionInput>;
+export type TransactionPlace = z.infer<typeof transactionPlaceSchema>;
 export type Capture = z.infer<typeof captureSchema>;
 export type Entry = { accountId: string; debitMinor: string; creditMinor: string };
 export type Transaction = TransactionInput & { entries: Entry[]; observationIds: string[]; revision: number; voided?: boolean; requestSignature?: string };

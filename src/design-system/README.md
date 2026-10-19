@@ -50,6 +50,8 @@ Large review queues keep a sticky count of pending and session-resolved evidence
 
 The Movements route is a product register. Scope it to one account or card, show that product’s balance or debt and movement count, and use the account rail or its mobile disclosure as the single scope control. Keep the ledger structure visible when the selected product has no movements. Search, import, export, and new movements use the current product; transfers use their direction relative to it. Import opens as a modal with a required preview and confirmation. On phones, rows keep merchant and amount visible together and place date, category, and status beneath them.
 
+Location is progressive disclosure inside the movement editor. Show an inline location label in the register when evidence or a confirmed place exists. The map distinguishes the iPhone sample from a Google Place selected by the owner, and loads only when the location disclosure is open.
+
 An account opening balance is a dated snapshot. Movements before that date remain visible in the product register and exports, but do not change the current balance, available amount, card debt, or unconfirmed card amount. Import help must explain this before confirmation.
 
 Signed interchange imports follow the selected product. Bank and cash accounts interpret positive values as income and negative values as expenses. Credit cards interpret positive values as purchases and negative values as refunds. An explicit transaction type overrides sign inference so payments and transfers keep their real meaning.

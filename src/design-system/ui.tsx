@@ -20,6 +20,7 @@ export type IconName =
   | "chevron"
   | "refresh"
   | "calendar"
+  | "location"
   | "food"
   | "groceries"
   | "restaurant"
@@ -104,6 +105,12 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
       <>
         <rect x="3" y="5" width="18" height="16" rx="3" />
         <path d="M7 3v4m10-4v4M3 11h18" />
+      </>
+    ),
+    location: (
+      <>
+        <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
+        <circle cx="12" cy="10" r="2.5" />
       </>
     ),
     food: (

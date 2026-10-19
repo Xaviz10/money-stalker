@@ -12,6 +12,7 @@ import {
   type State,
   type Observation,
   type Transaction,
+  type TransactionPlace,
 } from "../domain/model";
 import { dashboard } from "../domain/ledger";
 import { bogotaDate, decimalCOP, formatCOP, parseCOP } from "../domain/money";
@@ -29,6 +30,7 @@ import { ReviewDesk } from "./finance/ReviewDesk";
 import { AccountRail } from "./finance/AccountRail";
 import { AccountArtwork } from "./finance/AccountArtwork";
 import { CategoryIcon } from "./finance/CategoryIcon";
+import { TransactionMap } from "./finance/TransactionMap";
 import { DesignSystem } from "./design-system/DesignSystem";
 import {
   Icon,
@@ -226,12 +228,6 @@ function AppForm({
 const str = (f: FormData, key: string) => String(f.get(key) ?? "");
 const amount = (f: FormData, key: string) => parseCOP(str(f, key));
 const freshId = () => crypto.randomUUID();
-const capturedAt = (value: string) =>
-  new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "America/Bogota",
-  }).format(new Date(value));
 
 export function App() {
   const [state, setState] = useState<State>(emptyState),
@@ -675,6 +671,17 @@ function TransactionTable({
                         }[t.kind]}
                     </button>
                     {t.note && <small>{t.note}</small>}
+                    {(t.place ||
+                      state.observations.some(
+                        (observation) =>
+                          observation.transactionId === t.id &&
+                          observation.location,
+                      )) && (
+                      <span className="transaction-location-label">
+                        <Icon name="location" size={13} />
+                        {t.place?.name ?? "Ubicación guardada"}
+                      </span>
+                    )}
                     <FlowIndicator
                       record={t}
                       selectedAccount={selectedAccount}
@@ -914,8 +921,12 @@ function TransactionDialog({
   const isObservation = value !== "new" && "source" in value;
   const initial = value === "new" ? undefined : value;
   const [kind, setKind] = useState(initial?.kind ?? "expense");
+  const [merchant, setMerchant] = useState(initial?.merchant ?? "");
   const transaction =
     value !== "new" && !isObservation ? (value as Transaction) : undefined;
+  const [place, setPlace] = useState<TransactionPlace | undefined>(
+    transaction?.place,
+  );
   const locationEvidence =
     isObservation && (value as Observation).location
       ? [value as Observation]
@@ -926,6 +937,9 @@ function TransactionDialog({
               Boolean(observation.location),
           )
         : [];
+  const [locationOpen, setLocationOpen] = useState(
+    Boolean(locationEvidence.length || place),
+  );
   const operationId = useRef(freshId());
   useEffect(() => {
     dialog.current?.showModal();
@@ -949,35 +963,6 @@ function TransactionDialog({
           <Icon name="close" />
         </button>
       </div>
-      {locationEvidence.length > 0 && (
-        <div className="notice location-memory">
-          <div>
-            <strong>Ubicación guardada por el atajo</strong>
-            {locationEvidence.map((observation) => (
-              <div className="location-entry" key={observation.id}>
-                <small>
-                  {observation.source === "wallet" ? "Wallet" : "SMS"} ·{" "}
-                  {observation.location!.latitude.toFixed(5)},{" "}
-                  {observation.location!.longitude.toFixed(5)} · precisión{" "}
-                  {Math.round(observation.location!.accuracy)} m ·{" "}
-                  {capturedAt(observation.location!.observedAt)}
-                </small>
-                <a
-                  href={`https://maps.apple.com/?ll=${observation.location!.latitude},${observation.location!.longitude}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Abrir en Mapas
-                </a>
-              </div>
-            ))}
-            <small>
-              Es una pista del momento de captura. Un SMS retrasado puede llegar
-              después de salir del lugar.
-            </small>
-          </div>
-        </div>
-      )}
       <AppForm
         submit={transaction ? "Guardar cambios" : "Registrar movimiento"}
         onSubmit={async (f) => {
@@ -989,10 +974,11 @@ function TransactionDialog({
             counterAccountId:
               kind === "transfer" ? str(f, "counterAccountId") : null,
             amountMinor: amount(f, "amount"),
-            merchant: str(f, "merchant"),
+            merchant,
             categoryId: str(f, "categoryId") || "uncategorized",
             note: str(f, "note"),
             billId: str(f, "billId") || null,
+            place: place ?? null,
           };
           if (isObservation)
             await post("/reviews", {
@@ -1088,7 +1074,8 @@ function TransactionDialog({
             <input
               name="merchant"
               maxLength={200}
-              defaultValue={initial?.merchant}
+              value={merchant}
+              onChange={(event) => setMerchant(event.target.value)}
             />
           </Field>
           <Field label="Categoría">
@@ -1122,6 +1109,37 @@ function TransactionDialog({
             </Field>
           )}
         </div>
+        <details
+          className="transaction-location-picker"
+          open={locationOpen}
+          onToggle={(event) => setLocationOpen(event.currentTarget.open)}
+        >
+          <summary>
+            <span>
+              <strong>Ubicación y negocio</strong>
+              <small>
+                {place
+                  ? place.name
+                  : locationEvidence.length
+                    ? "Ubicación capturada por el atajo"
+                    : "Opcional"}
+              </small>
+            </span>
+            <Icon name="location" size={18} />
+          </summary>
+          {locationOpen && (
+            <TransactionMap
+              captured={locationEvidence.map(
+                (observation) => observation.location!,
+              )}
+              place={place}
+              onPlaceChange={(next) => {
+                setPlace(next);
+                if (next) setMerchant(next.name);
+              }}
+            />
+          )}
+        </details>
         <Field label="Nota">
           <textarea
             name="note"
@@ -2162,7 +2180,10 @@ function Settings({
           <p>
             Crea un acceso para tu dispositivo y úsalo en dos automatizaciones
             de Atajos: una para el texto del SMS Bancolombia y otra para los
-            datos de Wallet. No necesitas enviar capturas de pantalla.
+            datos de Wallet. En ambas, ejecuta{" "}
+            <strong>Obtener ubicación actual</strong> antes de enviar el evento.
+            Si la ubicación falla, envía la transacción de todos modos. No
+            necesitas capturas de pantalla.
           </p>
           <AppForm
             submit="Crear acceso para mi iPhone"
@@ -2183,6 +2204,29 @@ function Settings({
               />
             </Field>
           </AppForm>
+          <div className="shortcut-location-help">
+            <h4>Agregar ubicación a los dos Atajos</h4>
+            <ol>
+              <li>
+                Después de recibir el SMS o pago, ejecuta{" "}
+                <strong>Obtener ubicación actual</strong>.
+              </li>
+              <li>Obtén latitud, longitud y precisión horizontal.</li>
+              <li>
+                Agrega esos valores y la fecha actual dentro de{" "}
+                <code>location</code> en el JSON.
+              </li>
+              <li>
+                Si Ubicación falla o tarda, continúa y envía la transacción sin{" "}
+                <code>location</code>.
+              </li>
+            </ol>
+            <p className="small-note">
+              Hazlo tanto en el Atajo de SMS como en el de Wallet. La app
+              conservará la hora y la precisión para advertirte si la pista
+              pudo llegar tarde.
+            </p>
+          </div>
           {token && (
             <div className="notice">
               <div>

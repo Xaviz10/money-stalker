@@ -26,6 +26,8 @@ Bancolombia SMS capture reads masked source suffixes, amounts, transaction dates
 
 Both Shortcuts attempt a one-time location sample. Preserve coordinates, accuracy and the location timestamp after reconciliation and in exports. Location is optional supporting evidence, never a reason to drop a capture or automatic proof of merchant identity.
 
+Transactions may also store an owner-confirmed Google Place with its place ID, display name, address and coordinates. The movement editor centers the map on Shortcut evidence, lets the owner search or tap a visible business, and uses that selection as the merchant name. Captured coordinates and a confirmed place remain distinct: the first records where the phone was when the automation ran; the second records the business the owner selected.
+
 ## Brand commitments
 
 The user likes MoneyWiz's design and financial organization. The user explicitly selected the Accounts first preview after rejecting a generic card-based sidekick design. Preserve the curious eye mark, top navigation, blue account rail and expressive financial typography. The user requested a shared design system for current and future improvements. Financial labels and warnings must stay understandable. The user controls evidence matching.

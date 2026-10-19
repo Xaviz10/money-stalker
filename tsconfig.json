@@ -4,7 +4,7 @@
     "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
     "strict": true, "noEmit": true, "esModuleInterop": true,
     "skipLibCheck": true, "resolveJsonModule": true,
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client", "google.maps"]
   },
   "include": ["src", "domain", "server", "infra", "scripts", "tests", "*.ts"]
 }
