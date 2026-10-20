@@ -10,8 +10,15 @@ async function capturedMovement(request: APIRequestContext, register = true) {
   if (register) expect((await request.post(`${api}/reviews`, { data: { observationId: state.observations[0].id, action: 'separate' } })).ok()).toBe(true);
 }
 async function editLocation(dialog: Locator) {
+  const section = dialog.locator('.transaction-location-picker');
+  await expect(section).toBeVisible();
+  // The native details element opens before onToggle mounts PlacePicker.
+  // Wait for that render before checking whether its compact editor needs opening.
+  if (await section.getAttribute('open') === null) return;
+  await expect(section.locator('.place-picker')).toBeVisible();
   const button = dialog.getByRole('button', { name: 'Editar ubicación', exact: true });
   if (await button.isVisible()) await button.click();
+  await expect(dialog.getByLabel('Latitud del lugar')).toBeVisible();
 }
 test('simple location editor resolves links, saves corrections and preserves capture evidence', async ({ page, request }, info) => {
   await capturedMovement(request);
@@ -224,6 +231,7 @@ test('merchant location can be applied to existing movements and reused or remov
   await dialog.getByLabel('Recordar esta ubicación para próximos movimientos de este comercio', { exact: true }).check();
   await dialog.getByLabel('Aplicar esta ubicación a todos los movimientos de este comercio', { exact: true }).check();
   await dialog.getByText('Ubicación y negocio', { exact: true }).click();
+  await expect(dialog.locator('.place-picker')).toHaveCount(0);
   await dialog.getByText('Ubicación y negocio', { exact: true }).click();
   await editLocation(dialog);
   await expect(dialog.getByLabel('Aplicar esta ubicación a todos los movimientos de este comercio', { exact: true })).toBeChecked();
