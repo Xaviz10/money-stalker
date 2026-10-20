@@ -150,3 +150,35 @@ describe('product setup and initial debit identity', () => {
     }
   });
 });
+
+describe('expanded expense categories', () => {
+  it('adds the requested hierarchy to existing states without changing movement or merchant references', () => {
+    const state = setup();
+    state.categories = state.categories.filter(category => !category.id.startsWith('subscriptions'));
+    const internet = state.categories.find(category => category.id === 'utilities-internet')!;
+    internet.name = 'Internet y telefonía';
+    addTransaction(state, { id: 'internet-existing', accountId: 'bank', kind: 'expense', date: '2026-10-10', amountMinor: '10000', categoryId: internet.id, merchant: 'Proveedor de prueba' }, at);
+    state.aliases.push({ id: 'provider-rule', merchant: 'proveedor de prueba', categoryId: internet.id });
+    const movements = structuredClone(state.transactions), rules = structuredClone(state.aliases);
+    normalizeDefaultCategories(state);
+    const expected: Record<string, string[]> = {
+      subscriptions: ['Netflix', 'Prime', 'Disney', 'ChatGPT', 'Google', 'Spotify'],
+      'online-shopping': ['Electrónicas', 'Ropa', 'Hogar'],
+      shopping: ['Electrónicas', 'Ropa', 'Antojos'],
+      delivery: ['Mercado', 'Farmacia', 'Restaurantes'],
+      loans: ['Vivienda', 'Carro', 'Libre inversión', 'Otros'],
+      'bank-fees': ['Cuota de manejo', 'Intereses'],
+    };
+    for (const [parentId, names] of Object.entries(expected)) {
+      expect(state.categories.filter(category => category.parentId === parentId).map(category => category.name)).toEqual(names);
+      expect(state.categories.filter(category => category.id === parentId || category.parentId === parentId).every(category => category.scope === 'expense')).toBe(true);
+    }
+    expect(state.categories.find(category => category.id === 'utilities-internet')?.name).toBe('Internet');
+    expect(state.categories.find(category => category.id === 'utilities-phone')).toMatchObject({ name: 'Telefonía', parentId: 'utilities', scope: 'expense' });
+    expect(state.transactions).toEqual(movements);
+    expect(state.aliases).toEqual(rules);
+    const categories = structuredClone(state.categories);
+    normalizeDefaultCategories(state);
+    expect(state.categories).toEqual(categories);
+  });
+});

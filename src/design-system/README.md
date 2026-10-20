@@ -90,3 +90,5 @@ The favicon and installed-app icons use primary blue `#1949db`, the complete eye
 ## Product setup
 
 The account creation form asks for type, name, opening balance/date, then SMS identity for non-cash products. Bank accounts offer “Agregar tarjeta débito ahora”; the optional card shares the source balance and saves with the account as one operation. Keep visual personalization and organization in the collapsed “Más opciones” disclosure. Product editing owns future alias changes and “Agregar tarjeta débito”; the shared iPhone connection keeps four primary steps and a final optional later-card form. SMS identification status never implies that an automation is connected.
+
+Expense symbols: Suscripciones uses a playback screen, Compras online a cart, Compras a shopping bag, Créditos a document/clock, Gastos bancarios a bank/charge, Internet Wi-Fi and Telefonía a phone. Built-in subcategories reuse their parent symbol. Keep these outlined at the shared stroke weight and pair them with category text; the catalog includes every new family.

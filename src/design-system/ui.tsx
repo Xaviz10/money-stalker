@@ -36,9 +36,23 @@ export type IconName =
   | "coin"
   | "receipt"
   | "pocket"
-  | "investment";
+  | "investment"
+  | "subscription"
+  | "online-shopping"
+  | "shopping"
+  | "loan"
+  | "bank-fees"
+  | "internet"
+  | "phone";
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
+    subscription: <><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m10 9 5 3-5 3V9ZM7 2v3m10-3v3" /></>,
+    "online-shopping": <><path d="M3 4h2l3 11h11l2-8H6M9 20h.01M18 20h.01M12 3h6m-3-2 3 2-3 2" /><circle cx="9" cy="20" r="1" /><circle cx="18" cy="20" r="1" /></>,
+    shopping: <><path d="M5 7h14l2 14H3L5 7Z" /><path d="M8 8V6a4 4 0 0 1 8 0v2" /></>,
+    loan: <><path d="M3 4h13v6M3 4v16h7M6 8h6M6 12h3" /><circle cx="16" cy="16" r="6" /><path d="M16 13v3l2 1" /></>,
+    "bank-fees": <><path d="m3 8 8-5 8 5H3Zm2 3v6m6-6v6M3 20h9" /><circle cx="18" cy="17" r="4" /><path d="M16 17h4" /></>,
+    internet: <><path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0m-11 4a6 6 0 0 1 8 0" /><circle cx="12" cy="20" r="1" /></>,
+    phone: <><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M10 5h4m-3 14h2" /></>,
     coin: <><circle cx="12" cy="12" r="9" /><path d="M15 8c-1-2-7-2-7 1 0 4 8 1 8 5 0 3-6 4-8 1m4-10v14" /></>,
     receipt: <><path d="M5 3h14v18l-3-2-4 2-4-2-3 2V3Z" /><path d="M9 8h6m-6 4h6m-6 4h3" /></>,
     pocket: <><path d="M4 5h16v9c0 4-8 7-8 7s-8-3-8-7V5Z" /><path d="m4 9 8 5 8-5" /></>,
