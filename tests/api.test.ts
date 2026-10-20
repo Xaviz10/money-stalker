@@ -459,3 +459,51 @@ it('keeps historical place propagation separate from future memory and respects 
   await send('POST', '/transactions', { ...base, id: 'future-common', date: '2026-10-11', kind: 'expense', amountMinor: '3300000' });
   expect((await repo.read('owner')).transactions.find(t => t.id === 'future-common')?.place).toEqual(firstPlace);
 });
+
+it('converts matching historical expenses into contributions to one new investment across chunks', async () => {
+  const { repo, send } = await setup();
+  await send('POST', '/accounts', { id: 'cash', name: 'Efectivo', kind: 'cash', openingMinor: '0', openingDate: '2026-01-01' });
+  await send('POST', '/accounts', { id: 'other-fund', name: 'Otro fondo', kind: 'investment', openingMinor: '0', openingDate: '2026-01-01' });
+  for (let i = 0; i < 40; i++) expect((await send('POST', '/transactions', {
+    id: `contribution-${i}`, accountId: i % 2 ? 'cash' : 'bank', date: i ? '2025-12-01' : '2026-10-10',
+    amountMinor: String(100000 + i), kind: 'expense', merchant: i % 2 ? ' FONDO COMÚN ' : 'Fondo común',
+  })).status).toBe(201);
+  for (const [id, kind, counterAccountId] of [['income', 'income', undefined], ['refund', 'refund', undefined], ['elsewhere', 'transfer', 'other-fund']] as const) {
+    expect((await send('POST', '/transactions', { id, kind, counterAccountId, accountId: 'bank', date: '2026-10-11', amountMinor: '200000', merchant: 'Fondo común', categoryId: kind === 'income' ? 'salary' : 'uncategorized' })).status).toBe(201);
+  }
+  const response = await send('PATCH', '/transactions/contribution-0', {
+    expectedRevision: 1, applyToSimilar: true, rememberMerchant: true,
+    changes: { kind: 'transfer', counterAccountId: 'common-fund', investmentProduct: { id: 'common-fund', name: 'Mi inversión' }, categoryId: 'car', note: 'Aporte', billId: null },
+  });
+  expect(response).toMatchObject({ status: 200, body: { updated: 40 } });
+  const state = await repo.read('owner');
+  expect(state.accounts.filter(a => a.id === 'common-fund')).toHaveLength(1);
+  const contributions = state.transactions.filter(t => t.id.startsWith('contribution-'));
+  expect(contributions.every(t => t.kind === 'transfer' && t.counterAccountId === 'common-fund' && t.categoryId === 'car' && t.note === 'Aporte')).toBe(true);
+  expect(state.transactions.find(t => t.id === 'income')?.kind).toBe('income');
+  expect(state.transactions.find(t => t.id === 'refund')?.kind).toBe('refund');
+  expect(state.transactions.find(t => t.id === 'elsewhere')?.counterAccountId).toBe('other-fund');
+  expect(state.aliases.find(rule => rule.merchant === 'fondo común')?.investmentAccountId).toBe('common-fund');
+  const total = contributions.reduce((sum, t) => sum + BigInt(t.amountMinor), 0n).toString();
+  expect((await send('GET', '/dashboard')).body).toMatchObject({ balances: { 'common-fund': total, bank: '100100000' }, spendingMinor: '-200000' });
+  const first = contributions[0];
+  expect((await send('POST', '/transactions', { id: 'later-history', accountId: 'bank', date: '2025-11-01', amountMinor: '500000', kind: 'expense', merchant: 'Fondo común' })).status).toBe(201);
+  expect((await send('PATCH', `/transactions/${first.id}`, { expectedRevision: first.revision, applyToSimilar: true, changes: { kind: 'transfer', counterAccountId: 'common-fund', note: 'Aportes revisados' } })).status).toBe(200);
+  expect((await repo.read('owner')).transactions.find(t => t.id === 'later-history')).toMatchObject({ kind: 'transfer', counterAccountId: 'common-fund' });
+  expect((await send('GET', '/dashboard')).body).toMatchObject({ balances: { 'common-fund': (BigInt(total) + 500000n).toString() } });
+});
+
+it('unlinks paid bills during bulk investment conversion within DynamoDB transaction limits', async () => {
+  const repo = new DynamoLimitMemoryRepository(), api = createAPI(repo, new MemoryFiles());
+  const send = (method: string, path: string, body?: unknown) => api({ method, path, body, subject: 'owner' });
+  await send('POST', '/accounts', { id: 'bank', name: 'Banco', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01' });
+  for (let i = 0; i < 40; i++) {
+    await send('POST', '/bills', { id: `bill-${i}`, name: `Cuota ${i}`, amountMinor: '100000', dueDate: '2026-10-10' });
+    expect((await send('POST', '/transactions', { id: `bill-payment-${i}`, accountId: 'bank', amountMinor: '100000', date: '2026-10-10', kind: 'expense', merchant: 'Ahorro común', billId: `bill-${i}`, duplicateConfirmed: true })).status).toBe(201);
+  }
+  expect((await send('PATCH', '/transactions/bill-payment-0', { expectedRevision: 1, applyToSimilar: true, changes: { kind: 'transfer', counterAccountId: 'fund', investmentProduct: { id: 'fund', name: 'Fondo' }, billId: null } })).status).toBe(200);
+  const state = await repo.read('owner');
+  expect(state.bills.every(b => !b.paidTransactionId)).toBe(true);
+  expect(state.transactions.every(t => t.kind === 'transfer' && !t.billId)).toBe(true);
+  expect(repo.largestMutation).toBeLessThanOrEqual(96);
+});

@@ -284,7 +284,9 @@ export function dashboard(state: State, today: string) {
     const a = state.accounts.find(a => a.id === e.accountId); if (!a) continue;
     // The opening balance is a dated snapshot. Earlier movements stay visible as
     // history, but are already represented by that snapshot and must not be counted again.
-    if (t.date < a.openingDate) continue;
+    // A zero-opening investment is accumulated from its contributions, including
+    // historical ones. Funded snapshots still exclude already represented history.
+    if (t.date < a.openingDate && !(a.kind === 'investment' && BigInt(a.openingMinor) === 0n)) continue;
     const delta = BigInt(e.debitMinor) - BigInt(e.creditMinor);
     balances[a.id] += a.kind === 'credit' ? -delta : delta;
   }

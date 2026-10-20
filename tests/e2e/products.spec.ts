@@ -147,3 +147,38 @@ test("manual investments offer existing products and inline creation, then CSV r
   const summary = await (await request.get(`${apiBase}/dashboard`)).json();
   expect(summary).toMatchObject({ availableMinor: "111500000", investmentsMinor: "8500000", spendingMinor: "0", incomeMinor: "0", balances: { cash: "15000000", bank: "96500000" } });
 });
+
+test('reclassifying a merchant as an investment applies its destination to historical expenses and sums contributions', async ({ page, request }) => {
+  await request.post(`${apiBase}/accounts`, { data: { id: 'bank', name: 'Banco de prueba', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01' } });
+  for (const [id, date, amountMinor] of [['latest', '2026-10-18', '10000000'], ['historical', '2025-12-01', '20000000']]) {
+    expect((await request.post(`${apiBase}/transactions`, { data: { id, date, amountMinor, accountId: 'bank', kind: 'expense', merchant: 'FONDO HISTÓRICO' } })).ok()).toBe(true);
+  }
+  await page.goto('./#/movimientos');
+  await page.getByRole('button', { name: 'FONDO HISTÓRICO', exact: true }).first().click();
+  let editor = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await editor.getByLabel('Categoría de gasto').selectOption('__investment__');
+  await editor.getByLabel('Nombre del nuevo producto de inversión').fill('Ahorro a largo plazo');
+  await editor.getByLabel('Recordar este comercio, su categoría y producto de inversión para próximas importaciones').check();
+  await editor.getByLabel('Aplicar esta categoría y nota a todos los movimientos de este comercio').check();
+  await editor.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  let state = await (await request.get(`${apiBase}/state`)).json();
+  const investment = state.accounts.find((a: { kind: string }) => a.kind === 'investment');
+  expect(state.transactions.every((t: { kind: string; counterAccountId: string }) => t.kind === 'transfer' && t.counterAccountId === investment.id)).toBe(true);
+  expect(await (await request.get(`${apiBase}/dashboard`)).json()).toMatchObject({ investmentsMinor: '30000000', spendingMinor: '0', balances: { bank: '90000000' } });
+  // A later historical entry must reuse the product and increase it only once.
+  await page.getByRole('button', { name: 'Nuevo movimiento', exact: true }).click();
+  editor = page.getByRole('dialog', { name: 'Nuevo movimiento', exact: true });
+  await editor.getByLabel('Categoría de gasto').selectOption('__investment__');
+  await editor.getByRole('combobox', { name: 'Cuenta de origen', exact: true }).selectOption('bank');
+  await editor.getByLabel('Comercio o descripción').fill('FONDO HISTÓRICO');
+  await expect(editor.getByRole('combobox', { name: 'Producto de inversión', exact: true })).toHaveValue(investment.id);
+  await editor.getByLabel('Fecha', { exact: true }).fill('2025-11-01');
+  await editor.getByLabel('Valor (COP)').fill('50.000');
+  await editor.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.accounts.filter((a: { kind: string }) => a.kind === 'investment')).toHaveLength(1);
+  expect(state.transactions).toHaveLength(3);
+  expect(await (await request.get(`${apiBase}/dashboard`)).json()).toMatchObject({ investmentsMinor: '35000000', spendingMinor: '0', balances: { bank: '90000000' } });
+});

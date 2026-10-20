@@ -23,6 +23,7 @@ import {
   normalizeUnlinkedTransfers,
   transactionInput,
   transactionPlaceSchema,
+  movementOptionsSchema,
 } from "../domain/model";
 import {
   exportRecords,
@@ -200,6 +201,15 @@ export function createAPI(repo: Repository, files: Files) {
             409,
           );
         const sharedPlace = b.applyPlaceToSimilar ? transactionPlaceSchema.parse(b.changes.place) : undefined;
+        const investmentProduct = movementOptionsSchema.parse(b.changes).investmentProduct;
+        const destinationId = b.changes.counterAccountId ?? selected.counterAccountId;
+        const investmentTransfer = (b.changes.kind ?? selected.kind) === 'transfer' && typeof destinationId === 'string'
+          && (snapshot.accounts.some(account => account.id === destinationId && account.kind === 'investment') || investmentProduct?.id === destinationId);
+        // An investment choice changes the financial event, not just its label.
+        // Do not redirect income, refunds, withdrawals or transfers to other products.
+        const compatible = (item: typeof selected) => investmentTransfer
+          ? item.accountId !== destinationId && (item.kind === 'expense' || (item.kind === 'transfer' && item.counterAccountId === destinationId))
+          : item.kind === selected.kind;
         const key = merchantKey(selected.merchant);
         if (!key)
           throw new DomainError(
@@ -215,12 +225,13 @@ export function createAPI(repo: Repository, files: Files) {
               (item) =>
                 item.id !== selected.id &&
                 !item.voided &&
-                (b.applyPlaceToSimilar || item.kind === selected.kind) &&
+                (b.applyPlaceToSimilar || compatible(item)) &&
                 merchantKey(item.merchant) === key,
             )
             .map((item) => item.id),
         ];
         const sharedChanges = {
+          ...(investmentTransfer ? { kind: 'transfer', counterAccountId: destinationId, billId: null } : {}),
           categoryId:
             typeof b.changes.categoryId === "string"
               ? b.changes.categoryId
@@ -229,10 +240,11 @@ export function createAPI(repo: Repository, files: Files) {
             typeof b.changes.note === "string" ? b.changes.note : selected.note,
         };
         let updated = 0;
-        // Each edit also writes an audit row. Chunks keep every DynamoDB
-        // transaction comfortably below its 100-item limit.
-        for (let offset = 0; offset < matchingIds.length; offset += 35) {
-          const chunk = matchingIds.slice(offset, offset + 35);
+        // Investment conversion can also unlink a bill per movement, in addition
+        // to its transaction and audit row. Leave room for product/rule creation.
+        const chunkSize = investmentTransfer && applyToSimilar ? 25 : 35;
+        for (let offset = 0; offset < matchingIds.length; offset += chunkSize) {
+          const chunk = matchingIds.slice(offset, offset + chunkSize);
           updated += await repo.mutate(h, (s) => {
             let changed = 0;
             for (const id of chunk) {
@@ -241,7 +253,7 @@ export function createAPI(repo: Repository, files: Files) {
               );
               if (!current) continue;
               const propagated = {
-                ...(applyToSimilar && current.kind === selected.kind ? sharedChanges : {}),
+                ...(applyToSimilar && compatible(current) ? sharedChanges : {}),
                 ...(sharedPlace ? { place: sharedPlace } : {}),
               };
               const changes = id === selected.id ? b.changes : propagated;

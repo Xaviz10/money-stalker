@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { addTransaction, configure, dashboard, duplicateTransactions, recordInvestmentValue, recordStatement, undo } from "../domain/ledger";
+import { addTransaction, configure, dashboard, deleteTransaction, duplicateTransactions, recordInvestmentValue, recordStatement, undo } from "../domain/ledger";
 import { emptyState, normalizeUnlinkedTransfers } from "../domain/model";
 import { netWorthMinor } from "../domain/account-groups";
 import { captureJob, processJob } from "../server/processing";
@@ -189,4 +189,17 @@ describe("pockets and investments", () => {
     expect(() => recordInvestmentValue(state, { id: "older", accountId: "invest", date: "2026-10-17", valueMinor: "0" }, at)).toThrow(/orden/);
     expect(() => configure(state, "accounts", { ...state.accounts.find(account => account.id === "invest"), openingMinor: "20" })).toThrow(/saldo inicial/);
   });
+});
+
+it('adds historical contributions to zero-opening investments while respecting funded opening snapshots', () => {
+  const state = setup();
+  for (const [id, openingMinor] of [['zero', '0'], ['snapshot', '5000000']]) configure(state, 'accounts', { id, name: id, kind: 'investment', openingMinor, openingDate: '2026-06-01' });
+  for (const destination of ['zero', 'snapshot']) addTransaction(state, { id: `old-${destination}`, kind: 'transfer', accountId: 'bank', counterAccountId: destination, date: '2025-12-01', amountMinor: '2000000' }, at);
+  expect(dashboard(state, day).balances).toMatchObject({ bank: '100000000', zero: '2000000', snapshot: '5000000' });
+  addTransaction(state, { id: 'new-zero', kind: 'transfer', accountId: 'bank', counterAccountId: 'zero', date: day, amountMinor: '3000000' }, at);
+  expect(dashboard(state, day)).toMatchObject({ balances: { zero: '5000000', bank: '97000000' }, spendingMinor: '0' });
+  deleteTransaction(state, 'old-zero', at, 1);
+  expect(dashboard(state, day).balances.zero).toBe('3000000');
+  undo(state, 'delete:old-zero:2', at);
+  expect(dashboard(state, day).balances.zero).toBe('5000000');
 });

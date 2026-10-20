@@ -183,6 +183,8 @@ COP amounts are integer minor-unit strings, calculated with integer arithmetic. 
 
 Raw financial captures can remain in Intake until TTL deletion; ledger observations preserve relevant evidence. The 30-day job TTL is not an app-wide privacy deletion policy, and PITR is not a tested disaster-recovery procedure. Original files are not versioned in this stack.
 
+When an investment is applied to matching merchant movements, compatible expenses are converted to transfers to the same investment product in audited chunks, preserving each movement's source, amount and date. Income, refunds and transfers to other products are not redirected. Zero-opening investment balances accumulate historical contributions even before the product's opening date; investments with a nonzero opening balance retain the dated snapshot cutoff, as do bank and cash accounts.
+
 ## 7. Runtime, security and operations
 
 | Component | Configuration in `infra/stack.ts` |
