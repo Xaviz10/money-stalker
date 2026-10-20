@@ -19,7 +19,8 @@
     "infra:deploy": "cdk deploy --app 'node --import tsx infra/app.ts' -c deployment=true",
     "phase0": "node --import tsx scripts/phase0.ts",
     "cost": "node --import tsx scripts/cost.ts",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "test:e2e:iphone": "playwright test --config playwright.iphone.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.900.0",

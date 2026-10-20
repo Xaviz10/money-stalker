@@ -92,3 +92,9 @@ The favicon and installed-app icons use primary blue `#1949db`, the complete eye
 The account creation form asks for type, name, opening balance/date, then SMS identity for non-cash products. Bank accounts offer “Agregar tarjeta débito ahora”; the optional card shares the source balance and saves with the account as one operation. Keep visual personalization and organization in the collapsed “Más opciones” disclosure. Product editing owns future alias changes and “Agregar tarjeta débito”; the shared iPhone connection keeps four primary steps and a final optional later-card form. SMS identification status never implies that an automation is connected.
 
 Expense symbols: Suscripciones uses a playback screen, Compras online a cart, Compras a shopping bag, Créditos a document/clock, Gastos bancarios a bank/charge, Internet Wi-Fi and Telefonía a phone. Built-in subcategories reuse their parent symbol. Keep these outlined at the shared stroke weight and pair them with category text; the catalog includes every new family.
+
+## iPhone form containment
+
+Native date/time fields use `min-inline-size: 0`, explicit border-box width, a left-aligned WebKit value and the native picker. On phones, text inputs/selects use 16px type to avoid Safari focus zoom; selects keep the native menu with a consistent 44px target and chevron. Product editors and nested card forms lose desktop indentation. Long account names wrap, balances get their own row, and actions may wrap without hiding text. Reports stack dates below 420px. Never fix overflow by clipping the document.
+
+`npm run test:e2e:iphone` runs local WebKit layout regressions at 320, 375, 390 and 430px with synthetic data. Install its browser first with `npx playwright install webkit`. These checks cover product/card editors, native movement dates, reports, long names and large balances; real iPhone keyboard and browser chrome still require owner device verification.

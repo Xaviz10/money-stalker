@@ -496,6 +496,11 @@
         "name": "The Product Setup Rule",
         "body": "Configure SMS identity when creating or editing each non-cash product. Bank creation offers an optional debit card saved atomically with the same bank balance. Keep later debit creation available, personalization collapsed, and the shared four-step iPhone connection separate from product identity. Alias status never claims connected capture.",
         "section": "layout"
+      },
+      {
+        "name": "The iPhone Form Rule",
+        "body": "Contain native date/time widths with min-inline-size zero and keep the native picker. Phone inputs and selects use 16px text and 44px targets. Remove nested product-editor indentation, wrap long names and actions, and give balances their own row. Stack report dates below 420px and wrap preset buttons. Never hide document overflow to conceal defects. Verify in local WebKit at 320–430px.",
+        "section": "layout"
       }
     ],
     "dos": [

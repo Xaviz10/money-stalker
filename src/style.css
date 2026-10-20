@@ -5235,3 +5235,70 @@ hr {
 .product-optional-settings > div { display: grid; gap: 16px; padding-top: 18px; }
 .product-setup-success { color: var(--color-success); background: var(--color-success-bg); padding: 12px 16px; border-radius: var(--radius-control); font-size: 13px; }
 .product-sms-status { color: var(--color-muted); }
+
+/* iPhone forms: contain native controls and preserve usable text widths. */
+input[type="date"], input[type="datetime-local"], input[type="time"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-inline-size: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
+input::-webkit-datetime-edit { min-width: 0; padding: 0; }
+.report-filters label, .form, .product-instrument > div { min-width: 0; }
+@media (max-width: 700px) {
+  input:not([type="checkbox"]), select, textarea { max-width: 100%; font-size: 16px; }
+  select {
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 44px;
+    padding-right: 36px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23304367' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    text-overflow: ellipsis;
+  }
+  input[type="date"], input[type="datetime-local"], input[type="time"] { min-height: 46px; }
+  .field > span, .field small, .settings-section-body p, .product-aliases p { overflow-wrap: break-word; }
+  .checkbox { align-items: flex-start; font-size: 13px; }
+  .checkbox input { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 2px; }
+  .form > .button, .button-row .button, .register-more-actions .button { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: break-word; }
+  .settings-editor, .product-instrument .instrument-editor { padding-left: 0; min-width: 0; }
+  .settings-editor .form { width: 100%; max-width: 100%; padding: 14px; }
+  .settings-editor summary { overflow-wrap: anywhere; }
+  .settings-editor summary svg { flex-shrink: 0; }
+  .product-aliases { padding: 12px; }
+  .product-aliases h3 { font-size: 16px; line-height: 1.35; }
+  .product-instrument > div:not(.settings-editor) { min-width: 0; }
+  .product-instrument strong { overflow-wrap: anywhere; }
+  .account-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: start; }
+  .account-row > div:not(.account-organization) { min-width: 0; }
+  .account-row > div > strong { overflow-wrap: anywhere; }
+  .account-row > strong { grid-column: 2; margin: 0; justify-self: start; font-size: 18px; }
+  .account-row > .button { grid-column: 2; justify-self: start; }
+  .account-row > .settings-editor, .account-row > .product-balance-note { grid-column: 1 / -1; }
+  .account-row small { font-size: 12px; line-height: 1.55; }
+  .register-product-header { grid-template-columns: 36px minmax(0, 1fr); }
+  .register-product-name h1 { white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+  .register-balance { grid-column: 1 / -1; text-align: left; }
+  .register-balance strong { font-size: clamp(20px, 6vw, 28px); white-space: nowrap; }
+  .register-toolbar { grid-template-columns: minmax(0, 1fr); }
+  .register-more > summary { justify-content: center; }
+  .modal { padding: 20px; max-width: calc(100% - 24px); }
+  .modal .section-heading { align-items: flex-start; gap: 12px; }
+  .modal .section-heading h2 { min-width: 0; line-height: 1.25; overflow-wrap: break-word; }
+  .modal .section-heading > .icon-button { flex-shrink: 0; }
+}
+@media (max-width: 420px) {
+  .report-filters { grid-template-columns: minmax(0, 1fr); }
+  .report-summary { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  .report-presets { flex-wrap: wrap; overflow-x: visible; }
+  .report-presets button { min-height: 44px; white-space: normal; }
+}
