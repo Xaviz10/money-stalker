@@ -5302,3 +5302,70 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
   .report-presets { flex-wrap: wrap; overflow-x: visible; }
   .report-presets button { min-height: 44px; white-space: normal; }
 }
+
+/* Product ledger: a contained mobile list, with details spanning each row. */
+.register-details { display: block; }
+@media (max-width: 600px) {
+  .movement-register > .movement-table {
+    margin: 0;
+    padding: 0 18px 18px;
+    width: 100%;
+    overflow: visible;
+  }
+  .movement-table table, .movement-table thead, .movement-table tbody { display: block; width: 100%; min-width: 0; }
+  .movement-table table { border-collapse: separate; border-spacing: 0; }
+  .movement-table tbody tr:not(.register-empty-row) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "movement value" "details details";
+    align-items: start;
+    column-gap: 12px;
+    row-gap: 8px;
+    padding: 18px 0;
+  }
+  .movement-table tbody tr .register-movement { display: contents; }
+  .movement-table .register-details { grid-area: details; min-width: 0; }
+  .movement-table .transaction-name { grid-area: movement; display: block; width: 100%; min-height: 44px; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
+  .movement-table .register-value { min-width: 0; padding-top: 12px !important; white-space: nowrap; line-height: 1.5; }
+  .register-details > small { margin: 0 0 7px; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+  .register-details .transaction-flow { display: flex; width: fit-content; white-space: normal; margin: 0 0 6px; }
+  .register-details .transaction-location-label { margin-bottom: 6px; overflow-wrap: anywhere; }
+  .register-mobile-meta { margin-top: 0; gap: 4px 6px; }
+  .register-mobile-meta > span { min-width: 0; overflow-wrap: anywhere; }
+  .movement-table .register-empty-row td { padding: 20px 0; }
+}
+@media (max-width: 360px) {
+  .movement-table tbody tr:not(.register-empty-row) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "movement" "value" "details";
+  }
+  .movement-table .register-value { text-align: left; padding-top: 0 !important; }
+}
+
+/* Captured location remains distinct from a confirmed merchant. */
+.captured-location-list { display: grid; gap: 18px; }
+.captured-location-list .location-entry { display: grid; gap: 10px; border-bottom: 1px solid var(--color-line); padding-bottom: 16px; min-width: 0; }
+.captured-address { display: grid; gap: 6px; min-width: 0; }
+.captured-address p { margin: 0; overflow-wrap: anywhere; }
+.captured-address details { font-size: 12px; }
+.captured-address summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--color-primary); }
+.captured-address dl { margin: 0; display: grid; gap: 8px; }
+.captured-address dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px; }
+.captured-address dt { color: var(--color-muted); }
+.captured-address dd { margin: 0; overflow-wrap: anywhere; }
+.location-map-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.location-map-links a { min-height: 44px; display: inline-flex; align-items: center; }
+.capture-map { min-width: 0; display: grid; gap: 10px; }
+.capture-map h3 { font-size: 14px; margin: 0; }
+.location-map { width: 100%; height: 280px; min-width: 0; border: 1px solid var(--color-line); border-radius: var(--radius-control); overflow: hidden; }
+.location-map[hidden] { display: none; }
+@media (max-width: 600px) {
+  .location-map { height: 240px; }
+  .captured-address dl > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+
+.location-map .maplibregl-ctrl-attrib { font-size: 10px; line-height: 1.4; }
+.location-map .maplibregl-ctrl-attrib a { min-height: 0; display: inline; }
+.google-place-picker > summary { cursor: pointer; min-height: 44px; color: var(--color-primary); font-size: 13px; }
+
+.location-map-links a, .captured-address details > a { color: var(--color-primary); font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.location-map .maplibregl-ctrl-group button { width: 44px; height: 44px; }

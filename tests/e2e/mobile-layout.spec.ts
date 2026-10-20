@@ -52,3 +52,36 @@ test('iPhone product editors, movement dates and reports fit narrow screens', as
   await page.locator('.report-filters').scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('report-dates.png') });
 });
+
+test('movement rows keep side gutters, readable text and complete separators', async ({ page, request }, info) => {
+  await request.post(`${api}/test/reset`);
+  await request.post(`${api}/accounts`, { data: { id: 'bank', name: 'Cuenta diaria', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01' } });
+  for (const [index, merchant, amountMinor, categoryId, note] of [
+    [1, 'SUPERMERCADO DE PRUEBA SUCURSAL CENTRO', '12500000', 'delivery-groceries', 'Compra del mercado para la casa y productos de limpieza'],
+    [2, 'NETFLIX', '4490000', 'subscriptions-netflix', ''],
+    [3, 'TIENDAONLINECONUNNOMBRECONTINUOMUYLARGO', '123456789000', 'online-shopping-electronics', 'Pedido con una descripción extensa para verificar que se conserva completa'],
+    [4, 'COMERCIO EJEMPLO', '2200000', 'shopping-treats', ''],
+  ]) await request.post(`${api}/transactions`, { data: { id: `row-${index}`, accountId: 'bank', date: `2026-10-1${index}`, kind: 'expense', merchant, amountMinor, categoryId, note } });
+  await page.goto('./#/movimientos');
+  const table = page.locator('.movement-table');
+  await expect(table.locator('tbody tr')).toHaveCount(4);
+  await table.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('movement-rows.png') });
+  if ((page.viewportSize()?.width ?? 1000) <= 700) {
+    const layout = await table.evaluate(el => {
+      const outer = el.getBoundingClientRect();
+      return { left: parseFloat(getComputedStyle(el).paddingLeft), right: parseFloat(getComputedStyle(el).paddingRight), overflow: el.scrollWidth > el.clientWidth + 1,
+        rows: [...el.querySelectorAll('tbody tr')].map(row => { const box = row.getBoundingClientRect(); return box.left >= outer.left + 15 && box.right <= outer.right - 15; }),
+        text: [...el.querySelectorAll<HTMLElement>('.transaction-name, .register-movement small, .register-mobile-meta, .register-value')].every(item => item.scrollWidth <= item.clientWidth + 1),
+      };
+    });
+    expect(layout.left).toBeGreaterThanOrEqual(16);
+    expect(layout.right).toBeGreaterThanOrEqual(16);
+    expect(layout.overflow).toBe(false);
+    expect(layout.rows.every(Boolean)).toBe(true);
+    expect(layout.text).toBe(true);
+  }
+  await fits(page);
+  await table.getByRole('button', { name: 'NETFLIX', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Editar movimiento', exact: true })).toBeVisible();
+});

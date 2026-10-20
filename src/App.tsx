@@ -775,38 +775,40 @@ function TransactionTable({
                           refund: "Devolución",
                         }[t.kind]}
                     </button>
-                    {t.note && <small>{t.note}</small>}
-                    {(t.place ||
-                      state.observations.some(
-                        (observation) =>
-                          observation.transactionId === t.id &&
-                          observation.location,
-                      )) && (
-                      <span className="transaction-location-label">
-                        <Icon name="location" size={13} />
-                        {t.place?.name ?? "Ubicación guardada"}
-                      </span>
-                    )}
-                    <FlowIndicator
-                      record={t}
-                      selectedAccount={selectedAccount}
-                      state={state}
-                    />
-                    <span className="register-mobile-meta">
-                      <time dateTime={t.date}>{displayDate(t.date)}</time>
-                      <span aria-hidden="true">·</span>
-                      <span>
-                        {t.kind === "transfer"
-                          ? (otherAccount?.name ?? "Transferencia")
-                          : categoryLabel(state, t.categoryId)}
-                      </span>
-                      <span aria-hidden="true">·</span>
-                      <span>
-                        {historical
-                          ? "Histórico"
-                          : t.status === "posted"
-                            ? "Registrado"
-                            : "Por confirmar"}
+                    <span className="register-details">
+                      {t.note && <small>{t.note}</small>}
+                      {(t.place ||
+                        state.observations.some(
+                          (observation) =>
+                            observation.transactionId === t.id &&
+                            observation.location,
+                        )) && (
+                        <span className="transaction-location-label">
+                          <Icon name="location" size={13} />
+                          {t.place?.name ?? "Ubicación guardada"}
+                        </span>
+                      )}
+                      <FlowIndicator
+                        record={t}
+                        selectedAccount={selectedAccount}
+                        state={state}
+                      />
+                      <span className="register-mobile-meta">
+                        <time dateTime={t.date}>{displayDate(t.date)}</time>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {t.kind === "transfer"
+                            ? (otherAccount?.name ?? "Transferencia")
+                            : categoryLabel(state, t.categoryId)}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {historical
+                            ? "Histórico"
+                            : t.status === "posted"
+                              ? "Registrado"
+                              : "Por confirmar"}
+                        </span>
                       </span>
                     </span>
                   </td>
@@ -2583,8 +2585,7 @@ function Settings({
                     propiedades disponibles en tu iPhone.
                   </li>
                   <li>
-                    Comprueba que existan latitud, longitud y precisión antes de
-                    agregarlas al envío.
+                    Comprueba latitud y longitud. Extrae dirección completa, calle, ciudad, estado o departamento, código postal, región y país solo si están disponibles. La precisión es opcional; no todos los iPhone la exponen.
                   </li>
                 </ol>
                 <p className="shortcut-result">
@@ -2732,9 +2733,7 @@ function Settings({
                 </li>
               </ol>
               <p className="shortcut-result">
-                <strong>Versión inicial:</strong> déjala sin ubicación. Así una
-                falla de Localización no impide guardar el SMS. Añadiremos la
-                ubicación después del envío con una ruta independiente.
+                <strong>Una sola solicitud.</strong> Incluye el diccionario opcional location junto al SMS. Si no tienes una muestra válida, omite location y envía el movimiento igualmente.
               </p>
             </div>
           </details>
@@ -2812,6 +2811,24 @@ function Settings({
             </div>
           </details>
           </div></details>
+          <details className="shortcut-api-guide location-shortcut-guide">
+            <summary>Ubicación opcional · SMS y Wallet</summary>
+            <div>
+              <p>Envía <code>location</code> como un diccionario dentro del mismo JSON de <code>/capture-events</code>, junto a <code>eventId</code>, <code>source</code>, <code>observedAt</code> y el SMS o los datos de Wallet. No hay una segunda solicitud.</p>
+              <ol>
+                <li>Genera y conserva el EventId del movimiento. Intenta obtener una sola muestra con <strong>Obtener ubicación actual</strong> antes del envío.</li>
+                <li>Usa <strong>Obtener detalles de ubicaciones</strong> sobre esa misma variable para latitud, longitud y los componentes de dirección disponibles. Guarda la fecha de esa muestra como <code>LocationObservedAt</code>, en ISO 8601.</li>
+                <li>Crea un diccionario <code>location</code> con <code>latitude</code> y <code>longitude</code> de tipo Número y <code>observedAt</code> de tipo Texto. Agrega solo los campos opcionales disponibles. No uses cero para reemplazar un dato faltante ni inventes precisión.</li>
+                <li>Incluye el diccionario como valor de <code>location</code> en el JSON del evento y envía todo a la ruta habitual con POST y el mismo acceso del dispositivo. Al reintentar, reutiliza el EventId y el JSON completo, incluida la muestra original.</li>
+                <li>Si no hay coordenadas válidas, omite <code>location</code>. Comprueba en tu iPhone que un permiso denegado o una demora no detenga el atajo antes del envío; si lo detiene, deja este bloque desactivado hasta resolverlo.</li>
+              </ol>
+              <p className="small-note">Para un enlace de Apple Maps usa <strong>Obtener URL de Mapas</strong>. La propiedad URL de una ubicación también puede ser otro enlace; la app lo conserva como enlace recibido.</p>
+              <div className="shortcut-field-list">
+                {[["latitude", "Número · Latitud"], ["longitude", "Número · Longitud"], ["observedAt", "Texto · LocationObservedAt"], ["accuracy", "Número · Precisión en metros, si existe"], ["fullAddress", "Texto · Dirección completa"], ["street", "Texto · Calle"], ["streetNumber", "Texto · Número"], ["city", "Texto · Ciudad"], ["state", "Texto · Estado / departamento"], ["postalCode", "Texto · Código postal"], ["region", "Texto · Región"], ["country", "Texto · País"], ["countryCode", "Texto · Código del país"], ["name", "Texto · Nombre recibido, sin confirmar comercio"], ["url", "Texto · URL de Mapas o enlace recibido"]].map(([field, label]) => <span key={field}><code>{field}</code><b>{label}</b></span>)}
+              </div>
+              <p className="small-note">Los enlaces a Apple Maps y Google Maps se generan con las coordenadas. La dirección del teléfono no identifica automáticamente al comercio, especialmente si el SMS llegó tarde.</p>
+            </div>
+          </details>
           <details className="capture-step">
           <summary>4. Verifica la primera evidencia <small>El acceso creado aún no confirma la conexión</small></summary><div>
           <p>Después del primer envío, actualiza y busca el comercio, valor y fecha en Revisar. Una evidencia recibida confirma ese envío; no garantiza que iOS ejecute todas las automatizaciones.</p>
@@ -2825,9 +2842,7 @@ function Settings({
             transferencia. Si faltan datos, la captura aparecerá en Revisión.
           </p>
           <p className="small-note">
-            En la primera versión de los atajos, omite <code>location</code>.
-            Así el movimiento se guarda incluso si Localización está
-            desactivada, tarda o devuelve datos incompletos.
+            La ubicación viaja dentro de la misma solicitud que el evento. Conserva el EventId y el JSON completo al reintentar para evitar duplicados.
           </p>
           {health?.pending.length ? (
             <div className="notice">

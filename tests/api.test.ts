@@ -275,3 +275,50 @@ it('creates an inline investment atomically, supports retries, and rolls back in
   state = await repo.read('owner');
   expect(state.accounts.some(account => account.id === 'bad-fund')).toBe(false);
 });
+
+describe('optional Shortcut location in the same capture request', () => {
+  const location = { latitude: 4.6, longitude: -74.1, observedAt: now, fullAddress: 'Calle de Prueba 10, Ciudad de Prueba', street: 'Calle de Prueba', streetNumber: '10', city: 'Ciudad de Prueba', state: 'Departamento de Prueba', postalCode: '000000', region: 'Región de Prueba', country: 'Colombia', countryCode: 'CO', name: 'Ubicación del teléfono', url: 'https://maps.apple.com/place?coordinate=4.6,-74.1' };
+  it('durably saves money and rich location together, keeps retries idempotent and exports every field', async () => {
+    const { api, repo, files, send } = await setup();
+    const { token } = await repo.createDevice('owner', 'phone');
+    const body = { eventId: 'with-address', source: 'sms', observedAt: now, accountId: 'bank', date: '2026-10-10', amountMinor: '2200000', merchant: 'Comercio de prueba', location };
+    const request = { method: 'POST', path: '/capture-events', token, body };
+    const accepted = await api(request);
+    expect(accepted.status).toBe(202);
+    expect((await api(request)).status).toBe(202);
+    expect((await api({ ...request, body: { ...body, location: { ...location, latitude: 5 } } })).status).toBe(409);
+    const observationId = (accepted.body as { eventId: string }).eventId;
+    expect((await repo.job('owner', observationId))?.payload).toMatchObject({ location });
+    await processJob(repo, files, 'owner', observationId);
+    await processJob(repo, files, 'owner', observationId);
+    expect((await send('POST', '/reviews', { observationId, action: 'separate' })).status).toBe(200);
+    const state = (await send('GET', '/state')).body as State;
+    expect(state.transactions).toHaveLength(1);
+    expect(state.transactions[0]).toMatchObject({ merchant: 'Comercio de prueba', amountMinor: '2200000' });
+    expect(state.observations[0]).toMatchObject({ status: 'linked', location });
+    expect(state.observations[0].location?.accuracy).toBeUndefined();
+    const { exportRecords } = await import('../server/imports');
+    const csv = exportRecords(await repo.read('owner'), 'csv').bytes.toString();
+    expect(csv).toContain('DetalleUbicaciones');
+    for (const value of ['Calle de Prueba', 'Ciudad de Prueba', 'Departamento de Prueba', 'Región de Prueba', 'postalCode', 'https://www.google.com/maps/search/', 'https://maps.apple.com/place']) expect(csv).toContain(value);
+  });
+  it('does not persist a security message even when it includes a location', async () => {
+    const { api, repo } = await setup();
+    const { token } = await repo.createDevice('owner', 'phone');
+    expect((await api({ method: 'POST', path: '/capture-events', token, body: { eventId: 'security-location', source: 'sms', observedAt: now, message: 'Tu código de seguridad es 000000', location } })).status).toBe(422);
+    expect(await repo.pendingJobs()).toHaveLength(0);
+  });
+  it('never loses the financial capture to unavailable location, bad coordinates or optional metadata', async () => {
+    const { api, repo, files } = await setup(); const { token } = await repo.createDevice('owner', 'phone');
+    for (const [index, optionalLocation] of [undefined, { latitude: 999, longitude: -74, observedAt: now }, { ...location, accuracy: 'unknown', url: 'javascript:alert(1)' }].entries()) {
+      const result = await api({ method: 'POST', path: '/capture-events', token, body: { eventId: `optional-${index}`, source: 'wallet', observedAt: now, accountId: 'bank', date: '2026-10-10', amountMinor: '10000', merchant: 'Comercio de prueba', location: optionalLocation } });
+      expect(result.status).toBe(202);
+      await processJob(repo, files, 'owner', (result.body as { eventId: string }).eventId);
+    }
+    const state = await repo.read('owner'); expect(state.observations).toHaveLength(3);
+    expect(state.observations[0].location).toBeUndefined(); expect(state.observations[1].location).toBeUndefined();
+    expect(state.observations[2].location).toMatchObject({ fullAddress: location.fullAddress });
+    expect(state.observations[2].location?.url).toBeUndefined();
+    expect(state.observations[2].location?.accuracy).toBeUndefined();
+  });
+});

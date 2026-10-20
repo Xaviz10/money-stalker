@@ -43,14 +43,26 @@ export const transactionInput = z.object({
   categoryId: id.default('uncategorized'), note: z.string().max(1000).default(''), billId: id.optional(),
   status: z.enum(['provisional', 'posted']).default('posted'), reference: text.optional(), place: transactionPlaceSchema.optional(),
 });
+export const capturedLocationSchema = coordinate.extend({
+  observedAt: isoTimestamp,
+  accuracy: z.number().min(0).optional().catch(undefined),
+  fullAddress: z.string().trim().max(1000).optional().catch(undefined),
+  street: text.optional().catch(undefined), streetNumber: text.optional().catch(undefined),
+  city: text.optional().catch(undefined), state: text.optional().catch(undefined),
+  postalCode: text.optional().catch(undefined), region: text.optional().catch(undefined),
+  country: text.optional().catch(undefined), countryCode: text.optional().catch(undefined),
+  name: text.optional().catch(undefined),
+  url: z.url({ protocol: /^https$/ }).max(2000).refine(value => {
+    const parsed = new URL(value); return !parsed.username && !parsed.password;
+  }).optional().catch(undefined),
+});
 export const captureSchema = z.object({
   eventId: id, source: z.enum(['sms', 'wallet']), observedAt: isoTimestamp,
   instrumentHint: text.optional(), accountId: id.optional(), amountMinor: positive.optional(),
   currency: z.literal('COP').default('COP'), date: date.optional(),
   merchant: text.default(''), kind: z.enum(['expense', 'income', 'transfer', 'refund']).default('expense'),
   counterAccountId: id.optional(), reference: text.optional(), message: z.string().max(3000).optional(),
-  location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180),
-    accuracy: z.number().min(0), observedAt: isoTimestamp }).optional(),
+  location: capturedLocationSchema.optional().catch(undefined),
 }).strict();
 export type Account = z.infer<typeof accountSchema>;
 export const accountKindLabels: Record<Account['kind'], string> = { bank: 'Cuenta bancaria', cash: 'Efectivo', credit: 'Tarjeta de crédito', pocket: 'Bolsillo', investment: 'Inversión' };

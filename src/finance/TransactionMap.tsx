@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
+import { CaptureMap } from "./CaptureMap";
+import { appleMapsURL, capturedAddress, googleMapsURL } from "../../domain/location";
 import type { Capture, TransactionPlace } from "../../domain/model";
 
 type CapturedLocation = NonNullable<Capture["location"]>;
@@ -16,11 +18,6 @@ function loadMaps() {
     mapsPromise = Promise.all([importLibrary("maps"), importLibrary("places")]);
   }
   return mapsPromise;
-}
-
-function mapsURL(latitude: number, longitude: number, placeId?: string) {
-  const query = encodeURIComponent(`${latitude},${longitude}`);
-  return `https://www.google.com/maps/search/?api=1&query=${query}${placeId ? `&query_place_id=${encodeURIComponent(placeId)}` : ""}`;
 }
 
 function locationTime(value: string) {
@@ -44,11 +41,12 @@ export function TransactionMap({
   const searchNode = useRef<HTMLDivElement>(null);
   const selectedCircle = useRef<google.maps.Circle | undefined>(undefined);
   const [error, setError] = useState("");
+  const [googleOpen, setGoogleOpen] = useState(false);
   const center = place ??
     captured[0] ?? { latitude: 4.711, longitude: -74.0721 };
 
   useEffect(() => {
-    if (!mapsKey || !mapNode.current || !searchNode.current) return;
+    if (!googleOpen || !mapsKey || !mapNode.current || !searchNode.current) return;
     let disposed = false;
     const listeners: google.maps.MapsEventListener[] = [];
     const circles: google.maps.Circle[] = [];
@@ -143,7 +141,7 @@ export function TransactionMap({
       for (const circle of circles) circle.setMap(null);
       searchNode.current?.replaceChildren();
     };
-  }, []);
+  }, [googleOpen]);
 
   return (
     <div className="transaction-map">
@@ -155,41 +153,37 @@ export function TransactionMap({
               key={`${location.latitude}:${location.longitude}:${location.observedAt}`}
             >
               <small>
-                Capturada por el atajo · precisión{" "}
-                {Math.round(location.accuracy)} m ·{" "}
+                Capturada por el atajo · {location.accuracy === undefined ? "Precisión no disponible" : `precisión ${Math.round(location.accuracy)} m`} ·{" "}
                 {locationTime(location.observedAt)}
               </small>
+              <div className="captured-address">
+                {capturedAddress(location) && <p>{capturedAddress(location)}</p>}
+                <small>{location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</small>
+                <details><summary>Detalles recibidos del iPhone</summary><dl>
+                  {([["Nombre de la ubicación", location.name], ["Dirección completa", location.fullAddress], ["Calle", location.street], ["Número", location.streetNumber], ["Ciudad", location.city], ["Estado / departamento", location.state], ["Código postal", location.postalCode], ["Región", location.region], ["País", location.country], ["Código de país", location.countryCode]] as const).filter(([, value]) => value).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+                </dl>{location.url && <a href={location.url} target="_blank" rel="noreferrer">Enlace recibido del atajo</a>}</details>
+              </div>
+              <div className="location-map-links"><a href={appleMapsURL(location.latitude, location.longitude)} target="_blank" rel="noreferrer">Abrir en Apple Maps</a>
               <a
-                href={mapsURL(location.latitude, location.longitude)}
+                href={googleMapsURL(location.latitude, location.longitude)}
                 target="_blank"
                 rel="noreferrer"
               >
                 Abrir en Google Maps
-              </a>
+              </a></div>
             </div>
           ))}
         </div>
       )}
-      {mapsKey ? (
-        <>
+      <CaptureMap captured={captured} place={place} />
+      {mapsKey && <details className="google-place-picker" onToggle={event => setGoogleOpen(event.currentTarget.open)}>
+        <summary>Buscar y confirmar un negocio (Google)</summary>
+        {googleOpen && <>
           <div ref={searchNode} className="place-search" />
-          <div
-            ref={mapNode}
-            className="google-map"
-            aria-label="Mapa de la ubicación del movimiento"
-          />
-          <small>
-            Toca un negocio visible en el mapa o búscalo por nombre. La
-            ubicación capturada es una pista y puede corresponder al momento en
-            que llegó el SMS.
-          </small>
-        </>
-      ) : (
-        <p className="small-note">
-          La ubicación está guardada. Activa Google Maps para buscar y asociar
-          un negocio desde este mapa.
-        </p>
-      )}
+          <div ref={mapNode} className="google-map" aria-label="Mapa para confirmar un negocio en Google" />
+          <small>Elige tú el negocio; la dirección del teléfono no modifica el comercio automáticamente.</small>
+        </>}
+      </details>}
       {place && (
         <div className="selected-place">
           <div>
@@ -198,7 +192,7 @@ export function TransactionMap({
           </div>
           <div>
             <a
-              href={mapsURL(place.latitude, place.longitude, place.id)}
+              href={googleMapsURL(place.latitude, place.longitude, place.id)}
               target="_blank"
               rel="noreferrer"
             >

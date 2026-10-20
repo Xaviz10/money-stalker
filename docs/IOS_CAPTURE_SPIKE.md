@@ -21,11 +21,11 @@ Keep bank credentials, OTPs, full card numbers, real statements and private mess
 2. **Messages:** configure sender/content filters for bank transaction messages. Establish whether the message body reaches the shortcut, whether it executes without interaction, and whether the filters exclude login/security messages.
 3. **Notifications:** only if the installed version exposes the trigger, select Bancolombia/Nequi and inspect the available payload. Test hidden previews and locked-device behavior. Record unsupported behavior explicitly.
 
-For all three, capture the event first and enrich it with optional location without blocking delivery. If an amount or account is unknown, preserve an incomplete observation for review rather than inventing a value.
+For all three, send optional location inside the same event request; omit it when unavailable and verify that obtaining it does not prevent financial delivery. See `LOCATION_CAPTURE.md`. If an amount or account is unknown, preserve an incomplete observation for review rather than inventing a value.
 
 ## Event contract to validate
 
-Use a stable event ID generated once and retained on retry, device ID, source type, observed/received timestamps, source-provided transaction time if available, account/card hint, amount/currency when supplied, merchant/recipient text when supplied, and parser/schema version. Location has its own timestamp and accuracy.
+Use a stable event ID generated once and retained on retry, device ID, source type, observed/received timestamps, source-provided transaction time if available, account/card hint, amount/currency when supplied, merchant/recipient text when supplied, and parser/schema version. Location has its own timestamp; accuracy is retained when the device exposes it. Optional full address/components and a source URL remain evidence, never merchant proof.
 
 Authenticate with a revocable device token scoped to capture only. Reject excessive payloads, invalid tokens and unsupported formats. Report success only after the server has durably saved the observation and its processing marker. Do not place credentials in URLs.
 

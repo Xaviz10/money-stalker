@@ -501,6 +501,16 @@
         "name": "The iPhone Form Rule",
         "body": "Contain native date/time widths with min-inline-size zero and keep the native picker. Phone inputs and selects use 16px text and 44px targets. Remove nested product-editor indentation, wrap long names and actions, and give balances their own row. Stack report dates below 420px and wrap preset buttons. Never hide document overflow to conceal defects. Verify in local WebKit at 320–430px.",
         "section": "layout"
+      },
+      {
+        "name": "The Mobile Ledger Rule",
+        "body": "Reserve 18px side gutters independently of generic scroll-table styling. Mobile grid rows keep merchant and complete amount above full-width notes and metadata. Stack amounts below merchants at 360px and narrower. Long text wraps, separators span the inset content width, and desktop preserves table columns. Keep a single instance of row details and retain accessible edit actions.",
+        "section": "layout"
+      },
+      {
+        "name": "The Captured Location Rule",
+        "body": "Send optional rich location inside the same capture-events request. Display address, coordinates, sample timestamp and unknown precision honestly. The primary MapLibre map distinguishes blue phone evidence from green owner-confirmed places; provider failures retain text and coordinate links to Apple Maps and Google Maps. Keep attribution visible and postal components collapsed. Location never proves merchant identity or blocks financial saving.",
+        "section": "layout"
       }
     ],
     "dos": [

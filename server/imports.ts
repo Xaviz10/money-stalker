@@ -1,3 +1,4 @@
+import { appleMapsURL, googleMapsURL } from "../domain/location";
 import { DEFAULT_CASH_ID } from "../domain/cash";
 import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
@@ -568,9 +569,10 @@ export function exportRecords(
         .filter((o) => o.transactionId === t.id && o.location)
         .map(
           (o) =>
-            `${o.location!.latitude.toFixed(5)},${o.location!.longitude.toFixed(5)} ±${Math.round(o.location!.accuracy)}m ${o.location!.observedAt}`,
+            `${o.location!.latitude.toFixed(5)},${o.location!.longitude.toFixed(5)} ${o.location!.accuracy === undefined ? "precisión no disponible" : `±${Math.round(o.location!.accuracy)}m`} ${o.location!.observedAt}`,
         )
         .join(" | "),
+      DetalleUbicaciones: JSON.stringify(state.observations.filter(o => o.transactionId === t.id && o.location).map(o => ({ observationId: o.id, source: o.source, ...o.location!, googleMapsURL: googleMapsURL(o.location!.latitude, o.location!.longitude), appleMapsURL: appleMapsURL(o.location!.latitude, o.location!.longitude) }))),
       Lugar: t.place?.name ?? "",
       DireccionLugar: t.place?.address ?? "",
       UbicacionLugar: t.place
@@ -598,6 +600,7 @@ export function exportRecords(
     "Estado",
     "Evidencias",
     "Ubicaciones",
+    "DetalleUbicaciones",
     "Lugar",
     "DireccionLugar",
     "UbicacionLugar",
@@ -607,7 +610,7 @@ export function exportRecords(
   ];
   if (format === "csv") for (const value of valuationRecords) records.push({
     ID: value.ID, Fecha: value.Fecha, Cuenta: value.Cuenta, Destino: "", Tipo: "valoracion", ValorCOP: value.ValorDeclaradoCOP, Moneda: "COP", Comercio: "Valor declarado de inversión", Categoria: "", Estado: value.Estado,
-    Evidencias: "", Ubicaciones: "", Lugar: "", DireccionLugar: "", UbicacionLugar: "", GooglePlaceID: "", Referencia: "", Nota: `${value.Nota} · Antes: ${value.ValorAnteriorCOP} COP · Ajuste: ${value.AjusteCOP} COP · ${value.Registrada}`,
+    Evidencias: "", Ubicaciones: "", DetalleUbicaciones: "[]", Lugar: "", DireccionLugar: "", UbicacionLugar: "", GooglePlaceID: "", Referencia: "", Nota: `${value.Nota} · Antes: ${value.ValorAnteriorCOP} COP · Ajuste: ${value.AjusteCOP} COP · ${value.Registrada}`,
   });
   const sanitized = records.map((row) =>
     Object.fromEntries(Object.entries(row).map(([k, v]) => [k, safeCell(v)])),
