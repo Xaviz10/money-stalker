@@ -7,6 +7,7 @@ import {
   Button,
   EmptyState,
   Eyes,
+  EvidenceTrail,
   Icon,
   Panel,
 } from "../design-system/ui";
@@ -192,7 +193,7 @@ export function Dashboard({
     return (
       <Panel className="first-account">
         <div className="first-account-art">
-          <Eyes />
+          <EvidenceTrail variant="funds" /><Eyes />
         </div>
         <div>
           <h2>
@@ -217,8 +218,9 @@ export function Dashboard({
     <div className="accounts-dashboard">
       <div className="dashboard-main">
         <div className="dashboard-intro">
-          <h1>Cada peso, localizado.</h1>
-          <p>Tus cuentas, tus tarjetas y lo que realmente puedes usar.</p>
+          <div><h1>Cada peso, localizado.</h1>
+          <p>Tus cuentas, tus tarjetas y lo que realmente puedes usar.</p></div>
+          <EvidenceTrail variant="funds" />
         </div>
         <div className="funds-equation">
           <section className="funds-inputs">
@@ -468,7 +470,7 @@ export function Dashboard({
               No tienes evidencias pendientes de revisión.
             </EmptyState>
           )}
-          <Eyes className="preview-eyes" happy={!pending.length} />
+          <span className="preview-companion">{pending.length > 0 && <EvidenceTrail />}<Eyes className="preview-eyes" happy={!pending.length} /></span>
         </Panel>
         <Panel
           title="Gasto por categoría"

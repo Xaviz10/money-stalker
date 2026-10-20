@@ -1,7 +1,7 @@
 import { accountKindLabels, type Account, type State } from "../../domain/model";
 import { groupAccounts, netWorthMinor } from "../../domain/account-groups";
 import { formatCOP } from "../../domain/money";
-import { Icon } from "../design-system/ui";
+import { Icon, Eyes, EvidenceTrail } from "../design-system/ui";
 import { AccountArtwork } from "./AccountArtwork";
 
 export function AccountRail({
@@ -117,6 +117,7 @@ export function AccountRail({
           </div>
         )}
       </div>
+      <div className="rail-companion" aria-hidden="true"><EvidenceTrail variant="holdings" /><Eyes /></div>
       <div className="rail-worth">
         <span>Patrimonio neto</span>
         <strong>

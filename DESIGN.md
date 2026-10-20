@@ -321,3 +321,7 @@ Manual investment contributions offer existing investment products or inline pro
 Investment entry is hierarchical: choose Inversión in the expense-category selector, then select an existing investment product or create one inline. It is stored as a transfer, without requiring a separate investment movement type.
 
 App and favicon assets reuse the complete Conecta las pistas eye mark with its dark capsule, rotated −12 degrees in the lower-right corner on primary blue (#1949db). Maskable variants inset the eyes slightly to preserve them within platform cropping. Keep the same identity across SVG favicon, Apple touch icon and regular/maskable PWA icons.
+
+Icon backgrounds add a restrained white-outline coin, receipt and short dotted evidence trail at 16% opacity. Keep this supporting texture behind the corner eye mark, never competing with it.
+
+The frontend shares the icon’s evidence-trail language through `EvidenceTrail`: coins, wallet and receipts for funds; receipts, search and cards for evidence; pockets, coins and growth for holdings. Use low-opacity primary outlines in reserved heading/empty-state space and white outlines alongside the rail mascot. Do not overlay values, tables, controls or error messages. Decoration is static, noninteractive and hidden from assistive technology; at the narrowest widths omit heading motifs to preserve text. The catalog documents every variant. Pocket and investment products have their own semantic icons.

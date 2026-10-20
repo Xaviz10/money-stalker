@@ -23,11 +23,11 @@ export default defineConfig({
             background_color: "#f7f9fd",
             theme_color: "#1949db",
             icons: [
-              { src: `${base}icon-192.png?v=5`, sizes: "192x192", type: "image/png", purpose: "any" },
-              { src: `${base}icon-512.png?v=5`, sizes: "512x512", type: "image/png", purpose: "any" },
-              { src: `${base}icon-maskable-512.png?v=5`, sizes: "512x512", type: "image/png", purpose: "maskable" },
+              { src: `${base}icon-192.png?v=6`, sizes: "192x192", type: "image/png", purpose: "any" },
+              { src: `${base}icon-512.png?v=6`, sizes: "512x512", type: "image/png", purpose: "any" },
+              { src: `${base}icon-maskable-512.png?v=6`, sizes: "512x512", type: "image/png", purpose: "maskable" },
               {
-                src: `${base}icon.svg?v=5`,
+                src: `${base}icon.svg?v=6`,
                 sizes: "any",
                 type: "image/svg+xml",
                 purpose: "any",

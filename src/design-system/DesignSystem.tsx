@@ -5,6 +5,7 @@ import {
   DisclosureEditor,
   EmptyState,
   Eyes,
+  EvidenceTrail,
   Field,
   Icon,
   Panel,
@@ -42,6 +43,11 @@ export function DesignSystem() {
         <a className="text-link" href="#/resumen">
           Volver al resumen <Icon name="arrow" size={16} />
         </a>
+      </Panel>
+      <Panel title="Rastro financiero">
+        <p>Monedas, recibos, bolsillos y pistas acompañan las cabeceras y los estados vacíos. Son decorativos; los datos y las acciones mantienen el protagonismo.</p>
+        <div className="catalog-trails">{(["funds", "evidence", "holdings"] as const).map(variant => <EvidenceTrail key={variant} variant={variant} />)}</div>
+        <div className="catalog-row">{(["coin", "receipt", "pocket", "investment"] as const).map(name => <span key={name}><Icon name={name} /> {name}</span>)}</div>
       </Panel>
       <Panel title="Color">
         <div className="token-swatches">

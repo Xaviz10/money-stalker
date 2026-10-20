@@ -32,9 +32,17 @@ export type IconName =
   | "heart"
   | "leisure"
   | "other"
-  | "minus";
+  | "minus"
+  | "coin"
+  | "receipt"
+  | "pocket"
+  | "investment";
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
+    coin: <><circle cx="12" cy="12" r="9" /><path d="M15 8c-1-2-7-2-7 1 0 4 8 1 8 5 0 3-6 4-8 1m4-10v14" /></>,
+    receipt: <><path d="M5 3h14v18l-3-2-4 2-4-2-3 2V3Z" /><path d="M9 8h6m-6 4h6m-6 4h3" /></>,
+    pocket: <><path d="M4 5h16v9c0 4-8 7-8 7s-8-3-8-7V5Z" /><path d="m4 9 8 5 8-5" /></>,
+    investment: <><path d="M4 20h16M6 16v-3m6 3V9m6 7V5M4 9l6-5 5 2 5-4" /></>,
     eye: (
       <>
         <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
@@ -184,6 +192,21 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
     </svg>
   );
 }
+/** Decorative evidence trail: no labels, status, interaction or financial meaning. */
+export function EvidenceTrail({ variant = "evidence", className = "" }: {
+  variant?: "evidence" | "funds" | "holdings";
+  className?: string;
+}) {
+  const symbols: Record<typeof variant, [IconName, IconName, IconName]> = {
+    evidence: ["receipt", "search", "card"],
+    funds: ["coin", "wallet", "receipt"],
+    holdings: ["pocket", "coin", "investment"],
+  };
+  return <span className={`evidence-trail ${className}`} aria-hidden="true">
+    <svg className="evidence-trail-path" viewBox="0 0 180 90" fill="none"><path d="M27 52c12 31 47 28 58 2s36-34 63-18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 8" /></svg>
+    {symbols[variant].map((name, index) => <span key={name} className={`evidence-trail-symbol trail-symbol-${index}`}><Icon name={name} size={30} /></span>)}
+  </span>;
+}
 export function Eyes({
   happy = false,
   className = "",
@@ -274,8 +297,9 @@ export function EmptyState({
 }) {
   return (
     <div className="ds-empty">
-      <span className="ds-empty-icon">
-        <Icon name={icon} size={28} />
+      <span className="ds-empty-art" aria-hidden="true">
+        <EvidenceTrail variant={icon === "wallet" || icon === "bank" ? "funds" : "evidence"} />
+        <span className="ds-empty-icon"><Icon name={icon} size={28} /></span>
       </span>
       <h3>{title}</h3>
       <p>{children}</p>

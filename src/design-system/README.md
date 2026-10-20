@@ -5,7 +5,7 @@ The approved direction is **Accounts first**. The selected visual reference is `
 ## Source and ownership
 
 - `tokens.css`: live color, type, spacing, shape, focus, overlay, and motion primitives. The variable font is self-hosted in `fonts/`; the license is in `public/fonts/OFL-Inter.txt`.
-- `ui.tsx`: typed `Icon`, `Eyes`, `Badge`, `Button`, `Panel`, `EmptyState`, `SectionHeading`, `DisclosureEditor`, and `Field` components.
+- `ui.tsx`: typed `Icon`, `Eyes`, `EvidenceTrail`, `Badge`, `Button`, `Panel`, `EmptyState`, `SectionHeading`, `DisclosureEditor`, and `Field` components.
 - `../style.css`: shared components, application frame, finance patterns, and responsive layouts. New patterns belong in named sections rather than competing override layers.
 - Root `DESIGN.md`: portable design tokens and usage guidance. `.impeccable/design.json` carries responsive/motion extensions. Keep them synchronized with the implementation when changing the system.
 - `DesignSystem.tsx`: live examples of the shipped controls and their states. Examples are illustrative and do not write financial data.
@@ -71,3 +71,18 @@ Use visible focus, native keyboard behavior, labeled controls, `aria-current` fo
 ## Extend the system
 
 Reuse existing tokens/components before adding a new one. Promote a repeated, same-purpose pattern; keep one-off screen behavior local. Update the catalog and root design reference with a new reusable variant. Check the actual page at desktop, tablet, and narrow-phone sizes and run the relevant browser flow. Add behavior tests when financial state, grouping, filtering, or recovery changes.
+
+## Financial trail and companion
+
+`EvidenceTrail` is a decorative, noninteractive family of financial symbols with `funds`, `evidence` and `holdings` variants. Use it in reserved heading space, empty-state artwork and the rail companion. Keep it out of data rows, amounts, input fields and status messages. `coin`, `receipt`, `pocket` and `investment` are available in `Icon`; functional controls still need visible labels.
+
+
+| Variant | Symbols | Intended context |
+| --- | --- | --- |
+| `funds` | Coin, wallet, receipt | Summary and money overview |
+| `evidence` | Receipt, search, card | Review and empty evidence states |
+| `holdings` | Pocket, coin, investment | Accounts and saved products |
+
+Use primary-blue outlines at 12–18% opacity on light surfaces and white at 16% on the blue rail. Decorative elements have `aria-hidden`, ignore pointer events and remain static. Reserve their own space; hide heading motifs below 380px rather than squeezing text. The `Eyes` companion keeps its dark capsule and −12° inclination.
+
+The favicon and installed-app icons use primary blue `#1949db`, the complete eye mark in the lower-right corner, and faint coin/receipt outlines. Maskable variants inset the mark for platform cropping. Edit `public/icon.svg` and regenerate PNGs with `scripts/generate-icons.mjs`; keep favicon, Apple touch and PWA assets consistent. See the live variants at `#/design-system` and the portable rules in root `DESIGN.md`.

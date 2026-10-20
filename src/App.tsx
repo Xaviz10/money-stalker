@@ -37,6 +37,7 @@ import { DesignSystem } from "./design-system/DesignSystem";
 import {
   Icon,
   Eyes,
+  EvidenceTrail,
   Badge as SystemBadge,
   DisclosureEditor,
   EmptyState,
@@ -609,6 +610,7 @@ export function App() {
                         : "Cuentas bancarias, tarjetas y tu margen de tranquilidad."}
                 </p>}
               </div>
+              <EvidenceTrail variant={page === "revisar" ? "evidence" : page === "reportes" ? "funds" : "holdings"} />
             </div>
           )}
           {error && (

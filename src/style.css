@@ -5180,3 +5180,48 @@ hr {
 .investment-history li p { margin: var(--space-2) 0; color: var(--color-text); }
 
 .import-rule-detail { display: block; margin-top: 5px; color: var(--color-muted); font-size: 12px; }
+
+/* The same quiet financial evidence trail as the app icon. */
+.evidence-trail {
+  position: relative;
+  display: block;
+  width: 156px;
+  height: 78px;
+  flex: 0 0 auto;
+  color: var(--color-primary);
+  opacity: .17;
+  pointer-events: none;
+  user-select: none;
+}
+.evidence-trail-path { position: absolute; inset: 0; width: 100%; height: 100%; }
+.evidence-trail-symbol { position: absolute; display: flex; }
+.trail-symbol-0 { left: 10%; top: 7%; transform: rotate(-16deg); }
+.trail-symbol-1 { left: 46%; top: 42%; transform: rotate(12deg); }
+.trail-symbol-2 { right: 5%; top: 4%; transform: rotate(14deg); }
+.dashboard-intro { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.dashboard-intro > div, .page-heading > div { min-width: 0; }
+.page-heading > .evidence-trail { width: 126px; height: 70px; }
+.rail-companion { position: relative; min-height: 90px; margin: auto 4px 0; flex-shrink: 0; }
+.rail-companion .evidence-trail { color: #fff; opacity: .16; width: 160px; height: 78px; }
+.rail-companion > .eyes { position: absolute; width: 75px; right: 6px; bottom: 0; color: #0c205a; transform: rotate(-12deg); }
+.rail-companion + .rail-worth { margin-top: 14px; }
+.ds-empty-art { display: grid; place-items: center; position: relative; width: 140px; height: 72px; margin-bottom: 10px; }
+.ds-empty-art > .evidence-trail { position: absolute; inset: 0; width: 140px; height: 70px; opacity: .12; }
+.ds-empty-art > .ds-empty-icon { position: relative; margin: 0; color: var(--color-primary); background: var(--color-surface); padding: 8px; border-radius: 50%; }
+.preview-companion { position: absolute; right: 0; bottom: -8px; width: 145px; height: 85px; pointer-events: none; }
+.preview-companion .evidence-trail { width: 135px; height: 65px; opacity: .13; }
+.preview-companion .preview-eyes { right: 15px; bottom: 0; }
+.first-account-art { position: relative; }
+.first-account-art > .evidence-trail { position: absolute; width: 190px; height: 105px; color: inherit; opacity: .18; }
+.first-account-art > .eyes { position: relative; }
+.catalog-trails { display: flex; flex-wrap: wrap; gap: 20px; margin: 20px 0; }
+.catalog-row > span { display: inline-flex; align-items: center; gap: 8px; }
+@media (max-width: 700px) {
+  .dashboard-intro > .evidence-trail, .page-heading > .evidence-trail { width: 72px; height: 60px; }
+  .dashboard-intro > .evidence-trail .evidence-trail-symbol svg,
+  .page-heading > .evidence-trail .evidence-trail-symbol svg { width: 21px; height: 21px; }
+  .dashboard-intro, .page-heading { gap: 10px; }
+}
+@media (max-width: 380px) {
+  .dashboard-intro > .evidence-trail, .page-heading > .evidence-trail { display: none; }
+}
