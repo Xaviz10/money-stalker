@@ -2,6 +2,12 @@
 
 These instructions apply to the whole repository.
 
+## Architecture documentation maintenance
+
+- `ARCHITECTURE.md` is the repository's architecture reference. Update it in the same change whenever infrastructure or the system architecture changes, including hosting, runtime, authentication, data storage, capture/import flows, queues, schedules, retention, IAM/network boundaries, external services, monitoring, or operational limits.
+- Keep affected diagrams, component responsibilities, configuration references, per-service cost estimates and user-growth projections consistent with the implementation. Recalculate affected totals when service configuration, pricing or workload assumptions change; record the review date, region, currency, assumptions, exclusions and official pricing sources. Distinguish repository configuration from verified deployed state and estimates from measured costs.
+- Before completing an infrastructure change, check `ARCHITECTURE.md` for accuracy and include any required updates. Documentation maintenance authorizes local edits and verification only; the Release boundary below remains unchanged.
+
 ## Release boundary
 
 - Codex must never deploy this project. Do not start, trigger, promote, retry, validate or monitor deployments in Vercel, AWS or any other environment. The owner handles every deployment manually.

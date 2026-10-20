@@ -9,6 +9,7 @@ The aim is to capture spending with minimal effort, reconcile it with bank state
 Current import support includes the verified Bancolombia quarterly savings-account XLSX export and a COP interchange CSV/XLSX format. Bancolombia SMS evidence can extract card purchases, QR payments, account payments and transfers using masked account/card aliases. Every file is previewed before commit. Its possible duplicates are compared only with previously saved movements and resolved there; Pistas is reserved for unconfirmed SMS and Wallet Shortcut captures.
 
 - [Initial product and implementation plan](docs/INITIAL_PLAN.md)
+- [Architecture, diagrams and service cost projections](ARCHITECTURE.md)
 - [iPhone capture feasibility test](docs/IOS_CAPTURE_SPIKE.md)
 - [iPhone Shortcut capture contract](docs/SHORTCUT_CAPTURE.md)
 - [Google Maps setup](docs/GOOGLE_MAPS.md)
