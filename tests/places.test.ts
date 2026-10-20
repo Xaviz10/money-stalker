@@ -35,40 +35,72 @@ describe('Google Maps place links', () => {
   });
 });
 
-describe('Google Maps HTML previews', () => {
-  const page = 'https://maps.google.com/?q=Comercio+de+prueba&ftid=synthetic';
-  const html = (head: string) => new Response(`<html><head>${head}</head><body></body></html>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-  it('resolves a shared place by preview center, requiring confirmation and never fetching the image', async () => {
+describe('identity-verified Google Maps places', () => {
+  const featureId = '0x1:0x2';
+  const page = `https://maps.google.com/?q=Comercio+de+prueba&ftid=${featureId}`;
+  const entity = (coords: unknown = [4.6, -74.1], fid = featureId, cid = '2') => [fid, 'Comercio sintético', coords, cid];
+  const html = (payload: unknown, extra = '') => new Response(`<html><head>${extra}</head><body><script>function onEmbedLoad(){initEmbed(${JSON.stringify(payload)});}</script></body></html>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  it('ignores an unrelated US viewport and reads the point attached to the shared place ID', async () => {
     const request = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: page } }))
-      .mockResolvedValueOnce(html('<meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=4.6%2C-74.1&amp;zoom=15"><script>throw new Error("must not run")</script>'));
-    expect(await resolveGoogleMapsLink('https://maps.app.goo.gl/synthetic?g_st=ic', request)).toEqual({ latitude: 4.6, longitude: -74.1, approximate: true, url: page });
+      .mockResolvedValueOnce(html([[[1000, -120, 38]], null, [entity()]], '<meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=38,-120">'));
+    expect(await resolveGoogleMapsLink('https://maps.app.goo.gl/synthetic?g_st=ic', request)).toEqual({ latitude: 4.6, longitude: -74.1, approximate: false, url: page });
     expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1][0]).toBe('https://www.google.com/maps?cid=2&output=embed');
   });
-  it('prefers an exact canonical place URL over the preview camera', async () => {
-    const request = vi.fn().mockResolvedValue(html('<META CONTENT="https://maps.google.com/maps/api/staticmap?center=5%2C-75" PROPERTY="og:image"><link rel="canonical" href="https://www.google.com/maps/place/Prueba/data=!3d4.6!4d-74.1">'));
-    expect(await resolveGoogleMapsLink(page, request)).toMatchObject({ latitude: 4.6, longitude: -74.1, approximate: false, url: page });
+  it('never treats generic preview metadata, camera state or another business as place evidence', async () => {
+    for (const payload of [[], [[[1000, -120, 38]]], [entity([38, -120], '0x3:0x4', '4')], [entity([4.6, -74.1], featureId, '4')]]) {
+      await expect(resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(html(payload, '<meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=38,-120">')))).rejects.toThrow(/verificar las coordenadas/);
+    }
+    // An address without a verifiable identity must not fall back to an IP-based center.
+    await expect(resolveGoogleMapsLink('https://maps.google.com/?q=Comercio+de+prueba', vi.fn().mockResolvedValue(html([entity()])))).rejects.toThrow(/verificar las coordenadas/);
   });
-  it('rejects untrusted, invalid, ambiguous and non-HTML previews', async () => {
-    for (const metadata of [
-      '<meta property="og:image" content="https://evil.invalid/maps/api/staticmap?center=4.6,-74.1">',
-      '<meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=91,-74">',
-      '<meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=4,-74"><meta itemprop="image" content="https://maps.google.com/maps/api/staticmap?center=5,-75">',
-      '<script>const x="!3d4.6!4d-74.1"</script>',
-      '</head><body><meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=4,-74">',
-    ]) await expect(resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(html(metadata)))).rejects.toThrow(/coordenadas/);
-    await expect(resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(new Response('<meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=4,-74">', { headers: { 'content-type': 'application/json' } })))).rejects.toThrow(/coordenadas/);
+  it('rejects invalid, mismatched or conflicting place coordinates', async () => {
+    for (const payload of [[entity([91, -74])], [entity(['4.6', '-74.1'])], [entity([4.6, -74.1]), entity([38, -120])], [entity([4.6, -74.1], '0x3:0x2')]]) {
+      await expect(resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(html(payload)))).rejects.toThrow(/coordenadas/);
+    }
   });
-  it('cancels the response at the end of head and caps pages that omit it', async () => {
-    const cancel = vi.fn();
-    const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('<head><meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=4,-74"></head>')); }, cancel });
-    expect(await resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(new Response(stream, { headers: { 'content-type': 'text/html' } })))).toMatchObject({ latitude: 4, longitude: -74, approximate: true });
-    expect(cancel).toHaveBeenCalledOnce();
-    await expect(resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(html(' '.repeat(256 * 1024))))).rejects.toThrow(/coordenadas/);
+  it('preserves full precision of 64-bit IDs and supports CID or feature ID paths', async () => {
+    const fid = '0x1:0xffffffffffffffff', cid = '18446744073709551615';
+    for (const url of [`https://www.google.com/maps?cid=${cid}`, `https://www.google.com/maps/place/Prueba/data=!1s${fid}`]) {
+      const request = vi.fn().mockResolvedValue(html([entity([4.6, -74.1], fid, cid)]));
+      expect(await resolveGoogleMapsLink(url, request)).toMatchObject({ latitude: 4.6, longitude: -74.1, approximate: false });
+      expect(request.mock.calls[0][0]).toBe(`https://www.google.com/maps?cid=${cid}&output=embed`);
+    }
   });
-  it('rejects timeout and error pages without accepting their metadata', async () => {
-    await expect(resolveGoogleMapsLink(page, vi.fn().mockRejectedValue(new DOMException('timeout', 'TimeoutError')))).rejects.toThrow(/tardó demasiado/);
-    const response = new Response('<head><meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=4,-74"></head>', { status: 429, headers: { 'content-type': 'text/html' } });
+  it('rejects ambiguous and malformed identities without making a request', async () => {
+    for (const url of ['https://www.google.com/maps?ftid=invalid', 'https://www.google.com/maps?cid=18446744073709551616', 'https://www.google.com/maps?cid=0', 'https://www.google.com/maps?ftid=0x1:0x2&cid=3', 'https://www.google.com/maps?ftid=0x1:0x2&ftid=0x3:0x2']) {
+      const request = vi.fn();
+      await expect(resolveGoogleMapsLink(url, request)).rejects.toThrow(/coordenadas/);
+      expect(request).not.toHaveBeenCalled();
+    }
+  });
+  it('parses quoted brackets in JSON without executing JavaScript', async () => {
+    const payload = [[featureId, 'Comercio \" ] ) [', [4.6, -74.1], '2']];
+    expect(await resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(html(payload)))).toMatchObject({ latitude: 4.6, longitude: -74.1 });
+    const response = new Response('<script>initEmbed((()=>{throw new Error("must not run")})());</script>', { headers: { 'content-type': 'text/html' } });
     await expect(resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(response))).rejects.toThrow(/coordenadas/);
+  });
+  it('caps HTML size, ignores incomplete calls, and rejects non-HTML or error pages', async () => {
+    for (const response of [
+      html(' '.repeat(256 * 1024)),
+      html(Array.from({ length: 130 }).reduce<unknown>(value => [value], [])),
+      new Response(`<script>${'initEmbed([]);'.repeat(5)}</script>`, { headers: { 'content-type': 'text/html' } }),
+      new Response('<script>initEmbed([[', { headers: { 'content-type': 'text/html' } }),
+      new Response('not HTML', { headers: { 'content-type': 'application/json' } }),
+      new Response('rate limited', { status: 429, headers: { 'content-type': 'text/html' } }),
+    ]) await expect(resolveGoogleMapsLink(page, vi.fn().mockResolvedValue(response))).rejects.toThrow(/coordenadas/);
+    await expect(resolveGoogleMapsLink(page, vi.fn().mockRejectedValue(new DOMException('timeout', 'TimeoutError')))).rejects.toThrow(/tardó demasiado/);
+  });
+  it('does not accept a generic camera reached through a shortlink redirect', async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: 'https://www.google.com/maps/@38,-120,12z' } }))
+      .mockResolvedValueOnce(html([[[1000, -120, 38]]]));
+    await expect(resolveGoogleMapsLink('https://maps.app.goo.gl/synthetic', request)).rejects.toThrow(/coordenadas/);
+  });
+  it('blocks redirect escapes even after selecting a place identity', async () => {
+    const request = vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location: 'https://evil.invalid/maps' } }));
+    await expect(resolveGoogleMapsLink(page, request)).rejects.toThrow();
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

@@ -5,7 +5,7 @@ import { bogotaDate, nextPayday } from './money';
 
 const clone = <T>(value: T): T => structuredClone(value);
 export { merchantKey } from './merchant-rules';
-import { merchantKey, rememberMerchant } from './merchant-rules';
+import { merchantKey, rememberMerchant, rememberMerchantPlace } from './merchant-rules';
 type ComparableMovement = Pick<TransactionInput, 'accountId' | 'counterAccountId' | 'date' | 'amountMinor' | 'kind' | 'merchant' | 'reference'>;
 export function duplicateTransactions(state: State, movement: ComparableMovement): Transaction[] {
   return state.transactions.filter(t => !t.voided && t.accountId === movement.accountId
@@ -63,7 +63,8 @@ export function addTransaction(state: State, input: unknown, at: string, observa
   const value = transactionInput.parse(input);
   const options = movementOptionsSchema.parse(input);
   if (options.rememberMerchant && !value.merchant.trim()) throw new DomainError('Agrega el comercio antes de guardar una regla');
-  const requestSignature = JSON.stringify({ ...value, ...(options.investmentProduct ? { investmentProduct: options.investmentProduct } : {}) });
+  if (options.rememberMerchantPlace && (!value.merchant.trim() || !value.place)) throw new DomainError('Elige un comercio y una ubicación antes de recordarla');
+  const requestSignature = JSON.stringify({ ...value, ...(options.skipMerchantPlace ? { skipMerchantPlace: true } : {}), ...(options.investmentProduct ? { investmentProduct: options.investmentProduct } : {}) });
   if (value.date > bogotaDate(new Date(at))) throw new DomainError('Registra movimientos realizados, no ingresos o gastos futuros');
   const existing = state.transactions.find(t => t.id === value.id);
   if (existing) {
@@ -75,13 +76,15 @@ export function addTransaction(state: State, input: unknown, at: string, observa
   const prospective = product ? { ...state, accounts: [...state.accounts, product] } : state;
   const rule = applyMerchantDefaults ? state.aliases.find(a => a.merchant === merchantKey(value.merchant)) : undefined;
   const category = state.categories.find(item => item.id === rule?.categoryId);
-  if (value.categoryId === 'uncategorized' && rule && category && (category.scope === 'both' || category.scope === (value.kind === 'income' ? 'income' : 'expense'))) value.categoryId = rule.categoryId;
+  if (value.categoryId === 'uncategorized' && rule && category && (category.scope === 'both' || category.scope === (value.kind === 'income' ? 'income' : 'expense'))) value.categoryId = category.id;
   if (!value.note && rule?.note) value.note = rule.note;
+  if (!value.place && !options.skipMerchantPlace && rule?.place) value.place = clone(rule.place);
   const t: Transaction = { ...value, entries: entries(prospective, value), observationIds: observationId ? [observationId] : [], revision: 1, requestSignature };
   linkBill(state, t);
   if (product) state.accounts.push(product);
   state.transactions.push(t);
   if (options.rememberMerchant) rememberMerchant(state, t);
+  if (options.rememberMerchantPlace) rememberMerchantPlace(state, t);
   state.audit.push({ id: `create:${t.id}`, at, action: 'create', transactionId: t.id });
   return t;
 }
@@ -185,7 +188,7 @@ export function recordStatement(state: State, input: Observation, at: string): O
     accountId: requireValue(input.accountId, 'El extracto no identifica la cuenta'),
     counterAccountId: input.counterAccountId, date: requireValue(input.date, 'El extracto no contiene una fecha'),
     amountMinor: requireValue(input.amountMinor, 'El extracto no contiene un valor'), kind: input.kind,
-    merchant: input.merchant, reference: input.reference, categoryId: input.categoryId ?? 'uncategorized', note: input.note ?? '', status: 'posted' }, at, input.id, false);
+    merchant: input.merchant, reference: input.reference, categoryId: input.categoryId ?? 'uncategorized', note: input.note ?? '', place: input.place, status: 'posted' }, at, input.id, false);
   const observation = clone(input);
   observation.status = 'linked'; observation.candidates = []; observation.transactionId = transaction.id;
   state.observations.push(observation);
@@ -226,12 +229,13 @@ export function resolveObservation(state: State, observationId: string, action: 
   state.audit.push({ id: `separate:${o.id}:${t.id}`, at, action: 'separate', beforeObservation, transactionId: t.id,
     expectedRevision: t.revision, ...(batch ? { batchId: batch.id, batchSize: batch.size } : {}) });
 }
-export function editTransaction(state: State, transactionId: string, input: unknown, at: string, remember = false, expectedRevision?: number) {
+export function editTransaction(state: State, transactionId: string, input: unknown, at: string, remember = false, expectedRevision?: number, rememberPlace = false) {
   const t = requireValue(state.transactions.find(t => t.id === transactionId && !t.voided), 'Movimiento desconocido');
   const beforeTransaction = clone(t);
   if (expectedRevision !== undefined && t.revision !== expectedRevision) throw new DomainError('El movimiento cambió; actualiza antes de editar', 409);
   const changes = Object.fromEntries(Object.entries(input && typeof input === 'object' ? input : {}).map(([k, v]) => [k, v === null ? undefined : v]));
   const value = transactionInput.parse({ ...t, ...changes, id: t.id });
+  if (rememberPlace && (!value.merchant.trim() || !value.place)) throw new DomainError('Elige un comercio y una ubicación antes de recordarla');
   if (value.date > bogotaDate(new Date(at))) throw new DomainError('No se pueden registrar movimientos futuros');
   const product = newInvestmentForMovement(state, value, input);
   const journal = entries(product ? { ...state, accounts: [...state.accounts, product] } : state, value);
@@ -239,6 +243,7 @@ export function editTransaction(state: State, transactionId: string, input: unkn
   for (const bill of state.bills) if (bill.paidTransactionId === t.id) delete bill.paidTransactionId;
   Object.assign(t, value, { entries: journal, revision: t.revision + 1 }); linkBill(state, t);
   if (remember && t.merchant) rememberMerchant(state, t, beforeTransaction.merchant);
+  if (rememberPlace) rememberMerchantPlace(state, t, beforeTransaction.merchant);
   state.audit.push({ id: `edit:${t.id}:${t.revision}`, at, action: 'edit', transactionId: t.id, beforeTransaction, expectedRevision: t.revision });
 }
 export function deleteTransaction(state: State, transactionId: string, at: string, expectedRevision?: number) {

@@ -364,3 +364,98 @@ describe('simple Shortcut coordinates', () => {
     expect(state.observations.slice(1).every(observation => observation.location === undefined)).toBe(true);
   });
 });
+
+describe('remembered merchant places', () => {
+  const place = { id: 'synthetic-place', name: 'Comercio de prueba', address: 'Dirección sintética', latitude: 4.6, longitude: -74.1, source: 'manual' as const };
+  const movement = { accountId: 'bank', date: '2026-10-10', amountMinor: '2200000', kind: 'expense', merchant: 'Comercio de prueba' };
+  it('keeps place rules independent from category rules and respects explicit per-movement places or removal', async () => {
+    const { repo, send } = await setup();
+    expect((await send('POST', '/transactions', { ...movement, id: 'remember-place', categoryId: 'restaurants', note: 'Solo este movimiento', place, rememberMerchantPlace: true })).status).toBe(201);
+    expect((await repo.read('owner')).aliases[0]).toEqual({ id: 'comercio de prueba', merchant: 'comercio de prueba', place });
+    await send('POST', '/transactions', { ...movement, id: 'future', date: '2026-10-11', merchant: ' COMERCIO   DE PRUEBA ' });
+    const otherPlace = { ...place, id: 'different-branch', latitude: 4.7 };
+    await send('POST', '/transactions', { ...movement, id: 'specific', date: '2026-10-12', place: otherPlace });
+    await send('POST', '/transactions', { ...movement, id: 'without-place', date: '2026-10-13', skipMerchantPlace: true });
+    const state = await repo.read('owner');
+    expect(state.transactions.find(t => t.id === 'future')).toMatchObject({ place, categoryId: 'uncategorized', note: '' });
+    expect(state.transactions.find(t => t.id === 'specific')?.place).toEqual(otherPlace);
+    expect(state.transactions.find(t => t.id === 'without-place')?.place).toBeUndefined();
+    await send('PATCH', '/transactions/remember-place', { expectedRevision: 1, changes: { categoryId: 'car', note: 'Regla de categoría' }, rememberMerchant: true });
+    expect((await repo.read('owner')).aliases[0]).toMatchObject({ place, categoryId: 'car', note: 'Regla de categoría' });
+    await send('PATCH', '/transactions/remember-place', { expectedRevision: 2, changes: { place: otherPlace }, rememberMerchantPlace: true });
+    expect((await repo.read('owner')).aliases[0]).toMatchObject({ place: otherPlace, categoryId: 'car', note: 'Regla de categoría' });
+  });
+  it('applies places across existing movements in safe audited chunks without changing categories, amounts or phone evidence', async () => {
+    const repo = new DynamoLimitMemoryRepository(), files = new MemoryFiles(), api = createAPI(repo, files);
+    await repo.mutate('owner', s => configure(s, 'accounts', { id: 'bank', name: 'Prueba', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01' }));
+    for (let offset = 0; offset < 74; offset += 25) await repo.mutate('owner', s => {
+      for (let i = offset; i < Math.min(offset + 25, 74); i++) addTransaction(s, { ...movement, id: `same-place-${i}`, amountMinor: String(10000 + i), kind: i === 73 ? 'refund' : 'expense', merchant: i % 2 ? ' COMERCIO   de Prueba ' : movement.merchant, categoryId: i % 2 ? 'car' : 'restaurants', note: `Nota ${i}`, ...(i === 2 ? { place: { ...place, latitude: 4.8 } } : {}) }, now);
+    });
+    await repo.mutate('owner', s => {
+      addTransaction(s, { ...movement, id: 'other-merchant', merchant: 'Otro comercio' }, now);
+      addTransaction(s, { ...movement, id: 'deleted', place: { ...place, latitude: 4.9 } }, now).voided = true;
+      s.observations.push({ id: 'phone-evidence', source: 'sms', observedAt: now, receivedAt: now, merchant: movement.merchant, kind: 'expense', currency: 'COP', status: 'linked', transactionId: 'same-place-0', candidates: [], parserVersion: 'synthetic', location: { latitude: 4.5, longitude: -74.2, observedAt: now } });
+    });
+    const before = await repo.read('owner');
+    const result = await api({ method: 'PATCH', path: '/transactions/same-place-0', subject: 'owner', body: { expectedRevision: 1, changes: { place }, applyPlaceToSimilar: true, rememberMerchantPlace: true } });
+    expect(result).toMatchObject({ status: 200, body: { updated: 74 } });
+    const after = await repo.read('owner');
+    for (const t of after.transactions.filter(t => t.id.startsWith('same-place-'))) {
+      expect(t.place).toEqual(place);
+      const original = before.transactions.find(item => item.id === t.id)!;
+      expect([t.amountMinor, t.categoryId, t.note, t.entries]).toEqual([original.amountMinor, original.categoryId, original.note, original.entries]);
+      expect(after.audit.some(a => a.action === 'edit' && a.transactionId === t.id && a.beforeTransaction)).toBe(true);
+    }
+    expect(after.transactions.find(t => t.id === 'other-merchant')?.place).toBeUndefined();
+    expect(after.transactions.find(t => t.id === 'deleted')?.place?.latitude).toBe(4.9);
+    expect(after.observations).toEqual(before.observations);
+    expect(after.aliases[0]).toEqual({ id: 'comercio de prueba', merchant: 'comercio de prueba', place });
+    expect(repo.largestMutation).toBeLessThanOrEqual(100);
+  });
+  it('uses the place for future Shortcut registrations and CSV previews without promoting phone coordinates to a merchant rule', async () => {
+    const { repo, files, send } = await setup();
+    await send('POST', '/transactions', { ...movement, id: 'rule', place, rememberMerchantPlace: true });
+    const job = captureJob('owner', 'synthetic-device', { eventId: 'future-capture', source: 'wallet', observedAt: now, accountId: 'bank', date: '2026-10-12', amountMinor: '3300000', merchant: 'COMERCIO DE PRUEBA', kind: 'expense', location: { latitude: 4.7, longitude: -74.2, observedAt: now } }, now);
+    await repo.putJob(job); await processJob(repo, files, 'owner', job.id);
+    expect((await send('POST', '/reviews', { observationId: job.id, action: 'separate' })).status).toBe(200);
+    const registered = await repo.read('owner');
+    expect(registered.transactions.find(t => t.observationIds.includes(job.id))?.place).toEqual(place);
+    expect(registered.observations.find(o => o.id === job.id)?.location?.latitude).toBe(4.7);
+    const bytes = Buffer.from('Fecha;Descripcion;Valor;Moneda;Tipo\n2026-10-13;COMERCIO DE PRUEBA;44.000,00;COP;gasto');
+    const created = await send('POST', '/imports', { filename: 'place.csv', size: bytes.length, accountId: 'bank', profile: 'cop-interchange-v1' });
+    const batch = (created.body as { batch: { id: string; originalKey: string } }).batch;
+    await files.put(batch.originalKey, bytes);
+    expect((await send('POST', `/imports/${batch.id}/preview`, {})).status).toBe(200);
+    expect((await send('GET', `/imports/${batch.id}`)).body).toMatchObject({ rows: [{ observation: { place } }] });
+    await repo.mutate('owner', state => { state.aliases[0].place = { ...place, latitude: 4.8 }; });
+    await send('POST', `/imports/${batch.id}/commit`, { includeDuplicateRows: [] });
+    for (const pending of await repo.pendingJobs()) await processJob(repo, files, 'owner', pending.id);
+    expect((await repo.read('owner')).transactions.find(t => t.amountMinor === '4400000')?.place).toEqual(place);
+  });
+  it('rejects remembering a place without an explicit choice and preserves existing rules on failure', async () => {
+    const { repo, send } = await setup();
+    expect((await send('POST', '/transactions', { ...movement, id: 'invalid', rememberMerchantPlace: true })).status).toBe(400);
+    expect((await repo.read('owner')).transactions).toHaveLength(0);
+    await send('POST', '/transactions', { ...movement, id: 'valid', place, rememberMerchantPlace: true });
+    const before = await repo.read('owner');
+    expect((await send('PATCH', '/transactions/valid', { expectedRevision: 1, changes: { place: null }, applyPlaceToSimilar: true })).status).toBe(400);
+    expect((await repo.read('owner')).aliases).toEqual(before.aliases);
+    expect((await repo.read('owner')).transactions).toEqual(before.transactions);
+  });
+});
+
+it('keeps historical place propagation separate from future memory and respects category scope when combined', async () => {
+  const { repo, send } = await setup();
+  const firstPlace = { id: 'place-one', name: 'Comercio común', address: '', latitude: 4.6, longitude: -74.1, source: 'manual' };
+  const nextPlace = { ...firstPlace, id: 'place-two', latitude: 4.7 };
+  const base = { accountId: 'bank', date: '2026-10-10', merchant: 'Comercio común' };
+  await send('POST', '/transactions', { ...base, id: 'common-expense', kind: 'expense', amountMinor: '1200000', categoryId: 'restaurants', place: firstPlace, rememberMerchantPlace: true });
+  await send('POST', '/transactions', { ...base, id: 'common-income', kind: 'income', amountMinor: '2200000', categoryId: 'salary' });
+  expect((await send('PATCH', '/transactions/common-expense', { expectedRevision: 1, changes: { place: nextPlace, categoryId: 'car' }, applyToSimilar: true, applyPlaceToSimilar: true })).status).toBe(200);
+  const state = await repo.read('owner');
+  expect(state.transactions.find(t => t.id === 'common-expense')).toMatchObject({ place: nextPlace, categoryId: 'car' });
+  expect(state.transactions.find(t => t.id === 'common-income')).toMatchObject({ place: nextPlace, categoryId: 'salary' });
+  expect(state.aliases[0]).toMatchObject({ place: firstPlace, categoryId: 'car' });
+  await send('POST', '/transactions', { ...base, id: 'future-common', date: '2026-10-11', kind: 'expense', amountMinor: '3300000' });
+  expect((await repo.read('owner')).transactions.find(t => t.id === 'future-common')?.place).toEqual(firstPlace);
+});

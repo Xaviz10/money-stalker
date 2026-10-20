@@ -6,7 +6,8 @@ export function rememberMerchant(state: State, transaction: TransactionInput, or
   const destination = state.accounts.find(account => account.id === transaction.counterAccountId && account.kind === "investment");
   const keys = [...new Set([originalMerchant, transaction.merchant].filter((value): value is string => Boolean(value?.trim())).map(merchantKey))];
   for (const key of keys) {
-    const rule: MerchantRule = { id: key, merchant: key, categoryId: transaction.categoryId, note: transaction.note,
+    const previous = state.aliases.find(item => item.id === key);
+    const rule: MerchantRule = { ...(previous?.place ? { place: structuredClone(previous.place) } : {}), id: key, merchant: key, categoryId: transaction.categoryId, note: transaction.note,
       ...(transaction.kind === "transfer" && destination ? { investmentAccountId: destination.id } : {}),
       ...(key !== merchantKey(transaction.merchant) ? { displayMerchant: transaction.merchant } : {}),
     };
@@ -14,10 +15,21 @@ export function rememberMerchant(state: State, transaction: TransactionInput, or
     if (index < 0) state.aliases.push(rule); else state.aliases[index] = rule;
   }
 }
+/** Remember only the owner-selected place, independently from categorization. */
+export function rememberMerchantPlace(state: State, transaction: TransactionInput, originalMerchant?: string) {
+  if (!transaction.merchant.trim() || !transaction.place) throw new DomainError("Elige un comercio y una ubicación antes de recordarla");
+  const keys = [...new Set([originalMerchant, transaction.merchant].filter((value): value is string => Boolean(value?.trim())).map(merchantKey))];
+  for (const key of keys) {
+    const index = state.aliases.findIndex(item => item.id === key);
+    const rule: MerchantRule = { ...(index < 0 ? {} : state.aliases[index]), id: key, merchant: key, place: structuredClone(transaction.place) };
+    if (index < 0) state.aliases.push(rule); else state.aliases[index] = rule;
+  }
+}
 export function classifyImportedMerchant(state: Pick<State, "accounts" | "categories" | "aliases">, observation: Observation): Observation {
   const rule = state.aliases.find(item => item.merchant === merchantKey(observation.merchant));
   const result = { ...observation, categoryId: observation.categoryId ?? "uncategorized", note: observation.note ?? "" };
   if (!rule) return result;
+  if (!result.place && rule.place) result.place = structuredClone(rule.place);
   if (rule.investmentAccountId && !observation.cashWithdrawal && (observation.kind === "expense" || observation.kind === "transfer") && observation.accountId !== rule.investmentAccountId) {
     if (!state.accounts.some(account => account.id === rule.investmentAccountId && account.kind === "investment")) throw new DomainError("La inversión recordada para este comercio ya no existe; corrige la regla antes de importar");
     if (observation.counterAccountId && observation.counterAccountId !== rule.investmentAccountId) throw new DomainError("El destino de la fila difiere de la inversión recordada para este comercio");

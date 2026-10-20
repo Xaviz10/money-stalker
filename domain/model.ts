@@ -98,15 +98,15 @@ export type Observation = {
   date?: string; accountId?: string; amountMinor?: string; currency: 'COP'; merchant: string;
   kind: TransactionInput['kind']; counterAccountId?: string; reference?: string;
   status: 'review' | 'linked' | 'ignored'; transactionId?: string; candidates: string[]; reason?: string;
-  location?: Capture['location']; parserVersion: string; cashWithdrawal?: boolean; categoryId?: string; note?: string;
+  location?: Capture['location']; parserVersion: string; cashWithdrawal?: boolean; categoryId?: string; note?: string; place?: TransactionPlace;
 };
 export const valuationInput = z.object({ id, accountId: id, date, valueMinor: minor, note: z.string().trim().max(1000).default('') });
 export type InvestmentValuation = z.infer<typeof valuationInput> & { at: string; sequence: number; beforeMinor: string; adjustmentMinor: string; voided?: boolean };
 export type Audit = { id: string; at: string; action: string; transactionId?: string;
   beforeTransaction?: Transaction; beforeObservation?: Observation; expectedRevision?: number; undone?: boolean;
   batchId?: string; batchSize?: number; valuationId?: string };
-export type MerchantRule = { id: string; merchant: string; categoryId: string; note?: string; investmentAccountId?: string; displayMerchant?: string };
-export const movementOptionsSchema = z.object({ rememberMerchant: z.boolean().default(false), investmentProduct: z.object({ id, name: text.min(1) }).optional() });
+export type MerchantRule = { id: string; merchant: string; categoryId?: string; note?: string; investmentAccountId?: string; displayMerchant?: string; place?: TransactionPlace };
+export const movementOptionsSchema = z.object({ rememberMerchant: z.boolean().default(false), rememberMerchantPlace: z.boolean().default(false), skipMerchantPlace: z.boolean().default(false), investmentProduct: z.object({ id, name: text.min(1) }).optional() });
 export type State = {
   valuations: InvestmentValuation[]; accounts: Account[]; instruments: Instrument[]; categories: Category[]; bills: Bill[];
   transactions: Transaction[]; observations: Observation[]; audit: Audit[];

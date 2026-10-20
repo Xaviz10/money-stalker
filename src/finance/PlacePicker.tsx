@@ -16,6 +16,14 @@ export function PlacePicker({ merchant, captured, place, onChoose }: { merchant:
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const revision = useRef(0);
+  const edited = useRef(false);
+  useEffect(() => {
+    if (edited.current) return;
+    const next = place ?? captured[0];
+    setLatitude(next ? String(next.latitude) : '');
+    setLongitude(next ? String(next.longitude) : '');
+    setLink(place?.url ?? '');
+  }, [place?.latitude, place?.longitude, place?.url, captured[0]?.latitude, captured[0]?.longitude]);
   const lastRead = useRef('');
   const beforeConfirmation = useRef<TransactionPlace | undefined>(place);
   const [confirmed, setConfirmed] = useState(false);
@@ -23,6 +31,7 @@ export function PlacePicker({ merchant, captured, place, onChoose }: { merchant:
   const point = transactionPlaceSchema.safeParse({ id: `coordinates:${latitude}:${longitude}`, name: merchant || 'Lugar del movimiento', address: place?.address ?? '', latitude: numeric(latitude), longitude: numeric(longitude), source: 'manual' });
   const preview = point.success ? point.data : undefined;
   function choose(lat: string, lng: string, url?: string) {
+    edited.current = true;
     const result = transactionPlaceSchema.safeParse({ id: `coordinates:${lat}:${lng}`, name: merchant || 'Lugar del movimiento', address: '', latitude: numeric(lat), longitude: numeric(lng), source: url ? 'google-link' : 'manual', ...(url ? { url } : {}) });
     if (result.success) { onChoose(result.data); setError(''); }
     else if (lat || lng) setError('Completa ambas coordenadas: latitud entre −90 y 90 y longitud entre −180 y 180.');
@@ -30,6 +39,7 @@ export function PlacePicker({ merchant, captured, place, onChoose }: { merchant:
   }
   async function readLink(value: string) {
     const key = value.trim();
+    if (key) edited.current = true;
     if (key && lastRead.current === key) return;
     lastRead.current = key;
     const current = ++revision.current;
@@ -65,6 +75,6 @@ export function PlacePicker({ merchant, captured, place, onChoose }: { merchant:
     }}>{busy ? 'Obteniendo ubicación…' : 'Usar mi ubicación'}</button>}
     {error && <p className="error" role="alert">{error}</p>}
     <CaptureMap captured={[]} place={preview} />
-    {place && <button type="button" className="text-button" onClick={() => { revision.current++; setLatitude(''); setLongitude(''); setLink(''); setResolved(undefined); setError(''); setBusy(false); onChoose(undefined); }}>Quitar lugar</button>}
+    {place && <button type="button" className="text-button" onClick={() => { edited.current = true; revision.current++; setLatitude(''); setLongitude(''); setLink(''); setResolved(undefined); setError(''); setBusy(false); onChoose(undefined); }}>Quitar lugar</button>}
   </section>;
 }

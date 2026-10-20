@@ -1108,9 +1108,12 @@ function TransactionDialog({
     data: Record<string, unknown>;
     matches: Transaction[];
   }>();
-  const [place, setPlace] = useState<TransactionPlace | undefined>(
-    transaction?.place,
-  );
+  const [chosenPlace, setPlace] = useState<TransactionPlace | undefined>(transaction?.place);
+  const [placeTouched, setPlaceTouched] = useState(false);
+  const [rememberPlaceChoice, setRememberPlaceChoice] = useState(false);
+  const [applyPlaceChoice, setApplyPlaceChoice] = useState(false);
+  const rememberedPlace = state.aliases.find(rule => rule.merchant === normalizedMerchant)?.place;
+  const place = chosenPlace ?? (placeTouched ? undefined : rememberedPlace);
   const locationEvidence =
     isObservation && (value as Observation).location
       ? [value as Observation]
@@ -1206,6 +1209,8 @@ function TransactionDialog({
               kind === "transfer" ? str(f, "counterAccountId") : null,
             ...(creatingInvestment ? { investmentProduct: { id: newInvestmentId.current, name: (investmentName ?? merchant).trim() } } : {}),
             rememberMerchant: f.get("rememberMerchant") === "on",
+            rememberMerchantPlace: Boolean(place && merchant.trim() && rememberPlaceChoice),
+            skipMerchantPlace: placeTouched && !place,
             amountMinor: amount(f, "amount"),
             merchant,
             categoryId: subcategoryId || categoryId || "uncategorized",
@@ -1223,6 +1228,7 @@ function TransactionDialog({
             });
           else if (transaction) {
             const applyToSimilar = f.get("applyToSimilar") === "on";
+            const applyPlaceToSimilar = Boolean(place && merchant.trim() && applyPlaceChoice);
             const result = await api<{ saved: true; updated: number }>(
               `/transactions/${transaction.id}`,
               {
@@ -1230,13 +1236,17 @@ function TransactionDialog({
                 body: JSON.stringify({
                   changes: data,
                   applyToSimilar,
+                  applyPlaceToSimilar,
+                  rememberMerchantPlace: Boolean(place && merchant.trim() && rememberPlaceChoice),
                   rememberMerchant: f.get("rememberMerchant") === "on",
                   expectedRevision: transaction.revision,
                 }),
               },
             );
             await saved(
-              applyToSimilar
+              applyPlaceToSimilar
+                ? `${applyToSimilar ? "Categoría, nota y ubicación guardadas" : "Ubicación guardada"} en ${result.updated} ${result.updated === 1 ? "movimiento" : "movimientos"} del mismo comercio.`
+                : applyToSimilar
                 ? `Categoría y nota guardadas en ${result.updated} ${result.updated === 1 ? "movimiento" : "movimientos"} del mismo comercio.`
                 : undefined,
             );
@@ -1409,7 +1419,8 @@ function TransactionDialog({
             </span>
             <Icon name="location" size={18} />
           </summary>
-          {locationOpen && (
+          {locationOpen && <>
+            {rememberedPlace && !placeTouched && !chosenPlace && <p className="small-note remembered-place-note">Ubicación recordada para este comercio. Puedes cambiarla solo para este movimiento.</p>}
             <TransactionMap
               merchant={merchant}
               captured={locationEvidence.map(
@@ -1417,11 +1428,17 @@ function TransactionDialog({
               )}
               place={place}
               onPlaceChange={(next) => {
+                setPlaceTouched(true);
                 setPlace(next);
                 if (next) setMerchant(next.name);
               }}
             />
-          )}
+            {place && merchant.trim() && <div className="merchant-place-options">
+              <label className="checkbox"><input type="checkbox" name="rememberMerchantPlace" checked={rememberPlaceChoice} onChange={event => setRememberPlaceChoice(event.target.checked)} /> Recordar esta ubicación para próximos movimientos de este comercio</label>
+              {transaction && <label className="checkbox"><input type="checkbox" name="applyPlaceToSimilar" checked={applyPlaceChoice} onChange={event => setApplyPlaceChoice(event.target.checked)} /> Aplicar esta ubicación a todos los movimientos de este comercio</label>}
+              <p className="small-note">Úsala para todo el comercio solo si el nombre identifica la misma sede. La ubicación original de cada atajo se conserva.</p>
+            </div>}
+          </>}
         </details>
         <Field label="Nota">
           <textarea

@@ -22,6 +22,7 @@ import {
   id,
   normalizeUnlinkedTransfers,
   transactionInput,
+  transactionPlaceSchema,
 } from "../domain/model";
 import {
   exportRecords,
@@ -166,12 +167,14 @@ export function createAPI(repo: Repository, files: Files) {
             changes: z.record(z.string(), z.unknown()),
             remember: z.boolean().default(false),
             applyToSimilar: z.boolean().default(false),
+            applyPlaceToSimilar: z.boolean().default(false),
+            rememberMerchantPlace: z.boolean().default(false),
             rememberMerchant: z.boolean().default(false),
             expectedRevision: z.number().int().min(1),
           })
           .parse(body);
         const applyToSimilar = b.applyToSimilar || b.remember;
-        if (!applyToSimilar) {
+        if (!applyToSimilar && !b.applyPlaceToSimilar) {
           await repo.mutate(h, (s) =>
             editTransaction(
               s,
@@ -180,6 +183,7 @@ export function createAPI(repo: Repository, files: Files) {
               now,
               b.rememberMerchant,
               b.expectedRevision,
+              b.rememberMerchantPlace,
             ),
           );
           return { status: 200, body: { saved: true, updated: 1 } };
@@ -195,6 +199,7 @@ export function createAPI(repo: Repository, files: Files) {
             "El movimiento cambió; actualiza antes de editar",
             409,
           );
+        const sharedPlace = b.applyPlaceToSimilar ? transactionPlaceSchema.parse(b.changes.place) : undefined;
         const key = merchantKey(selected.merchant);
         if (!key)
           throw new DomainError(
@@ -210,7 +215,7 @@ export function createAPI(repo: Repository, files: Files) {
               (item) =>
                 item.id !== selected.id &&
                 !item.voided &&
-                item.kind === selected.kind &&
+                (b.applyPlaceToSimilar || item.kind === selected.kind) &&
                 merchantKey(item.merchant) === key,
             )
             .map((item) => item.id),
@@ -235,20 +240,20 @@ export function createAPI(repo: Repository, files: Files) {
                 (item) => item.id === id && !item.voided,
               );
               if (!current) continue;
-              const changes = id === selected.id ? b.changes : sharedChanges;
-              if (
-                id !== selected.id &&
-                current.categoryId === sharedChanges.categoryId &&
-                current.note === sharedChanges.note
-              )
-                continue;
+              const propagated = {
+                ...(applyToSimilar && current.kind === selected.kind ? sharedChanges : {}),
+                ...(sharedPlace ? { place: sharedPlace } : {}),
+              };
+              const changes = id === selected.id ? b.changes : propagated;
+              if (id !== selected.id && Object.entries(propagated).every(([key, value]) => JSON.stringify(current[key as keyof typeof current]) === JSON.stringify(value))) continue;
               editTransaction(
                 s,
                 id,
                 changes,
                 now,
-                id === selected.id,
+                id === selected.id && (b.rememberMerchant || applyToSimilar),
                 revisions.get(id),
+                id === selected.id && b.rememberMerchantPlace,
               );
               changed++;
             }
