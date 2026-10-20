@@ -6,7 +6,7 @@ export type ParsedBankSMS = {
   amountMinor?: string;
   date?: string;
   merchant?: string;
-  kind?: "expense" | "transfer";
+  kind?: "expense" | "income" | "transfer";
   instrumentHint?: string;
   counterpartyHint?: string;
   counterInstrumentHint?: string;
@@ -21,9 +21,12 @@ const compact = (value: string) =>
 const clean = (value: string) => value.trim().replace(/\s+/g, " ");
 
 function amountMinor(raw: string): string | undefined {
-  const token = raw.trim(),
-    colombian = /^COP/i.test(token);
+  const token = raw.trim();
   let value = token.replace(/^(COP|\$)\s*/i, "").replace(/\s/g, "");
+  const colombian =
+    /^COP/i.test(token) ||
+    /,\d{1,2}$/.test(value) ||
+    /^[+-]?\d{1,3}(?:\.\d{3})+$/.test(value);
   const pattern = colombian
     ? /^[+-]?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/
     : /^[+-]?(?:(?:\d{1,3}(?:,\d{3})+)|\d+)(?:\.\d{1,2})?$/;
@@ -64,6 +67,21 @@ export function parseBancolombiaSMS(message: string): ParsedBankSMS {
   if (!/^Bancolombia:/i.test(text)) return base;
   const parsedDate = messageDate(text);
 
+  const withdrawal = text.match(
+    /Retiraste\s+((?:COP|\$)\s*[\d.,]+)\s+en\s+(.+?)\s+de\s+tu\s+T\.?Deb\s+\*{0,2}(\d{4})\s+el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i,
+  );
+  if (withdrawal)
+    return {
+      ...base,
+      matched: true,
+      amountMinor: amountMinor(withdrawal[1]),
+      date: parsedDate,
+      merchant: clean(withdrawal[2]),
+      kind: "transfer",
+      instrumentHint: withdrawal[3],
+      // The owner confirms the cash destination in Review; never infer it from the ATM.
+    };
+
   const purchase = text.match(
     /Compraste\s+((?:COP|\$)\s*[\d.,]+)\s+en\s+(.+?)(?=\s+con\s+tu\s+T\.?Cred\b|,\s*el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b)/i,
   );
@@ -92,6 +110,35 @@ export function parseBancolombiaSMS(message: string): ParsedBankSMS {
       kind: "expense",
       instrumentHint: qr[2],
       counterpartyHint: serviceHint(text),
+    };
+
+  const keyTransfer = text.match(
+    /Transferiste\s+((?:COP|\$)\s*[\d.,]+)\s+a\s+la\s+llave\s+([\w.+-]+)\s+desde\s+tu\s+cuenta\s+\*?(\d{4})\s+a\s+(.+?)\s+el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i,
+  );
+  if (keyTransfer)
+    return {
+      ...base,
+      matched: true,
+      amountMinor: amountMinor(keyTransfer[1]),
+      date: parsedDate,
+      merchant: clean(keyTransfer[4]),
+      kind: "transfer",
+      instrumentHint: keyTransfer[3],
+      // A Bre-B key is not an account alias; its digits cannot identify an owned account.
+    };
+
+  const received = text.match(
+    /recibiste\s+una\s+transferencia\s+de\s+(.+?)\s+por\s+((?:COP|\$)\s*[\d.,]+)\s+en\s+tu\s+cuenta\s+\*?(\d{4})\b/i,
+  );
+  if (received)
+    return {
+      ...base,
+      matched: true,
+      amountMinor: amountMinor(received[2]),
+      date: parsedDate,
+      merchant: clean(received[1]),
+      kind: "income",
+      instrumentHint: received[3],
     };
 
   const transfer = text.match(

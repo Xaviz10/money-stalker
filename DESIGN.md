@@ -271,6 +271,8 @@ Debit instruments indent under their bank account and explain that they use its 
 
 ### Reports
 
+The time chart exposes exact net amounts on hover, touch, and keyboard arrows (Home/End reach the first/last period). Keep points circular at every viewport and show refunds below a visible zero baseline. Category bars share a common scale, retain negative net refunds, and open the category’s movements when selected; sign, amount, and text carry meaning alongside color.
+
 Reports answer how much was spent, when, where, and in which category for an explicit date range and optional product. Lead with net spending after refunds, then show gross expenses, refunds, and daily average. Follow with a continuous time chart, category/subcategory bars, and ranked merchants. Keep filters visible and provide month, trailing-30-day, and year presets. On phones, preserve the summary grid and stack the analytical panels without horizontal page overflow. Income, transfers, future and deleted movements do not appear as expenses.
 
 ### Evidence and available money

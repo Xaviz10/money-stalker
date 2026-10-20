@@ -64,6 +64,28 @@ describe('authorization and capture', () => {
     expect(visible.observations[0]).toMatchObject({ status: 'review', location: { latitude: 5.12345, longitude: -73.12345, accuracy: 18, observedAt: now } });
     expect((await api({ method: 'GET', path: '/state', token })).status).toBe(401);
   });
+  it('persists all financial fields from a Pagaste SMS through the capture API', async () => {
+    const { api, repo, files, send } = await setup();
+    await repo.mutate('owner', state => configure(state, 'instruments', {
+      id: 'payment-account', name: 'Cuenta de prueba', accountId: 'bank', aliases: ['1122'],
+    }));
+    const { token } = await repo.createDevice('owner', 'phone');
+    const accepted = await api({ method: 'POST', path: '/capture-events', token, body: {
+      eventId: 'payment-sms', source: 'sms', observedAt: now,
+      message: 'Bancolombia: Pagaste $1,312,000.00 a SERVICIO EJEMPLO desde tu producto 1122 el 12/10/2026 21:02:36. ¿Dudas? Llamanos al 0000000000. Estamos cerca',
+    } });
+    expect(accepted.status).toBe(202);
+    const id = (accepted.body as { eventId: string }).eventId;
+    await processJob(repo, files, 'owner', id);
+    expect((await repo.job('owner', id))?.status).toBe('done');
+    const visible = (await send('GET', '/state')).body as State;
+    expect(visible.observations).toHaveLength(1);
+    expect(visible.observations[0]).toMatchObject({
+      accountId: 'bank', amountMinor: '131200000', date: '2026-10-12',
+      merchant: 'SERVICIO EJEMPLO', kind: 'expense', status: 'review',
+      parserVersion: 'bancolombia-sms-v1',
+    });
+  });
   it('accepts and normalizes the basic ISO 8601 timezone emitted by Apple Shortcuts', async () => {
     const { api, repo } = await setup(); const { token, device } = await repo.createDevice('owner', 'phone');
     const accepted = await api({ method: 'POST', path: '/capture-events', token, body: {
