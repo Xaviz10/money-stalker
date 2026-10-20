@@ -59,3 +59,15 @@ Si no hay conexión, falla el proveedor o WebGL no está disponible, la direcci�
 La ubicación pertenece a cada observación, no a la identidad del comercio. Se conserva al conciliar SMS, Wallet y extractos. CSV/XLSX conserva `Ubicaciones` y agrega `DetalleUbicaciones`, un JSON con cada observación, sus campos originales, su precisión si existe y los enlaces por coordenadas. Una captura tardía o una dirección postal no confirma el lugar de compra.
 
 Fuentes: [MapLibre raster sources](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-raster-tile-source/), [OpenStreetMap tile policy](https://operations.osmfoundation.org/policies/tiles/), [Apple Maps URLs](https://developer.apple.com/documentation/mapkit/unified-map-urls), [Google Maps URLs](https://developers.google.com/maps/documentation/urls/get-started).
+
+## Elegir o corregir el lugar de un movimiento
+
+La misma sección **Ubicación y negocio** está disponible al crear un movimiento manual, editar uno guardado o usar **Editar antes de guardar** en Revisión. Puede elegirse otro lugar aunque el SMS ya tenga coordenadas: la muestra original, su dirección y su fecha siguen asociadas a la observación. El lugar confirmado se guarda aparte en `transaction.place`.
+
+MapLibre representa el mapa; no incluye un directorio de comercios. La opción universal es escribir comercio/ciudad, abrir **Buscar en Google Maps**, copiar el enlace del resultado y pegarlo en **Enlace de Google Maps**. **Leer enlace** prepara las coordenadas y el nombre para revisarlos. **Usar este lugar** confirma la selección en el formulario; los cambios solo se persisten al guardar el movimiento. También se pueden escribir nombre, dirección y coordenadas manualmente. La búsqueda integrada de Google sigue disponible cuando hay una clave configurada.
+
+Se interpretan enlaces completos con coordenadas de la ficha o consultas de coordenadas. Una URL que solo contiene `@latitud,longitud` o un centro de mapa se marca como aproximada y requiere confirmación explícita: el centro de la cámara puede no ser el comercio. No se adivinan lugares a partir de rutas con múltiples destinos o enlaces ambiguos.
+
+Los enlaces cortos se resuelven mediante `POST /places/resolve-link`, exclusivo de la sesión del propietario. No usa el token del Shortcut. Solo sigue redirecciones HTTPS entre dominios admitidos de Google Maps, con límite de saltos y tiempo; no descarga ni interpreta páginas de lugares, ni acepta destinos arbitrarios. Algunos enlaces usan JavaScript, consentimiento o identificadores sin coordenadas: si no pueden resolverse, la interfaz pide la URL completa o coordenadas manuales y conserva cualquier selección existente.
+
+El lugar guarda `source` (`google`, `google-link` o `manual`) y, cuando procede, la URL de origen. Los lugares antiguos sin `source` conservan su compatibilidad con Google. Los ID locales por coordenadas nunca se envían como Google Place ID. Los exports incluyen `OrigenLugar` y `EnlaceLugar` junto con el lugar confirmado y la evidencia original del teléfono.

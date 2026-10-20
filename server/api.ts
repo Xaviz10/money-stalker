@@ -1,3 +1,4 @@
+import { resolveGoogleMapsLink } from "./places";
 import { classifyImportedMerchant } from "../domain/merchant-rules";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -68,6 +69,10 @@ export function createAPI(repo: Repository, files: Files) {
       // For the personal release, each verified Cognito sub owns exactly one household.
       // Never accept household IDs from request bodies, headers or query parameters.
       const h = request.subject;
+      if (method === "POST" && path === "/places/resolve-link") {
+        const input = z.object({ url: z.string().trim().min(1).max(2000) }).strict().parse(body);
+        return { status: 200, body: await resolveGoogleMapsLink(input.url) };
+      }
       if (method === "GET" && path === "/state") {
         const state = await repo.read(h);
         normalizeUnlinkedTransfers(state);

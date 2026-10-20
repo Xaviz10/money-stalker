@@ -322,3 +322,20 @@ describe('optional Shortcut location in the same capture request', () => {
     expect(state.observations[2].location?.accuracy).toBeUndefined();
   });
 });
+
+describe('owner-confirmed movement locations', () => {
+  it('requires owner authentication to resolve links and keeps non-Google place IDs out of Google exports', async () => {
+    const { api, send, repo } = await setup();
+    const url = 'https://www.google.com/maps/place/Ejemplo/data=!3d4.65!4d-74.15';
+    expect((await api({ method: 'POST', path: '/places/resolve-link', body: { url } })).status).toBe(401);
+    expect(await send('POST', '/places/resolve-link', { url })).toMatchObject({ status: 200, body: { latitude: 4.65, longitude: -74.15, approximate: false } });
+    expect((await send('POST', '/places/resolve-link', { url: 'https://localhost/private' })).status).toBe(400);
+    const place = { id: 'coordinates:4.65:-74.15', latitude: 4.65, longitude: -74.15, name: 'Lugar confirmado', address: 'Dirección de prueba', source: 'google-link', url };
+    expect((await send('POST', '/transactions', { id: 'chosen-place', accountId: 'bank', date: '2026-10-10', amountMinor: '10000', kind: 'expense', merchant: place.name, place })).status).toBe(201);
+    const { exportRecords } = await import('../server/imports');
+    const XLSX = await import('xlsx');
+    const book = XLSX.read(exportRecords(await repo.read('owner'), 'xlsx').bytes, { type: 'buffer' });
+    const rows = XLSX.utils.sheet_to_json<Record<string, string>>(book.Sheets.Movimientos, { defval: '' });
+    expect(rows[0]).toMatchObject({ Lugar: place.name, OrigenLugar: 'google-link', EnlaceLugar: url, GooglePlaceID: '' });
+  });
+});

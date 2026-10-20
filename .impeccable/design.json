@@ -511,6 +511,11 @@
         "name": "The Captured Location Rule",
         "body": "Send optional rich location inside the same capture-events request. Display address, coordinates, sample timestamp and unknown precision honestly. The primary MapLibre map distinguishes blue phone evidence from green owner-confirmed places; provider failures retain text and coordinate links to Apple Maps and Google Maps. Keep attribution visible and postal components collapsed. Location never proves merchant identity or blocks financial saving.",
         "section": "layout"
+      },
+      {
+        "name": "The Place Correction Rule",
+        "body": "All movement forms share PlacePicker for explicit place selection via merchant search, pasted Google Maps links or manual coordinates. Preserve original Shortcut location and sample time separately. Camera-center URLs require acknowledgment; invalid or unresolved links retain the current place. Owner confirmation selects a place; saving the movement persists it.",
+        "section": "layout"
       }
     ],
     "dos": [

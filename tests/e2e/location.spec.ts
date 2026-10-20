@@ -1,13 +1,13 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 const api = `http://127.0.0.1:${process.env.E2E_API_PORT ?? '8787'}/api`;
-async function capturedMovement(request: APIRequestContext) {
+async function capturedMovement(request: APIRequestContext, register = true) {
   await request.post(`${api}/test/reset`);
   await request.post(`${api}/accounts`, { data: { id: 'location-bank', name: 'Cuenta de prueba', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01', captureAliases: ['1122'] } });
   const device = await (await request.post(`${api}/devices`, { data: { name: 'iPhone sintético' } })).json();
   await request.post(`${api}/capture-events`, { headers: { Authorization: `Bearer ${device.token}` }, data: { eventId: 'location-sms', source: 'sms', observedAt: '2026-10-20T18:00:00Z', message: 'Bancolombia: Compraste $22.000,00 en COMERCIO DE PRUEBA con tu T.Deb *1122, el 18/10/2026 a las 10:55.', location: { latitude: 4.6, longitude: -74.1, observedAt: '2026-10-20T18:00:02Z', fullAddress: 'Calle de Prueba 10, Ciudad de Prueba, Colombia', street: 'Calle de Prueba', streetNumber: '10', city: 'Ciudad de Prueba', state: 'Departamento de Prueba', postalCode: '000000', region: 'Región de Prueba', country: 'Colombia', countryCode: 'CO', url: 'https://maps.apple.com/place?coordinate=4.6,-74.1' } } });
   await expect.poll(async () => (await (await request.get(`${api}/state`)).json()).observations[0]?.location?.city).toBe('Ciudad de Prueba');
   const state = await (await request.get(`${api}/state`)).json();
-  expect((await request.post(`${api}/reviews`, { data: { observationId: state.observations[0].id, action: 'separate' } })).ok()).toBe(true);
+  if (register) expect((await request.post(`${api}/reviews`, { data: { observationId: state.observations[0].id, action: 'separate' } })).ok()).toBe(true);
 }
 test('SMS location shows address, optional precision and coordinate map links without altering merchant', async ({ page, request }, info) => {
   await capturedMovement(request);
@@ -26,6 +26,7 @@ test('SMS location shows address, optional precision and coordinate map links wi
   await page.screenshot({ path: info.outputPath('captured-address.png') });
   expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await dialog.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
   const state = await (await request.get(`${api}/state`)).json();
   expect(state.transactions[0].merchant).toBe('COMERCIO DE PRUEBA');
   expect(state.transactions[0].place).toBeUndefined();
@@ -52,6 +53,7 @@ test('MapLibre renders saved coordinates and keeps the map stable while editing'
   await expect(marker).toHaveAttribute('data-persist', 'yes');
   await expect(dialog.locator('.maplibregl-canvas')).toHaveCount(1);
   await dialog.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
   expect((await (await request.get(`${api}/state`)).json()).observations[0].location.city).toBe('Ciudad de Prueba');
 });
 
@@ -62,7 +64,100 @@ test('map loading failure preserves evidence and lets the movement save', async 
   await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
   await expect(dialog.getByText(/No se pudo cargar el mapa/)).toBeVisible();
+  expect(await dialog.locator('.capture-map-frame').evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(240);
   await expect(dialog.getByRole('link', { name: 'Abrir en Google Maps', exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
   await expect(dialog).not.toBeVisible();
+});
+
+test('manual and saved movements can choose, revise and remove a linked place', async ({ page, request }) => {
+  await request.post(`${api}/test/reset`);
+  await request.post(`${api}/accounts`, { data: { id: 'manual-bank', name: 'Cuenta de prueba', kind: 'bank', openingMinor: '100000000', openingDate: '2026-01-01' } });
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.goto('./#/movimientos');
+  await page.getByRole('button', { name: 'Nuevo movimiento', exact: true }).click();
+  let dialog = page.getByRole('dialog', { name: 'Nuevo movimiento', exact: true });
+  await dialog.getByLabel('Comercio o descripción').fill('Comercio manual');
+  await dialog.getByLabel('Valor (COP)').fill('22.000');
+  await dialog.getByText('Ubicación y negocio', { exact: true }).click();
+  await expect(dialog.getByLabel('Buscar comercio o dirección')).toHaveValue('Comercio manual');
+  await expect(dialog.getByRole('link', { name: 'Buscar en Google Maps', exact: true })).toHaveAttribute('href', 'https://www.google.com/maps/search/?api=1&query=Comercio%20manual');
+  await dialog.getByLabel('Enlace de Google Maps', { exact: true }).fill('https://www.google.com/maps/place/Comercio+Elegido/data=!3d4.65!4d-74.15');
+  await dialog.getByRole('button', { name: 'Leer enlace', exact: true }).click();
+  await expect(dialog.getByLabel('Comercio o descripción')).toHaveValue('Comercio manual');
+  await dialog.getByLabel('Dirección del lugar (opcional)', { exact: true }).fill('Dirección de prueba');
+  await dialog.getByRole('button', { name: 'Usar este lugar', exact: true }).click();
+  await expect(dialog.getByLabel('Comercio o descripción')).toHaveValue('Comercio Elegido');
+  await dialog.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  let state = await (await request.get(`${api}/state`)).json();
+  expect(state.transactions[0].place).toMatchObject({ name: 'Comercio Elegido', latitude: 4.65, longitude: -74.15, source: 'google-link', address: 'Dirección de prueba' });
+  await page.getByRole('button', { name: 'Comercio Elegido', exact: true }).click();
+  dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await expect(dialog.locator('.selected-place')).toContainText('Comercio Elegido');
+  await expect(dialog.locator('.selected-place').getByRole('link', { name: 'Ver en Maps' })).not.toHaveAttribute('href', /query_place_id/);
+  await dialog.getByText('Revisar lugar o escribir coordenadas', { exact: true }).click();
+  await dialog.getByLabel('Nombre del lugar', { exact: true }).fill('Lugar corregido');
+  await dialog.getByLabel('Latitud del lugar', { exact: true }).fill('4,7');
+  await dialog.getByLabel('Longitud del lugar', { exact: true }).fill('-74,2');
+  await dialog.getByRole('button', { name: 'Usar este lugar', exact: true }).click();
+  await expect(dialog.locator('.selected-place')).toContainText('Lugar corregido');
+  await dialog.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  state = await (await request.get(`${api}/state`)).json();
+  expect(state.transactions[0].place).toMatchObject({ name: 'Lugar corregido', latitude: 4.7, longitude: -74.2, source: 'manual' });
+  await page.getByRole('button', { name: 'Lugar corregido', exact: true }).click();
+  dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await dialog.getByRole('button', { name: 'Quitar lugar', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  state = await (await request.get(`${api}/state`)).json();
+  expect(state.transactions[0].place).toBeUndefined();
+});
+
+test('review edits can correct a delayed SMS location with a short map link and preserve phone evidence', async ({ page, request }, info) => {
+  await capturedMovement(request, false);
+  const original = (await (await request.get(`${api}/state`)).json()).observations[0].location;
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.route('**/api/places/resolve-link', route => route.fulfill({ json: { latitude: 4.65, longitude: -74.15, name: 'Comercio Correcto', approximate: false, url: 'https://www.google.com/maps/place/Comercio+Correcto/data=!3d4.65!4d-74.15' } }));
+  await page.goto('./#/revisar');
+  await page.getByRole('button', { name: 'Editar antes de guardar', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar antes de guardar', exact: true });
+  await expect(dialog.locator('.captured-address > p')).toBeVisible();
+  await dialog.getByLabel('Enlace de Google Maps', { exact: true }).fill('https://maps.app.goo.gl/synthetic-link');
+  await dialog.getByRole('button', { name: 'Leer enlace', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Usar este lugar', exact: true }).click();
+  await expect(dialog.locator('.selected-place')).toContainText('Comercio Correcto');
+  await expect(dialog.locator('.captured-address > p')).toContainText('Calle de Prueba');
+  await dialog.locator('.selected-place').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('corrected-location.png') });
+  expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await dialog.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  const state = await (await request.get(`${api}/state`)).json();
+  expect(state.transactions).toHaveLength(1);
+  expect(state.transactions[0].place).toMatchObject({ name: 'Comercio Correcto', latitude: 4.65, longitude: -74.15, source: 'google-link' });
+  expect(state.observations[0].location).toEqual(original);
+  expect(state.observations[0].status).toBe('linked');
+});
+
+test('camera-center links require explicit confirmation and unsupported links do not erase a place', async ({ page, request }) => {
+  await capturedMovement(request);
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.goto('./#/movimientos');
+  await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await dialog.getByLabel('Enlace de Google Maps', { exact: true }).fill('https://www.google.com/maps/@4.7,-74.2,17z');
+  await dialog.getByRole('button', { name: 'Leer enlace', exact: true }).click();
+  await expect(dialog.getByText(/solo indica el centro del mapa/)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Usar este lugar', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Confirma las coordenadas');
+  await expect(dialog.locator('.selected-place')).toHaveCount(0);
+  await dialog.getByRole('checkbox', { name: /Confirmo que las coordenadas/ }).check();
+  await dialog.getByRole('button', { name: 'Usar este lugar', exact: true }).click();
+  await expect(dialog.locator('.selected-place')).toBeVisible();
+  await dialog.getByLabel('Enlace de Google Maps', { exact: true }).fill('https://evil.invalid/maps?q=4,-74');
+  await dialog.getByRole('button', { name: 'Leer enlace', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('no corresponde a Google Maps');
+  await expect(dialog.locator('.selected-place')).toBeVisible();
 });

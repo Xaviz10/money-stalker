@@ -51,9 +51,11 @@ export function CaptureMap({ captured, place }: { captured: CapturedLocation[]; 
   if (!captured.length && !place) return null;
   return <section className="capture-map" aria-label="Mapa de la ubicación del movimiento">
     <h3>Ubicación del movimiento</h3>
-    {status === 'loading' && <p role="status" className="small-note">Cargando mapa…</p>}
-    <div ref={node} className="location-map" aria-label="Mapa de la ubicación capturada" hidden={status === 'error'} />
-    {status === 'error' && <p role="status" className="small-note">No se pudo cargar el mapa. La ubicación sigue guardada; usa los enlaces para abrirla.</p>}
+    <div className="capture-map-frame">
+      <div ref={node} className="location-map" aria-label="Mapa de la ubicación capturada" hidden={status === 'error'} />
+      {status === 'loading' && <p role="status" className="map-status small-note">Cargando mapa…</p>}
+      {status === 'error' && <p role="status" className="map-status small-note">No se pudo cargar el mapa. Las coordenadas siguen disponibles; usa los enlaces para abrirlas.</p>}
+    </div>
     <small>Azul: ubicación del teléfono. Verde: negocio confirmado por ti. La ubicación capturada no confirma el comercio.</small>
   </section>;
 }

@@ -578,7 +578,9 @@ export function exportRecords(
       UbicacionLugar: t.place
         ? `${t.place.latitude.toFixed(5)},${t.place.longitude.toFixed(5)}`
         : "",
-      GooglePlaceID: t.place?.id ?? "",
+      GooglePlaceID: t.place && (!t.place.source || t.place.source === 'google') ? t.place.id : "",
+      OrigenLugar: t.place ? t.place.source ?? 'google' : "",
+      EnlaceLugar: t.place?.url ?? "",
       Referencia: t.reference ?? "",
       Nota: t.note,
     }));
@@ -605,12 +607,14 @@ export function exportRecords(
     "DireccionLugar",
     "UbicacionLugar",
     "GooglePlaceID",
+    "OrigenLugar",
+    "EnlaceLugar",
     "Referencia",
     "Nota",
   ];
   if (format === "csv") for (const value of valuationRecords) records.push({
     ID: value.ID, Fecha: value.Fecha, Cuenta: value.Cuenta, Destino: "", Tipo: "valoracion", ValorCOP: value.ValorDeclaradoCOP, Moneda: "COP", Comercio: "Valor declarado de inversión", Categoria: "", Estado: value.Estado,
-    Evidencias: "", Ubicaciones: "", DetalleUbicaciones: "[]", Lugar: "", DireccionLugar: "", UbicacionLugar: "", GooglePlaceID: "", Referencia: "", Nota: `${value.Nota} · Antes: ${value.ValorAnteriorCOP} COP · Ajuste: ${value.AjusteCOP} COP · ${value.Registrada}`,
+    Evidencias: "", Ubicaciones: "", DetalleUbicaciones: "[]", Lugar: "", DireccionLugar: "", UbicacionLugar: "", GooglePlaceID: "", OrigenLugar: "", EnlaceLugar: "", Referencia: "", Nota: `${value.Nota} · Antes: ${value.ValorAnteriorCOP} COP · Ajuste: ${value.AjusteCOP} COP · ${value.Registrada}`,
   });
   const sanitized = records.map((row) =>
     Object.fromEntries(Object.entries(row).map(([k, v]) => [k, safeCell(v)])),

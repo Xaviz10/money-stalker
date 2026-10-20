@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
+import { PlacePicker } from "./PlacePicker";
 import { CaptureMap } from "./CaptureMap";
 import { appleMapsURL, capturedAddress, googleMapsURL } from "../../domain/location";
 import type { Capture, TransactionPlace } from "../../domain/model";
@@ -30,10 +31,12 @@ function locationTime(value: string) {
 
 export function TransactionMap({
   captured,
+  merchant,
   place,
   onPlaceChange,
 }: {
   captured: CapturedLocation[];
+  merchant: string;
   place?: TransactionPlace;
   onPlaceChange: (place?: TransactionPlace) => void;
 }) {
@@ -91,6 +94,7 @@ export function TransactionMap({
           if (!selectedPlace.id || !selectedPlace.location) return;
           const next = {
             id: selectedPlace.id,
+            source: 'google' as const,
             name: selectedPlace.displayName || "Lugar seleccionado",
             address: selectedPlace.formattedAddress || "",
             latitude: selectedPlace.location.lat(),
@@ -175,6 +179,7 @@ export function TransactionMap({
           ))}
         </div>
       )}
+      <PlacePicker merchant={merchant} onChoose={onPlaceChange} />
       <CaptureMap captured={captured} place={place} />
       {mapsKey && <details className="google-place-picker" onToggle={event => setGoogleOpen(event.currentTarget.open)}>
         <summary>Buscar y confirmar un negocio (Google)</summary>
@@ -188,11 +193,13 @@ export function TransactionMap({
         <div className="selected-place">
           <div>
             <strong>{place.name}</strong>
+            <small>Lugar elegido para este movimiento</small>
+            <small>{place.latitude.toFixed(6)}, {place.longitude.toFixed(6)}</small>
             {place.address && <small>{place.address}</small>}
           </div>
           <div>
             <a
-              href={googleMapsURL(place.latitude, place.longitude, place.id)}
+              href={googleMapsURL(place.latitude, place.longitude, !place.source || place.source === 'google' ? place.id : undefined)}
               target="_blank"
               rel="noreferrer"
             >

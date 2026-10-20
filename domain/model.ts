@@ -23,6 +23,8 @@ const coordinate = z.object({
 });
 export const transactionPlaceSchema = coordinate.extend({
   id: text.min(1), name: text.min(1), address: z.string().trim().max(500).default(''),
+  source: z.enum(['google', 'google-link', 'manual']).optional(),
+  url: z.url({ protocol: /^https$/ }).max(2000).refine(value => { const parsed = new URL(value); return !parsed.username && !parsed.password; }).optional(),
 });
 export const accountSchema = z.object({
   id, name: text.min(1), kind: z.enum(['bank', 'cash', 'credit', 'pocket', 'investment']), openingMinor: minor,

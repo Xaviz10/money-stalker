@@ -1411,6 +1411,7 @@ function TransactionDialog({
           </summary>
           {locationOpen && (
             <TransactionMap
+              merchant={merchant}
               captured={locationEvidence.map(
                 (observation) => observation.location!,
               )}
