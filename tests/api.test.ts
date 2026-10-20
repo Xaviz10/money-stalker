@@ -212,3 +212,66 @@ describe('import lifecycle and retries', () => {
     expect((await repo.batch('owner', b.id))?.status).toBe('done'); expect((await repo.read('owner')).transactions).toHaveLength(25);
   });
 });
+
+
+it('persists manual investment values in the owner ledger, preserves idempotency and rejects other products or owners', async () => {
+  const { repo, send } = await setup();
+  await send('POST', '/accounts', { id: 'investment', name: 'Inversión sintética', kind: 'investment', openingMinor: '1000000', openingDate: '2026-01-01', eligible: true });
+  const input = { id: 'manual-value', accountId: 'investment', date: '2026-10-17', valueMinor: '1200000', note: 'Valor declarado' };
+  expect((await send('POST', '/investment-values', input)).status).toBe(201);
+  expect((await send('POST', '/investment-values', input)).status).toBe(201);
+  const state = await repo.read('owner');
+  expect(state.valuations).toHaveLength(1);
+  expect(state.accounts.find(account => account.id === 'investment')?.eligible).toBe(false);
+  expect(persistedStateItems(state).has('valuations#manual-value')).toBe(true);
+  expect((await send('POST', '/investment-values', { ...input, id: 'wrong-kind', accountId: 'bank' })).status).toBe(400);
+  expect((await send('POST', '/investment-values', input, 'other-owner')).status).toBe(400);
+  expect((await send('POST', '/undo', { auditId: 'valuation:manual-value' })).status).toBe(200);
+  expect((await repo.read('owner')).valuations[0].voided).toBe(true);
+});
+
+
+it('remembers a renamed investment merchant for CSV previews, freezes classification, and compares only movements predating upload', async () => {
+  const { repo, files, send } = await setup();
+  await send('POST', '/categories', { id: 'investment-category', name: 'Aportes', scope: 'expense' });
+  await send('POST', '/transactions', { id: 'original-investment', accountId: 'bank', date: '2026-10-12', kind: 'expense', amountMinor: '10000000', merchant: 'FONDO ORIGINAL' });
+  const edited = await send('PATCH', '/transactions/original-investment', {
+    changes: { kind: 'transfer', counterAccountId: 'fund', merchant: 'Fondo renombrado', categoryId: 'investment-category', note: 'Aporte programado', investmentProduct: { id: 'fund', name: 'Plan a largo plazo' } },
+    expectedRevision: 1, rememberMerchant: true,
+  });
+  expect(edited.status).toBe(200);
+  let state = await repo.read('owner');
+  expect(state.aliases.find(rule => rule.merchant === 'fondo original')).toMatchObject({ investmentAccountId: 'fund', categoryId: 'investment-category', displayMerchant: 'Fondo renombrado' });
+  const bytes = Buffer.from('Fecha;Descripcion;Valor;Moneda;Tipo\n2026-10-12;FONDO ORIGINAL;100.000,00;COP;gasto\n2026-10-13;FONDO ORIGINAL;200.000,00;COP;gasto\n2026-10-13;FONDO ORIGINAL;200.000,00;COP;gasto\n2026-10-14;FONDO ORIGINAL;150.000,00;COP;gasto');
+  const created = await send('POST', '/imports', { filename: 'investment.csv', size: bytes.length, accountId: 'bank', profile: 'cop-interchange-v1' });
+  const batch = (created.body as { batch: { id: string; originalKey: string } }).batch;
+  await files.put(batch.originalKey, bytes);
+  await send('POST', '/transactions', { id: 'after-upload', accountId: 'bank', counterAccountId: 'fund', date: '2026-10-14', kind: 'transfer', amountMinor: '15000000', merchant: 'Fondo renombrado' });
+  expect((await send('POST', `/imports/${batch.id}/preview`, {})).body).toMatchObject({ accepted: 3, duplicates: 1 });
+  const preview = (await send('GET', `/imports/${batch.id}`)).body as { rows: { status: string; observation: { kind: string; counterAccountId: string; categoryId: string; note: string } }[] };
+  expect(preview.rows.map(row => row.status)).toEqual(['duplicate', 'accepted', 'accepted', 'accepted']);
+  for (const row of preview.rows) expect(row.observation).toMatchObject({ kind: 'transfer', counterAccountId: 'fund', categoryId: 'investment-category', note: 'Aporte programado' });
+  // A changed rule must not redirect an already reviewed preview at commit time.
+  await repo.mutate('owner', s => { for (const rule of s.aliases) rule.categoryId = 'restaurants'; });
+  await send('POST', `/imports/${batch.id}/commit`, { includeDuplicateRows: [] });
+  for (const job of await repo.pendingJobs()) await processJob(repo, files, 'owner', job.id);
+  state = await repo.read('owner');
+  expect(state.transactions).toHaveLength(5);
+  expect(state.transactions.filter(movement => movement.observationIds.length).every(movement => movement.kind === 'transfer' && movement.counterAccountId === 'fund' && movement.categoryId === 'investment-category')).toBe(true);
+  expect((await send('GET', '/dashboard')).body).toMatchObject({ investmentsMinor: '80000000', availableMinor: '20000000', spendingMinor: '0', incomeMinor: '0' });
+});
+
+it('creates an inline investment atomically, supports retries, and rolls back invalid movements', async () => {
+  const { repo, send } = await setup();
+  const input = { id: 'inline', accountId: 'bank', counterAccountId: 'new-fund', date: '2026-10-20', kind: 'transfer', amountMinor: '1000000', merchant: 'Merchant de prueba', investmentProduct: { id: 'new-fund', name: 'Nombre elegido' }, rememberMerchant: true };
+  expect((await send('POST', '/transactions', input)).status).toBe(201);
+  expect((await send('POST', '/transactions', input)).status).toBe(201);
+  let state = await repo.read('owner');
+  expect(state.accounts.filter(account => account.kind === 'investment')).toHaveLength(1);
+  expect(state.accounts.find(account => account.id === 'new-fund')).toMatchObject({ name: 'Nombre elegido', openingMinor: '0', openingDate: '2026-01-01', eligible: false });
+  expect(state.transactions).toHaveLength(1);
+  expect(state.aliases[0]).toMatchObject({ investmentAccountId: 'new-fund' });
+  expect((await send('POST', '/transactions', { ...input, id: 'bad', accountId: 'missing', counterAccountId: 'bad-fund', investmentProduct: { id: 'bad-fund', name: 'No se debe crear' } })).status).toBe(400);
+  state = await repo.read('owner');
+  expect(state.accounts.some(account => account.id === 'bad-fund')).toBe(false);
+});

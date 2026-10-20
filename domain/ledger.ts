@@ -1,9 +1,11 @@
-import { accountSchema, billSchema, categorySchema, instrumentSchema, settingsSchema, transactionInput,
+import { accountSchema, billSchema, categorySchema, instrumentSchema, settingsSchema, transactionInput, valuationInput, movementOptionsSchema,
   DomainError, normalizeUnlinkedTransfer, requireValue, type State, type Transaction, type TransactionInput, type Observation, type Entry, type Account } from './model';
+import { ensureWithdrawalCash } from './cash';
 import { bogotaDate, nextPayday } from './money';
 
 const clone = <T>(value: T): T => structuredClone(value);
-export const merchantKey = (value: string) => value.normalize('NFKC').trim().toLocaleLowerCase('es-CO').replace(/\s+/g, ' ');
+export { merchantKey } from './merchant-rules';
+import { merchantKey, rememberMerchant } from './merchant-rules';
 type ComparableMovement = Pick<TransactionInput, 'accountId' | 'counterAccountId' | 'date' | 'amountMinor' | 'kind' | 'merchant' | 'reference'>;
 export function duplicateTransactions(state: State, movement: ComparableMovement): Transaction[] {
   return state.transactions.filter(t => !t.voided && t.accountId === movement.accountId
@@ -16,6 +18,7 @@ function captureCandidates(state: State, observation: Observation): Transaction[
   return state.transactions.filter(t => !t.voided && t.accountId === observation.accountId && (
     (observation.reference && t.reference === observation.reference) ||
     (t.amountMinor === observation.amountMinor && t.kind === observation.kind
+      && (observation.kind !== 'transfer' || t.counterAccountId === observation.counterAccountId)
       && Math.abs(Date.parse(t.date) - Date.parse(observation.date!)) <= 7 * 86400000)
   ));
 }
@@ -48,9 +51,19 @@ function linkBill(state: State, t: Transaction) {
   if (bill.amountMinor !== t.amountMinor) throw new DomainError('El pago de la factura debe coincidir con su valor; ajusta la factura primero');
   bill.paidTransactionId = t.id;
 }
-export function addTransaction(state: State, input: unknown, at: string, observationId?: string): Transaction {
+function newInvestmentForMovement(state: State, movement: TransactionInput, input: unknown) {
+  const options = movementOptionsSchema.parse(input);
+  if (!options.investmentProduct) return undefined;
+  if (movement.kind !== 'transfer' || movement.counterAccountId !== options.investmentProduct.id) throw new DomainError('El producto nuevo debe ser el destino de la transferencia');
+  if (state.accounts.some(account => account.id === options.investmentProduct!.id)) throw new DomainError('El identificador del producto ya existe', 409);
+  const source = findAccount(state, movement.accountId);
+  return accountSchema.parse({ ...options.investmentProduct, kind: 'investment', openingMinor: '0', openingDate: source.openingDate < movement.date ? source.openingDate : movement.date, eligible: false });
+}
+export function addTransaction(state: State, input: unknown, at: string, observationId?: string, applyMerchantDefaults = true): Transaction {
   const value = transactionInput.parse(input);
-  const requestSignature = JSON.stringify(value);
+  const options = movementOptionsSchema.parse(input);
+  if (options.rememberMerchant && !value.merchant.trim()) throw new DomainError('Agrega el comercio antes de guardar una regla');
+  const requestSignature = JSON.stringify({ ...value, ...(options.investmentProduct ? { investmentProduct: options.investmentProduct } : {}) });
   if (value.date > bogotaDate(new Date(at))) throw new DomainError('Registra movimientos realizados, no ingresos o gastos futuros');
   const existing = state.transactions.find(t => t.id === value.id);
   if (existing) {
@@ -58,17 +71,26 @@ export function addTransaction(state: State, input: unknown, at: string, observa
     if (existing.requestSignature !== requestSignature) throw new DomainError('Identificador reutilizado para un movimiento distinto', 409);
     return existing;
   }
-  const rule = state.aliases.find(a => a.merchant === merchantKey(value.merchant));
-  if (value.categoryId === 'uncategorized' && rule) value.categoryId = rule.categoryId;
+  const product = newInvestmentForMovement(state, value, input);
+  const prospective = product ? { ...state, accounts: [...state.accounts, product] } : state;
+  const rule = applyMerchantDefaults ? state.aliases.find(a => a.merchant === merchantKey(value.merchant)) : undefined;
+  const category = state.categories.find(item => item.id === rule?.categoryId);
+  if (value.categoryId === 'uncategorized' && rule && category && (category.scope === 'both' || category.scope === (value.kind === 'income' ? 'income' : 'expense'))) value.categoryId = rule.categoryId;
   if (!value.note && rule?.note) value.note = rule.note;
-  const t: Transaction = { ...value, entries: entries(state, value), observationIds: observationId ? [observationId] : [], revision: 1, requestSignature };
+  const t: Transaction = { ...value, entries: entries(prospective, value), observationIds: observationId ? [observationId] : [], revision: 1, requestSignature };
   linkBill(state, t);
+  if (product) state.accounts.push(product);
   state.transactions.push(t);
+  if (options.rememberMerchant) rememberMerchant(state, t);
   state.audit.push({ id: `create:${t.id}`, at, action: 'create', transactionId: t.id });
   return t;
 }
 export function configure(state: State, kind: string, input: unknown) {
-  if (kind === 'settings') { state.settings = settingsSchema.parse(input); return; }
+  if (kind === 'settings') {
+    const next = settingsSchema.parse({ ...state.settings, ...(typeof input === 'object' && input ? input : {}) });
+    if (next.cashAccountId && !state.accounts.some(a => a.id === next.cashAccountId && a.kind === 'cash')) throw new DomainError('Selecciona una cuenta de efectivo para los retiros');
+    state.settings = next; return;
+  }
   if (kind === 'accounts') {
     const item = accountSchema.parse(input), old = state.accounts.find(a => a.id === item.id);
     if (item.parentAccountId) {
@@ -79,13 +101,18 @@ export function configure(state: State, kind: string, input: unknown) {
     }
     if (item.kind !== 'bank' && state.accounts.some(a => a.parentAccountId === item.id))
       throw new DomainError('Desvincula las tarjetas de crédito antes de cambiar el tipo de cuenta');
-    if (old && state.transactions.some(t => t.accountId === old.id || t.counterAccountId === old.id)
+    const aliasKey = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const aliases = (item.captureAliases ?? []).map(aliasKey);
+    if (new Set(aliases).size !== aliases.length || aliases.some(alias => state.accounts.some(account => account.id !== item.id && account.captureAliases?.some(value => aliasKey(value) === alias)) || state.instruments.some(instrument => instrument.accountId !== item.id && instrument.aliases.some(value => aliasKey(value) === alias)))) throw new DomainError('Este alias ya identifica otro producto');
+    if (item.kind === 'pocket' || item.kind === 'investment') item.eligible = false;
+    if (old && (state.transactions.some(t => t.accountId === old.id || t.counterAccountId === old.id) || (state.valuations ?? []).some(v => v.accountId === old.id))
       && ['kind', 'openingMinor', 'openingDate'].some(k => old[k as keyof Account] !== item[k as keyof Account]))
       throw new DomainError('No cambies el saldo inicial de una cuenta con movimientos; registra y documenta una corrección');
     upsert(state.accounts, item); return;
   }
   if (kind === 'instruments') {
     const item = instrumentSchema.parse(input); findAccount(state, item.accountId);
+    if (item.aliases.some(alias => state.accounts.some(account => account.id !== item.accountId && account.captureAliases?.some(value => merchantKey(value) === merchantKey(alias))))) throw new DomainError('Este alias ya identifica otro producto');
     if (state.instruments.some(i => i.id !== item.id && i.aliases.some(a => item.aliases.includes(a)))) throw new DomainError('Alias de tarjeta duplicado');
     upsert(state.instruments, item); return;
   }
@@ -136,11 +163,18 @@ export function recordStatement(state: State, input: Observation, at: string): O
   if (input.source !== 'statement') throw new DomainError('Solo los extractos se registran como confirmados');
   const existing = state.observations.find(o => o.id === input.id);
   if (existing) return existing;
+  if (input.cashWithdrawal) {
+    const source = findAccount(state, requireValue(input.accountId, 'Cuenta origen desconocida'));
+    const day = requireValue(input.date, 'El retiro no contiene una fecha');
+    const destination = ensureWithdrawalCash(state, source.openingDate < day ? source.openingDate : day, input.counterAccountId);
+    if (!destination) throw new DomainError('Selecciona la cuenta de efectivo para los retiros antes de confirmar');
+    input = { ...input, kind: 'transfer', counterAccountId: destination };
+  }
   const transaction = addTransaction(state, { id: `obs:${input.id}`,
     accountId: requireValue(input.accountId, 'El extracto no identifica la cuenta'),
     counterAccountId: input.counterAccountId, date: requireValue(input.date, 'El extracto no contiene una fecha'),
     amountMinor: requireValue(input.amountMinor, 'El extracto no contiene un valor'), kind: input.kind,
-    merchant: input.merchant, reference: input.reference, status: 'posted' }, at, input.id);
+    merchant: input.merchant, reference: input.reference, categoryId: input.categoryId ?? 'uncategorized', note: input.note ?? '', status: 'posted' }, at, input.id, false);
   const observation = clone(input);
   observation.status = 'linked'; observation.candidates = []; observation.transactionId = transaction.id;
   state.observations.push(observation);
@@ -152,6 +186,7 @@ export function mergeObservation(state: State, observationId: string, transactio
   if (observation.status !== 'review') throw new DomainError('La evidencia ya fue revisada', 409);
   const t = requireValue(state.transactions.find(t => t.id === transactionId && !t.voided), 'Movimiento desconocido');
   if (observation.accountId && observation.accountId !== t.accountId) throw new DomainError('No se pueden unir cuentas distintas');
+  if (observation.kind === 'transfer' && (t.kind !== 'transfer' || observation.counterAccountId !== t.counterAccountId)) throw new DomainError('Las transferencias deben tener el mismo destino para unirse');
   const beforeTransaction = clone(t), beforeObservation = clone(observation);
   if (observation.source === 'statement') {
     if (!observation.amountMinor || !observation.date) throw new DomainError('Extracto incompleto');
@@ -187,10 +222,12 @@ export function editTransaction(state: State, transactionId: string, input: unkn
   const changes = Object.fromEntries(Object.entries(input && typeof input === 'object' ? input : {}).map(([k, v]) => [k, v === null ? undefined : v]));
   const value = transactionInput.parse({ ...t, ...changes, id: t.id });
   if (value.date > bogotaDate(new Date(at))) throw new DomainError('No se pueden registrar movimientos futuros');
-  const journal = entries(state, value);
+  const product = newInvestmentForMovement(state, value, input);
+  const journal = entries(product ? { ...state, accounts: [...state.accounts, product] } : state, value);
+  if (product) state.accounts.push(product);
   for (const bill of state.bills) if (bill.paidTransactionId === t.id) delete bill.paidTransactionId;
   Object.assign(t, value, { entries: journal, revision: t.revision + 1 }); linkBill(state, t);
-  if (remember && t.merchant) upsert(state.aliases, { id: merchantKey(t.merchant), merchant: merchantKey(t.merchant), categoryId: t.categoryId, note: t.note });
+  if (remember && t.merchant) rememberMerchant(state, t, beforeTransaction.merchant);
   state.audit.push({ id: `edit:${t.id}:${t.revision}`, at, action: 'edit', transactionId: t.id, beforeTransaction, expectedRevision: t.revision });
 }
 export function deleteTransaction(state: State, transactionId: string, at: string, expectedRevision?: number) {
@@ -203,7 +240,13 @@ export function deleteTransaction(state: State, transactionId: string, at: strin
 }
 export function undo(state: State, auditId: string, at: string) {
   const a = requireValue(state.audit.find(a => a.id === auditId), 'Cambio desconocido');
-  if (a.undone || (!a.beforeObservation && !a.beforeTransaction)) throw new DomainError('Este cambio no puede deshacerse');
+  if (a.undone || (!a.beforeObservation && !a.beforeTransaction && !a.valuationId)) throw new DomainError('Este cambio no puede deshacerse');
+  if (a.valuationId) {
+    const valuation = requireValue(state.valuations.find(v => v.id === a.valuationId), 'Valoración desconocida');
+    const active = state.valuations.filter(v => v.accountId === valuation.accountId && !v.voided).sort((a, b) => a.sequence - b.sequence);
+    if (active.at(-1)?.id !== valuation.id) throw new DomainError('Deshaz primero la valoración más reciente', 409);
+    valuation.voided = true;
+  }
   if (a.transactionId) {
     const t = requireValue(state.transactions.find(t => t.id === a.transactionId), 'Movimiento desconocido');
     if (t.revision !== a.expectedRevision) throw new DomainError('Hay cambios posteriores; revísalos primero', 409);
@@ -229,7 +272,11 @@ export function dashboard(state: State, today: string) {
     const delta = BigInt(e.debitMinor) - BigInt(e.creditMinor);
     balances[a.id] += a.kind === 'credit' ? -delta : delta;
   }
-  const liquid = state.accounts.filter(a => a.kind !== 'credit' && a.eligible).reduce((sum, a) => sum + balances[a.id], 0n);
+  for (const value of state.valuations ?? []) {
+    if (!value.voided && value.date <= today && balances[value.accountId] !== undefined) balances[value.accountId] += BigInt(value.adjustmentMinor);
+  }
+  const productTotal = (kind: Account['kind']) => state.accounts.filter(a => a.kind === kind).reduce((sum, a) => sum + balances[a.id], 0n).toString();
+  const liquid = state.accounts.filter(a => (a.kind === 'bank' || a.kind === 'cash') && a.eligible).reduce((sum, a) => sum + balances[a.id], 0n);
   const cardDebt = state.accounts.filter(a => a.kind === 'credit').reduce((sum, a) => sum + (balances[a.id] > 0n ? balances[a.id] : 0n), 0n);
   const payday = nextPayday(today, state.settings.payday);
   const dueBills = state.bills.filter(b => !b.paidTransactionId && b.dueDate < payday);
@@ -244,7 +291,7 @@ export function dashboard(state: State, today: string) {
   const spending = month.filter(t => ['expense', 'refund'].includes(t.kind)).reduce((sum, t) => sum + (t.kind === 'refund' ? -1n : 1n) * BigInt(t.amountMinor), 0n);
   const income = month.filter(t => t.kind === 'income').reduce((sum, t) => sum + BigInt(t.amountMinor), 0n);
   const categorySpending = state.categories.map(c => ({ ...c, amountMinor: month.filter(t => t.categoryId === c.id && ['expense', 'refund'].includes(t.kind)).reduce((sum, t) => sum + (t.kind === 'refund' ? -1n : 1n) * BigInt(t.amountMinor), 0n).toString() }));
-  return { today, nextPayday: payday, liquidMinor: liquid.toString(), cardDebtMinor: cardDebt.toString(), billsMinor: bills.toString(),
+  return { today, cashMinor: productTotal('cash'), pocketsMinor: productTotal('pocket'), investmentsMinor: productTotal('investment'), nextPayday: payday, liquidMinor: liquid.toString(), cardDebtMinor: cardDebt.toString(), billsMinor: bills.toString(),
     reserveMinor: state.settings.reserveMinor, uncertainMinor: uncertain.toString(),
     availableMinor: (liquid - cardDebt - bills - BigInt(state.settings.reserveMinor) - uncertain).toString(),
     spendingMinor: spending.toString(), incomeMinor: income.toString(), categorySpending, dueBills,
@@ -269,4 +316,26 @@ export function dashboard(state: State, today: string) {
     }),
     lastStatementAt: state.observations.filter(o => o.source === 'statement' && o.status === 'linked').map(o => o.receivedAt).sort().at(-1),
   };
+}
+
+
+export function recordInvestmentValue(state: State, input: unknown, at: string) {
+  const value = valuationInput.parse(input);
+  const account = findAccount(state, value.accountId);
+  if (account.kind !== 'investment') throw new DomainError('Solo puedes valorar un producto de inversión');
+  state.valuations ??= [];
+  const existing = state.valuations.find(item => item.id === value.id);
+  if (existing) {
+    if (existing.accountId !== value.accountId || existing.date !== value.date || existing.valueMinor !== value.valueMinor || existing.note !== value.note) throw new DomainError('Identificador reutilizado para otra valoración', 409);
+    return existing;
+  }
+  if (value.date > bogotaDate(new Date(at)) || value.date < account.openingDate) throw new DomainError('La fecha debe estar entre el saldo inicial y hoy');
+  const latest = state.valuations.filter(item => item.accountId === account.id && !item.voided).sort((a, b) => a.sequence - b.sequence).at(-1);
+  if (latest && value.date < latest.date) throw new DomainError('Registra las valoraciones en orden de fecha');
+  const beforeMinor = dashboard(state, value.date).balances[account.id];
+  const sequence = Math.max(0, ...state.valuations.filter(item => item.accountId === account.id).map(item => item.sequence)) + 1;
+  const result = { ...value, at, sequence, beforeMinor, adjustmentMinor: (BigInt(value.valueMinor) - BigInt(beforeMinor)).toString() };
+  state.valuations.push(result);
+  state.audit.push({ id: `valuation:${value.id}`, at, action: 'valuation', valuationId: value.id });
+  return result;
 }

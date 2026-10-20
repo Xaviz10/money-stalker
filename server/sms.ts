@@ -2,6 +2,7 @@ import { date, type Account, type State } from "../domain/model";
 
 export type ParsedBankSMS = {
   matched: boolean;
+  cashWithdrawal?: boolean;
   parserVersion: "bancolombia-sms-v1";
   amountMinor?: string;
   date?: string;
@@ -78,8 +79,8 @@ export function parseBancolombiaSMS(message: string): ParsedBankSMS {
       date: parsedDate,
       merchant: clean(withdrawal[2]),
       kind: "transfer",
+      cashWithdrawal: true,
       instrumentHint: withdrawal[3],
-      // The owner confirms the cash destination in Review; never infer it from the ATM.
     };
 
   const purchase = text.match(
@@ -113,7 +114,7 @@ export function parseBancolombiaSMS(message: string): ParsedBankSMS {
     };
 
   const keyTransfer = text.match(
-    /Transferiste\s+((?:COP|\$)\s*[\d.,]+)\s+a\s+la\s+llave\s+([\w.+-]+)\s+desde\s+tu\s+cuenta\s+\*?(\d{4})\s+a\s+(.+?)\s+el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i,
+    /Transferiste\s+((?:COP|\$)\s*[\d.,]+)\s+a\s+la\s+llave\s+([\w.+-]+)\s+desde\s+tu\s+cuenta\s+\*?(\d{4})\s+(?:a|al)\s+(.+?)\s+el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i,
   );
   if (keyTransfer)
     return {
@@ -142,7 +143,7 @@ export function parseBancolombiaSMS(message: string): ParsedBankSMS {
     };
 
   const transfer = text.match(
-    /Transferiste\s+((?:COP|\$)\s*[\d.,]+)\s+desde\s+tu\s+cuenta\s+\*?(\d{4})\s+a\s+(.+?)\s+el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i,
+    /Transferiste\s+((?:COP|\$)\s*[\d.,]+)\s+desde\s+tu\s+cuenta\s+\*?(\d{4})\s+(?:a|al)\s+(.+?)\s+el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i,
   );
   if (transfer) {
     const service = serviceHint(transfer[3]),
@@ -159,7 +160,7 @@ export function parseBancolombiaSMS(message: string): ParsedBankSMS {
           : "Transferencia bancaria",
       kind: "transfer",
       instrumentHint: transfer[2],
-      counterpartyHint: service,
+      counterpartyHint: service ?? clean(transfer[3].replace(/\*+\d+/g, "")),
       counterInstrumentHint: destination,
     };
   }
@@ -201,7 +202,7 @@ export function resolveCapturedAccount(
     .map((i) => state.accounts.find((a) => a.id === i.accountId))
     .filter((a): a is Account => Boolean(a) && (!kind || a!.kind === kind));
   const direct = state.accounts.filter(
-    (a) => (!kind || a.kind === kind) && accountTextMatches(a, hint),
+    (a) => (!kind || a.kind === kind) && (a.captureAliases?.some(alias => compact(alias) === key) || (!/^\d+$/.test(hint) && accountTextMatches(a, hint))),
   );
   const matches = [
     ...new Map(
@@ -226,8 +227,13 @@ export function resolveCapturedDestination(
   );
   if (byInstrument) return byInstrument;
   if (!parsed.counterpartyHint) return undefined;
-  const matches = state.accounts.filter((a) =>
-    accountTextMatches(a, parsed.counterpartyHint!),
-  );
+  const service = ["nequi", "bre-b"].includes(parsed.counterpartyHint);
+  const hint = clean(parsed.counterpartyHint);
+  const names = [hint, hint.replace(/^(?:tu|la|el)\s+/i, ""), hint.replace(/^(?:(?:tu|la|el)\s+)?(?:cuenta|bolsillo|inversion(?:es)?)\s+/i, "")].map(compact);
+  const matches = state.accounts.filter((account) => {
+    if (service) return accountTextMatches(account, hint);
+    if (parsed.counterInstrumentHint) return false;
+    return [account.name, ...(account.captureAliases ?? [])].some(alias => names.includes(compact(alias)));
+  });
   return matches.length === 1 ? matches[0].id : undefined;
 }

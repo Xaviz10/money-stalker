@@ -1,3 +1,4 @@
+import { classifyImportedMerchant } from "../domain/merchant-rules";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -11,6 +12,7 @@ import {
   mergeObservation,
   resolveObservation,
   refreshCaptureCandidates,
+  recordInvestmentValue,
   undo,
 } from "../domain/ledger";
 import { bogotaDate } from "../domain/money";
@@ -127,6 +129,9 @@ export function createAPI(repo: Repository, files: Files) {
         await repo.mutate(h, (s) => configure(s, path.slice(1), body));
         return { status: 200, body: { saved: true } };
       }
+      if (method === "POST" && path === "/investment-values") {
+        return { status: 201, body: await repo.mutate(h, state => recordInvestmentValue(state, body, now)) };
+      }
       if (method === "POST" && path === "/transactions") {
         const submitted = z
           .object({ duplicateConfirmed: z.boolean().optional() })
@@ -139,13 +144,13 @@ export function createAPI(repo: Repository, files: Files) {
             const movement = transactionInput.parse(input);
             if (
               !duplicateConfirmed &&
-              duplicateTransactions(s, movement).length
+              duplicateTransactions(s, movement).some(match => match.id !== movement.id)
             )
               throw new DomainError(
                 "Este movimiento parece estar registrado. Confirma si deseas guardarlo otra vez.",
                 409,
               );
-            return addTransaction(s, movement, now);
+            return addTransaction(s, input, now);
           }),
         };
       }
@@ -156,6 +161,7 @@ export function createAPI(repo: Repository, files: Files) {
             changes: z.record(z.string(), z.unknown()),
             remember: z.boolean().default(false),
             applyToSimilar: z.boolean().default(false),
+            rememberMerchant: z.boolean().default(false),
             expectedRevision: z.number().int().min(1),
           })
           .parse(body);
@@ -167,7 +173,7 @@ export function createAPI(repo: Repository, files: Files) {
               transaction[1],
               b.changes,
               now,
-              false,
+              b.rememberMerchant,
               b.expectedRevision,
             ),
           );
@@ -401,7 +407,8 @@ export function createAPI(repo: Repository, files: Files) {
           !profiles.some((p) => p.id === b.profile && p.verified)
         )
           throw new DomainError("Perfil no verificado");
-        if (!(await repo.read(h)).accounts.some((a) => a.id === b.accountId))
+        const beforeUpload = await repo.read(h);
+        if (!beforeUpload.accounts.some((a) => a.id === b.accountId))
           throw new DomainError("Cuenta desconocida");
         const batchId = randomUUID(),
           originalKey = `original/${h}/${batchId}/file`;
@@ -411,9 +418,11 @@ export function createAPI(repo: Repository, files: Files) {
           ...b,
           status: "uploading",
           originalKey,
+          comparisonKey: `normalized/${h}/${batchId}/comparison.json`,
           createdAt: now,
           next: 0,
         };
+        await files.put(batch.comparisonKey!, Buffer.from(JSON.stringify(beforeUpload.transactions.filter(transaction => !transaction.voided).map(transaction => transaction.id))));
         await repo.saveBatch(batch);
         return {
           status: 201,
@@ -438,10 +447,21 @@ export function createAPI(repo: Repository, files: Files) {
             now,
             profiles,
             state.accounts,
+            state.settings.cashAccountId,
           );
+          if (!batch.comparisonKey) throw new DomainError("Vuelve a subir el archivo para comparar solo con movimientos anteriores a la carga");
+          const priorIds = new Set(JSON.parse(Buffer.from(await files.get(batch.comparisonKey)).toString("utf8")) as string[]);
+          const comparisonState = { ...state, transactions: state.transactions.filter(transaction => priorIds.has(transaction.id)) };
           for (const row of preview.rows) {
             if (row.status !== "accepted" || !row.observation) continue;
-            const candidates = duplicateTransactions(state, {
+            try {
+              row.observation = classifyImportedMerchant(state, row.observation);
+            } catch (error) {
+              row.status = "rejected";
+              row.error = error instanceof DomainError ? error.message : "No se pudo aplicar la regla de este comercio";
+              continue;
+            }
+            const candidates = duplicateTransactions(comparisonState, {
               accountId: row.observation.accountId!,
               counterAccountId: row.observation.counterAccountId,
               date: row.observation.date!,

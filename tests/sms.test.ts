@@ -194,7 +194,7 @@ describe("Bancolombia SMS parsing", () => {
 
 describe("Bancolombia SMS capture", () => {
   it.each(formatCases)(
-    "persists $merchant in Review and keeps retries idempotent",
+    "captures $merchant and keeps retries idempotent",
     async ({ message, instrumentHint, kind, ...expected }) => {
       const state = emptyState();
       configure(state, "accounts", {
@@ -225,6 +225,13 @@ describe("Bancolombia SMS capture", () => {
       await processJob(repo, files, "owner", job.id);
       await processJob(repo, files, "owner", job.id);
       const result = await repo.read("owner");
+      if (message.includes("Retiraste")) {
+        expect(result.transactions).toHaveLength(1);
+        expect(result.transactions[0]).toMatchObject({ accountId: "source", counterAccountId: "cash:auto", amountMinor: expected.amountMinor, kind: "transfer" });
+        expect(result.observations[0].status).toBe("linked");
+        expect(result.accounts.filter(account => account.kind === "cash")).toHaveLength(1);
+        return;
+      }
       expect(result.transactions).toHaveLength(0);
       expect(result.observations).toHaveLength(1);
       expect(result.observations[0]).toMatchObject({

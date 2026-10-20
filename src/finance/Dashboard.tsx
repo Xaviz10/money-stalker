@@ -266,7 +266,7 @@ export function Dashboard({
             <strong className={BigInt(s.availableMinor) < 0n ? "negative" : ""}>
               {formatCOP(s.availableMinor)}
             </strong>
-            <p>Después de tus compromisos, en todas tus cuentas.</p>
+            <p>Después de tus compromisos{state.accounts.some(account => account.kind === "pocket" || account.kind === "investment") ? ", sin bolsillos ni inversiones." : ", en todas tus cuentas."}</p>
             <div
               className={`balance-status ${stale || s.incomplete ? "needs-attention" : ""}`}
             >
@@ -295,6 +295,11 @@ export function Dashboard({
             : "Sin extractos conciliados"}{" "}
           · El disponible depende de que tus datos estén completos.
         </p>
+        {state.accounts.some(account => ["cash", "pocket", "investment"].includes(account.kind)) && <section className="holdings-summary" aria-label="Dinero por tipo de producto"><dl>
+          {state.accounts.some(account => account.kind === "cash") && <div><dt>Efectivo</dt><dd>{formatCOP(s.cashMinor)}</dd><small>Incluido en el disponible si es elegible.</small></div>}
+          {state.accounts.some(account => account.kind === "pocket") && <div><dt>Disponible en bolsillos</dt><dd>{formatCOP(s.pocketsMinor)}</dd><small>Separado del disponible general.</small></div>}
+          {state.accounts.some(account => account.kind === "investment") && <div><dt>Dinero en inversiones</dt><dd>{formatCOP(s.investmentsMinor)}</dd><small>Valor declarado; sin rentabilidad automática.</small></div>}
+        </dl></section>}
         <Panel className="activity-panel">
           <div className="activity-toolbar">
             <div

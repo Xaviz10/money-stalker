@@ -38,9 +38,9 @@ export function AccountArtwork({
       name={
         account.kind === "credit"
           ? "card"
-          : account.kind === "cash"
+          : account.kind === "cash" || account.kind === "pocket"
             ? "wallet"
-            : "bank"
+            : account.kind === "investment" ? "overview" : "bank"
       }
       size={size}
     />

@@ -1,4 +1,4 @@
-import type { Account, State } from "../../domain/model";
+import { accountKindLabels, type Account, type State } from "../../domain/model";
 import { groupAccounts, netWorthMinor } from "../../domain/account-groups";
 import { formatCOP } from "../../domain/money";
 import { Icon } from "../design-system/ui";
@@ -34,9 +34,7 @@ export function AccountRail({
         <small>
           {a.kind === "credit"
             ? "Crédito · deuda"
-            : a.kind === "cash"
-              ? "Efectivo"
-              : "Cuenta bancaria"}
+            : accountKindLabels[a.kind]}
         </small>
         <b>{balances ? formatCOP(balances[a.id] ?? "0") : "—"}</b>
       </span>
@@ -105,6 +103,8 @@ export function AccountRail({
             {groups.cash.map((a) => row(a))}
           </section>
         )}
+        {groups.pockets.length > 0 && <section className="pocket-accounts"><h2>Bolsillos</h2>{groups.pockets.map(account => row(account))}</section>}
+        {groups.investments.length > 0 && <section className="investment-accounts"><h2>Inversiones</h2>{groups.investments.map(account => row(account))}</section>}
         {!state.accounts.length && (
           <div className="rail-empty">
             <Icon name="wallet" size={29} />

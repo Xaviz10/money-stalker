@@ -55,10 +55,12 @@ async function mock(page: Page, state: State) {
     failMatch: false,
     holdReads: false,
     writes: 0,
+    reads: 0,
   };
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/state") || path.endsWith("/dashboard")) {
+      if (path.endsWith("/state")) control.reads++;
       while (control.holdReads)
         await new Promise((resolve) => setTimeout(resolve, 30));
       if (control.failRead)
@@ -148,6 +150,8 @@ test("review explains amount changes, preserves a failed match, confirms success
   await expect(
     page.getByText("Al unir, el valor cambiará a $ 19.000 según el extracto."),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registrar otro movimiento", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Editar antes de guardar", exact: true })).toBeVisible();
   control.failMatch = true;
   await page.getByRole("button", { name: "Unir de todos modos" }).click();
   await expect(page.locator(".review-action-error")).toContainText(
@@ -229,4 +233,63 @@ test("compact financial operands keep digit groups intact and ledger controls se
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+
+test("refresh button reports progress, recovers from a timeout and can retry", async ({ page }) => {
+  await page.clock.install();
+  const control = await mock(page, fixture());
+  await page.goto("./");
+  const refresh = page.getByRole("button", { name: "Actualizar datos" });
+  await expect(refresh).toBeEnabled();
+  await page.clock.fastForward(500);
+  control.holdReads = true;
+  await refresh.click();
+  await expect(refresh).toBeDisabled();
+  await expect(refresh).toHaveAttribute("aria-busy", "true");
+  await page.clock.fastForward(15001);
+  await expect(page.getByRole("alert")).toContainText("La actualización tardó demasiado");
+  await expect(refresh).toBeEnabled();
+  control.holdReads = false;
+  await refresh.click();
+  await expect(page.locator(".action-notice")).toContainText("Datos actualizados.");
+  await expect(refresh).toHaveAttribute("aria-busy", "false");
+});
+
+test("returning to the app refreshes data once and preserves an open editor", async ({ page }) => {
+  await page.clock.install();
+  const state = fixture();
+  const control = await mock(page, state);
+  await page.goto("./");
+  await expect(page.getByRole("button", { name: "Actualizar datos" })).toBeEnabled();
+  await page.clock.fastForward(500);
+  await page.getByRole("button", { name: "Nuevo movimiento" }).click();
+  const editor = page.getByRole("dialog", { name: "Nuevo movimiento" });
+  await editor.getByLabel("Comercio o descripción").fill("Borrador sin guardar");
+  const reads = control.reads;
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.clock.fastForward(500);
+  expect(control.reads).toBe(reads);
+  state.accounts[0].openingMinor = "200000000";
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("pageshow"));
+  });
+  await page.clock.fastForward(250);
+  await expect.poll(() => control.reads).toBe(reads + 1);
+  await expect(page.locator(".available-total > strong")).toHaveText("$ 1.962.500");
+  await expect(editor.getByLabel("Comercio o descripción")).toHaveValue("Borrador sin guardar");
+  await editor.getByRole("button", { name: "Cerrar", exact: true }).click();
+  const focusedReads = control.reads;
+  state.accounts[0].openingMinor = "300000000";
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.clock.fastForward(250);
+  await expect.poll(() => control.reads).toBe(focusedReads + 1);
+  await expect(page.locator(".available-total > strong")).toHaveText("$ 2.962.500");
 });

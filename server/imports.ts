@@ -1,3 +1,4 @@
+import { DEFAULT_CASH_ID } from "../domain/cash";
 import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
 import {
@@ -292,6 +293,7 @@ export function parseImport(
   now: string,
   registry: Profile[] = profiles,
   accounts: Account[] = [],
+  cashAccountId?: string,
 ): { hash: string; rows: ImportRow[]; profile: string; skippedRows: number[] } {
   if (!bytes.length || bytes.length > MAX_FILE_BYTES)
     throw new DomainError("El archivo debe pesar entre 1 byte y 5 MB");
@@ -473,7 +475,11 @@ export function parseImport(
         accounts,
         accountId,
       );
-      const kind =
+      const cashWithdrawal = profile.id === "bancolombia-savings-quarterly-v1" && BigInt(amount) < 0n && /^retiros?\s+(?:(?:en|por)\s+)?cajeros?\b/.test(normalize(merchant));
+      const cash = accounts.filter(item => item.kind === "cash");
+      const withdrawalDestination = cash.some(item => item.id === cashAccountId) ? cashAccountId : cash.length === 1 ? cash[0].id : cash.length === 0 ? DEFAULT_CASH_ID : undefined;
+      if (cashWithdrawal && !withdrawalDestination) throw new DomainError("Selecciona el destino de los retiros en Cuentas y ajustes: hay varias cuentas de efectivo");
+      const kind = cashWithdrawal ? "transfer" :
         classified?.kind ??
         kinds[rawKind] ??
         (profile.signed ? inferredKind : undefined);
@@ -503,7 +509,8 @@ export function parseImport(
           currency: "COP",
           merchant: classified?.merchant ?? merchant,
           kind,
-          counterAccountId:
+          cashWithdrawal: cashWithdrawal || undefined,
+          counterAccountId: cashWithdrawal ? withdrawalDestination :
             classified?.counterAccountId ??
             (String(read(row, profile.columns.destination) ?? "").trim() ||
               undefined),
@@ -549,13 +556,13 @@ export function exportRecords(
         state.accounts.find((a) => a.id === t.accountId)?.name ?? t.accountId,
       Destino:
         state.accounts.find((a) => a.id === t.counterAccountId)?.name ?? "",
-      Tipo: t.kind,
+      Tipo: t.kind as string,
       ValorCOP: decimalCOP(t.amountMinor),
       Moneda: "COP",
       Comercio: t.merchant,
       Categoria:
         state.categories.find((c) => c.id === t.categoryId)?.name ?? "",
-      Estado: t.status,
+      Estado: t.status as string,
       Evidencias: t.observationIds.join("|"),
       Ubicaciones: state.observations
         .filter((o) => o.transactionId === t.id && o.location)
@@ -573,6 +580,11 @@ export function exportRecords(
       Referencia: t.reference ?? "",
       Nota: t.note,
     }));
+  const valuationRecords = (state.valuations ?? []).filter(value => !accountId || value.accountId === accountId).map(value => ({
+    ID: value.id, Cuenta: state.accounts.find(account => account.id === value.accountId)?.name ?? value.accountId,
+    Fecha: value.date, ValorAnteriorCOP: decimalCOP(value.beforeMinor), ValorDeclaradoCOP: decimalCOP(value.valueMinor),
+    AjusteCOP: decimalCOP(value.adjustmentMinor), Registrada: value.at, Nota: safeCell(value.note), Estado: value.voided ? "Anulada" : "Declarada",
+  }));
   const columns = [
     "ID",
     "Fecha",
@@ -593,6 +605,10 @@ export function exportRecords(
     "Referencia",
     "Nota",
   ];
+  if (format === "csv") for (const value of valuationRecords) records.push({
+    ID: value.ID, Fecha: value.Fecha, Cuenta: value.Cuenta, Destino: "", Tipo: "valoracion", ValorCOP: value.ValorDeclaradoCOP, Moneda: "COP", Comercio: "Valor declarado de inversión", Categoria: "", Estado: value.Estado,
+    Evidencias: "", Ubicaciones: "", Lugar: "", DireccionLugar: "", UbicacionLugar: "", GooglePlaceID: "", Referencia: "", Nota: `${value.Nota} · Antes: ${value.ValorAnteriorCOP} COP · Ajuste: ${value.AjusteCOP} COP · ${value.Registrada}`,
+  });
   const sanitized = records.map((row) =>
     Object.fromEntries(Object.entries(row).map(([k, v]) => [k, safeCell(v)])),
   );
@@ -636,6 +652,7 @@ export function exportRecords(
     ),
     "Categorias",
   );
+  if (valuationRecords.length) XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(valuationRecords.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, safeCell(value)])))), "Valoraciones");
   return {
     bytes: XLSX.write(book, { type: "buffer", bookType: "xlsx" }),
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

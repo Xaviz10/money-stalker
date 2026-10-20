@@ -25,18 +25,18 @@ export const transactionPlaceSchema = coordinate.extend({
   id: text.min(1), name: text.min(1), address: z.string().trim().max(500).default(''),
 });
 export const accountSchema = z.object({
-  id, name: text.min(1), kind: z.enum(['bank', 'cash', 'credit']), openingMinor: minor,
+  id, name: text.min(1), kind: z.enum(['bank', 'cash', 'credit', 'pocket', 'investment']), openingMinor: minor,
   openingDate: date, closingDay: z.number().int().min(1).max(31).optional(),
   dueDay: z.number().int().min(1).max(31).optional(), eligible: z.boolean().default(true),
   institution: text.optional(), institutionUrl: institutionUrl.optional(), imageDataUrl: accountImage.optional(),
-  parentAccountId: id.optional(),
+  parentAccountId: id.optional(), captureAliases: z.array(text.min(1).refine(value => !/\d{5,}/.test(value), 'Usa nombres o solo los últimos cuatro dígitos')).max(10).optional(),
 });
 export const instrumentSchema = z.object({ id, name: text.min(1), accountId: id, aliases: z.array(text.min(1)).max(10) });
 export const categorySchema = z.object({
   id, name: text.min(1), scope: z.enum(['expense', 'income', 'both']).default('expense'), parentId: id.optional(),
 });
 export const billSchema = z.object({ id, name: text.min(1), amountMinor: positive, dueDate: date, paidTransactionId: id.optional() });
-export const settingsSchema = z.object({ payday: z.number().int().min(1).max(31), reserveMinor: minor });
+export const settingsSchema = z.object({ payday: z.number().int().min(1).max(31), reserveMinor: minor, cashAccountId: id.optional() });
 export const transactionInput = z.object({
   id, accountId: id, counterAccountId: id.optional(), date, amountMinor: positive,
   kind: z.enum(['expense', 'income', 'transfer', 'refund']), merchant: text.default(''),
@@ -53,6 +53,7 @@ export const captureSchema = z.object({
     accuracy: z.number().min(0), observedAt: isoTimestamp }).optional(),
 }).strict();
 export type Account = z.infer<typeof accountSchema>;
+export const accountKindLabels: Record<Account['kind'], string> = { bank: 'Cuenta bancaria', cash: 'Efectivo', credit: 'Tarjeta de crédito', pocket: 'Bolsillo', investment: 'Inversión' };
 export type Instrument = z.infer<typeof instrumentSchema>;
 export type Category = z.infer<typeof categorySchema>;
 export type Bill = z.infer<typeof billSchema>;
@@ -67,15 +68,19 @@ export type Observation = {
   date?: string; accountId?: string; amountMinor?: string; currency: 'COP'; merchant: string;
   kind: TransactionInput['kind']; counterAccountId?: string; reference?: string;
   status: 'review' | 'linked' | 'ignored'; transactionId?: string; candidates: string[]; reason?: string;
-  location?: Capture['location']; parserVersion: string;
+  location?: Capture['location']; parserVersion: string; cashWithdrawal?: boolean; categoryId?: string; note?: string;
 };
+export const valuationInput = z.object({ id, accountId: id, date, valueMinor: minor, note: z.string().trim().max(1000).default('') });
+export type InvestmentValuation = z.infer<typeof valuationInput> & { at: string; sequence: number; beforeMinor: string; adjustmentMinor: string; voided?: boolean };
 export type Audit = { id: string; at: string; action: string; transactionId?: string;
   beforeTransaction?: Transaction; beforeObservation?: Observation; expectedRevision?: number; undone?: boolean;
-  batchId?: string; batchSize?: number };
+  batchId?: string; batchSize?: number; valuationId?: string };
+export type MerchantRule = { id: string; merchant: string; categoryId: string; note?: string; investmentAccountId?: string; displayMerchant?: string };
+export const movementOptionsSchema = z.object({ rememberMerchant: z.boolean().default(false), investmentProduct: z.object({ id, name: text.min(1) }).optional() });
 export type State = {
-  accounts: Account[]; instruments: Instrument[]; categories: Category[]; bills: Bill[];
+  valuations: InvestmentValuation[]; accounts: Account[]; instruments: Instrument[]; categories: Category[]; bills: Bill[];
   transactions: Transaction[]; observations: Observation[]; audit: Audit[];
-  aliases: { id: string; merchant: string; categoryId: string; note?: string }[]; settings: Settings;
+  aliases: MerchantRule[]; settings: Settings;
 };
 export const defaultCategories: Category[] = [
   { id: 'uncategorized', name: 'Sin categoría', scope: 'both' },
@@ -109,6 +114,7 @@ export const defaultCategories: Category[] = [
   { id: 'other-income', name: 'Otros ingresos', scope: 'income' },
 ];
 export function normalizeDefaultCategories(state: State) {
+  state.valuations ??= [];
   for (const category of defaultCategories) {
     const existing = state.categories.find(c => c.id === category.id);
     if (existing) Object.assign(existing, category);
@@ -119,7 +125,7 @@ export function normalizeDefaultCategories(state: State) {
 export function normalizeUnlinkedTransfer(state: State, observation: Observation) {
   const accountIds = new Set(state.accounts.map(account => account.id));
   if (observation.status === 'review' && observation.kind === 'transfer'
-    && (!observation.counterAccountId || !accountIds.has(observation.counterAccountId))) {
+    && (!observation.counterAccountId || !accountIds.has(observation.counterAccountId)) && !observation.cashWithdrawal) {
     observation.kind = 'expense';
     delete observation.counterAccountId;
     observation.reason = 'No se encontró una cuenta propia destino; se tratará como gasto';
@@ -129,7 +135,7 @@ export function normalizeUnlinkedTransfers(state: State) {
   for (const observation of state.observations) normalizeUnlinkedTransfer(state, observation);
 }
 export function emptyState(): State {
-  return { accounts: [], instruments: [], categories: defaultCategories.map(category => ({ ...category })),
+  return { valuations: [], accounts: [], instruments: [], categories: defaultCategories.map(category => ({ ...category })),
     bills: [], transactions: [], observations: [], audit: [], aliases: [], settings: { payday: 1, reserveMinor: '0' } };
 }
 export class DomainError extends Error { constructor(message: string, public status = 400) { super(message); } }

@@ -95,8 +95,17 @@ test("review queue shows progress and registers repeated purchases individually 
   await page.getByRole("button", { name: /Parqueadero.*2 pistas/ }).click();
   await page.reload();
   await expect(page.locator(".review-focus h3")).toHaveText("Parqueadero");
-  await expect(page.getByRole("heading", { name: "Sin movimiento coincidente" })).toBeVisible();
-  await expect(page.getByText("Esta evidencia está lista para registrarse como un movimiento nuevo.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Listo para registrar" })).toBeVisible();
+  await expect(page.getByText("Recibimos la captura, pero aún no está guardada como movimiento. Puedes registrarla ahora o editar sus datos antes de guardar.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registrar como movimiento distinto" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Registrar movimiento", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Editar antes de guardar", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Editar antes de guardar" });
+  await expect(editor.getByLabel("Comercio o descripción")).toHaveValue("Parqueadero");
+  await editor.getByLabel("Comercio o descripción").fill("Parqueadero corregido");
+  expect((await (await request.get(`${apiBase}/state`)).json()).transactions).toHaveLength(0);
+  await editor.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: testInfo.outputPath("review-ready.png"), fullPage: true });
   if (isMobile) await page.getByRole("button", { name: /Cambiar grupo/ }).click();
   await page.getByRole("button", { name: /Peaje.*3 pistas/ }).click();
@@ -119,12 +128,12 @@ test("review queue shows progress and registers repeated purchases individually 
   await expect(page.locator(".clue-state")).toHaveText("1 de 2 en este grupo");
 
   await page
-    .getByRole("button", { name: "Registrar como movimiento distinto" })
+    .getByRole("button", { name: "Registrar movimiento", exact: true })
     .click();
   await expect(page.getByText("1 pendientes", { exact: true })).toBeVisible();
   await expect(page.getByText("4 resueltas", { exact: true })).toBeVisible();
   await page
-    .getByRole("button", { name: "Registrar como movimiento distinto" })
+    .getByRole("button", { name: "Registrar otro movimiento", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Todo en su lugar" }),
@@ -157,4 +166,34 @@ test("review queue shows progress and registers repeated purchases individually 
       (observation: { status: string }) => observation.status === "review",
     ),
   ).toHaveLength(0);
+});
+
+test("an unmatched SMS can be edited before it is registered", async ({ page, request }) => {
+  await request.post(`${apiBase}/accounts`, { data: {
+    id: "sms-bank", name: "Cuenta de prueba", kind: "bank", openingMinor: "0", openingDate: "2026-01-01", eligible: true,
+  } });
+  await request.post(`${apiBase}/instruments`, { data: {
+    id: "sms-card", name: "Débito de prueba", accountId: "sms-bank", aliases: ["1122"],
+  } });
+  const device = await (await request.post(`${apiBase}/devices`, { data: { name: "iPhone de prueba" } })).json();
+  await request.post(`${apiBase}/capture-events`, { headers: { Authorization: `Bearer ${device.token}` }, data: {
+    eventId: "edit-sms", source: "sms", observedAt: "2026-10-17T18:00:00Z",
+    message: "Bancolombia: Compraste $22.000,00 en COMERCIO EJEMPLO con tu T.Deb *1122, el 17/10/2026 a las 10:55.",
+  } });
+  await expect.poll(async () => (await (await request.get(`${apiBase}/state`)).json()).observations.length).toBe(1);
+  await page.goto("./#/revisar");
+  await expect(page.getByRole("button", { name: "Registrar movimiento", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registrar otro movimiento", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Editar antes de guardar", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Editar antes de guardar" });
+  await editor.getByLabel("Comercio o descripción").fill("Comercio corregido");
+  await editor.getByLabel("Valor (COP)").fill("23.000");
+  expect((await (await request.get(`${apiBase}/state`)).json()).transactions).toHaveLength(0);
+  await editor.getByRole("button", { name: "Registrar movimiento", exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  const state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.transactions).toHaveLength(1);
+  expect(state.transactions[0]).toMatchObject({ merchant: "Comercio corregido", amountMinor: "2300000" });
+  expect(state.observations.filter((item: { status: string }) => item.status === "review")).toHaveLength(0);
+  expect(state.transactions[0].observationIds).toHaveLength(1);
 });

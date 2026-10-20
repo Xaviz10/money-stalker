@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   emptyState,
+  accountKindLabels,
   type State,
   type Observation,
   type Transaction,
@@ -265,6 +266,7 @@ export function App() {
     initialPage === "importar" ? "movimientos" : initialPage,
   );
   const [editing, setEditing] = useState<Transaction | Observation | "new">();
+  const [movementPreset, setMovementPreset] = useState<{ accountId: string; kind: "income" }>();
   const [importing, setImporting] = useState(initialPage === "importar");
   const [loading, setLoading] = useState(false),
     [notice, setNotice] = useState("");
@@ -275,14 +277,27 @@ export function App() {
   const [stale, setStale] = useState(false);
   const alive = useRef(true);
   const refreshSequence = useRef(0);
+  const refreshController = useRef<AbortController | null>(null);
+  const refreshInFlight = useRef(false);
   const refresh = useCallback(async () => {
     const sequence = ++refreshSequence.current;
+    refreshController.current?.abort();
+    const controller = new AbortController();
+    refreshController.current = controller;
+    refreshInFlight.current = true;
     setLoading(true);
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error("La actualización tardó demasiado. Intenta de nuevo."));
+      }, 15000);
+    });
     try {
-      const [s, d] = await Promise.all([
-        api<State>("/state"),
-        api<Summary>("/dashboard"),
-      ]);
+      const [s, d] = await Promise.race([Promise.all([
+        api<State>("/state", { signal: controller.signal }),
+        api<Summary>("/dashboard", { signal: controller.signal }),
+      ]), timeout]);
       if (sequence !== refreshSequence.current) return true;
       setState(s);
       setSummary(d);
@@ -293,10 +308,14 @@ export function App() {
     } catch (e) {
       if (sequence !== refreshSequence.current) return false;
       setStale(true);
-      setError((e as Error).message);
+      setError(controller.signal.aborted ? "La actualización tardó demasiado. Intenta de nuevo." : (e as Error).message);
       return false;
     } finally {
-      if (sequence === refreshSequence.current) setLoading(false);
+      clearTimeout(timeoutId);
+      if (sequence === refreshSequence.current) {
+        refreshInFlight.current = false;
+        setLoading(false);
+      }
     }
   }, []);
   useEffect(() => {
@@ -337,9 +356,32 @@ export function App() {
     if (signedIn) {
       void refresh();
       const timer = setInterval(() => {
-        if (document.visibilityState === "visible") void refresh();
+        if (document.visibilityState === "visible" && !refreshInFlight.current) void refresh();
       }, 30000);
-      return () => clearInterval(timer);
+      let returnTimer: ReturnType<typeof setTimeout> | undefined;
+      const refreshOnReturn = () => {
+        clearTimeout(returnTimer);
+        if (document.visibilityState !== "visible") return;
+        // A single return can emit visibilitychange, focus and pageshow together.
+        returnTimer = setTimeout(() => {
+          if (document.visibilityState === "visible" && !refreshInFlight.current) void refresh();
+        }, 200);
+      };
+      document.addEventListener("visibilitychange", refreshOnReturn);
+      window.addEventListener("focus", refreshOnReturn);
+      window.addEventListener("pageshow", refreshOnReturn);
+      window.addEventListener("online", refreshOnReturn);
+      return () => {
+        clearInterval(timer);
+        clearTimeout(returnTimer);
+        document.removeEventListener("visibilitychange", refreshOnReturn);
+        window.removeEventListener("focus", refreshOnReturn);
+        window.removeEventListener("pageshow", refreshOnReturn);
+        window.removeEventListener("online", refreshOnReturn);
+        refreshSequence.current++;
+        refreshController.current?.abort();
+        refreshInFlight.current = false;
+      };
     }
   }, [signedIn, refresh]);
   useEffect(() => {
@@ -481,16 +523,21 @@ export function App() {
             }).format(new Date())}
           </time>
           <button
-            className="icon-button"
-            onClick={() => void refresh()}
+            className={`icon-button refresh-button ${loading ? "is-refreshing" : ""}`}
+            onClick={async () => {
+              setNotice("");
+              if (await refresh()) setNotice("Datos actualizados.");
+            }}
             aria-label="Actualizar datos"
+            aria-busy={loading}
+            title={loading ? "Actualizando datos…" : "Actualizar datos"}
             disabled={loading}
           >
             <Icon name="refresh" size={19} />
           </button>
           <button
             className="button primary new-movement"
-            onClick={() => setEditing("new")}
+            onClick={() => { setMovementPreset(undefined); setEditing("new"); }}
             disabled={!state.accounts.length}
           >
             <Icon name="plus" size={19} />
@@ -619,7 +666,7 @@ export function App() {
             <Reports state={state} accountId={selectedAccount} onAccountChange={setSelectedAccount} />
           )}
           {page === "cuentas" && (
-            <Settings state={state} summary={summary} refresh={refresh} />
+            <Settings state={state} summary={summary} refresh={refresh} receiveCash={(accountId) => { setMovementPreset({ accountId, kind: "income" }); setEditing("new"); }} />
           )}
           {page === "design-system" && <DesignSystem />}
           <footer className="footer">
@@ -632,9 +679,10 @@ export function App() {
           value={editing}
           state={state}
           preferredAccountId={
-            page === "movimientos" ? movementAccount : selectedAccount
+            movementPreset?.accountId ?? (page === "movimientos" ? movementAccount : selectedAccount)
           }
-          close={() => setEditing(undefined)}
+          preferredKind={movementPreset?.kind}
+          close={() => { setEditing(undefined); setMovementPreset(undefined); }}
           saved={async (message) => {
             const refreshed = await refresh();
             setEditing(undefined);
@@ -895,9 +943,7 @@ function Movements({
           <span>
             {account.kind === "credit"
               ? "Tarjeta de crédito"
-              : account.kind === "cash"
-                ? "Efectivo"
-                : "Cuenta bancaria"}
+              : accountKindLabels[account.kind]}
           </span>
           <h1>{account.name}</h1>
           {account.institution && <small>{account.institution}</small>}
@@ -1019,12 +1065,14 @@ function TransactionDialog({
   value,
   state,
   preferredAccountId,
+  preferredKind,
   close,
   saved,
 }: {
   value: Transaction | Observation | "new";
   state: State;
   preferredAccountId?: string;
+  preferredKind?: "income";
   close: () => void;
   saved: (message?: string) => Promise<void>;
 }) {
@@ -1036,8 +1084,19 @@ function TransactionDialog({
   const initialCategory =
     state.categories.find((item) => item.id === transaction?.categoryId) ??
     state.categories.find((item) => item.id === "uncategorized")!;
-  const [kind, setKind] = useState(initial?.kind ?? "expense");
+  const initialInvestment = initial?.kind === "transfer" && state.accounts.some(account => account.id === initial.counterAccountId && account.kind === "investment");
+  const [kind, setKind] = useState<Transaction["kind"] | "investment">(initialInvestment ? "investment" : initial?.kind ?? preferredKind ?? "expense");
   const [merchant, setMerchant] = useState(initial?.merchant ?? "");
+  const [sourceAccountId, setSourceAccountId] = useState(initial?.accountId ?? preferredAccountId ?? "");
+  const [investmentChoice, setInvestmentChoice] = useState<string | undefined>(initialInvestment ? initial?.counterAccountId : undefined);
+  const [investmentName, setInvestmentName] = useState<string>();
+  const newInvestmentId = useRef(freshId());
+  const investmentProducts = state.accounts.filter(account => account.kind === "investment" && account.id !== sourceAccountId);
+  const normalizedMerchant = merchant.normalize("NFKC").trim().toLocaleLowerCase("es-CO").replace(/\s+/g, " ");
+  const rememberedInvestment = state.aliases.find(rule => rule.merchant === normalizedMerchant)?.investmentAccountId;
+  const matchingInvestments = investmentProducts.filter(account => account.name.normalize("NFKC").trim().toLocaleLowerCase("es-CO").replace(/\s+/g, " ") === normalizedMerchant);
+  const investmentDestination = investmentChoice ?? (investmentProducts.some(account => account.id === rememberedInvestment) ? rememberedInvestment : matchingInvestments.length === 1 ? matchingInvestments[0].id : "__new_investment__");
+  const creatingInvestment = kind === "investment" && investmentDestination === "__new_investment__";
   const [categoryId, setCategoryId] = useState(initialCategory.parentId ?? initialCategory.id);
   const [subcategoryId, setSubcategoryId] = useState(initialCategory.parentId ? initialCategory.id : "");
   const [deleting, setDeleting] = useState(false);
@@ -1075,7 +1134,7 @@ function TransactionDialog({
       <div className="section-heading">
         <h2 id="transaction-dialog-title">
           {isObservation
-            ? "Completar evidencia"
+            ? "Editar antes de guardar"
             : transaction
               ? "Editar movimiento"
               : "Nuevo movimiento"}
@@ -1084,6 +1143,7 @@ function TransactionDialog({
           <Icon name="close" />
         </button>
       </div>
+      {isObservation && <p className="small-note">Ajusta los datos de la captura. El movimiento se guardará cuando pulses Registrar movimiento.</p>}
       {pendingDuplicate && (
         <section
           className="duplicate-confirmation"
@@ -1135,11 +1195,13 @@ function TransactionDialog({
         onSubmit={async (f) => {
           const data = {
             id: transaction?.id ?? operationId.current,
-            kind,
+            kind: kind === "investment" ? "transfer" : kind,
             date: str(f, "date"),
             accountId: str(f, "accountId"),
-            counterAccountId:
+            counterAccountId: kind === "investment" ? (creatingInvestment ? newInvestmentId.current : investmentDestination) :
               kind === "transfer" ? str(f, "counterAccountId") : null,
+            ...(creatingInvestment ? { investmentProduct: { id: newInvestmentId.current, name: (investmentName ?? merchant).trim() } } : {}),
+            rememberMerchant: f.get("rememberMerchant") === "on",
             amountMinor: amount(f, "amount"),
             merchant,
             categoryId: subcategoryId || categoryId || "uncategorized",
@@ -1164,6 +1226,7 @@ function TransactionDialog({
                 body: JSON.stringify({
                   changes: data,
                   applyToSimilar,
+                  rememberMerchant: f.get("rememberMerchant") === "on",
                   expectedRevision: transaction.revision,
                 }),
               },
@@ -1195,7 +1258,7 @@ function TransactionDialog({
           <Field label="Tipo">
             <select
               name="kind"
-              value={kind}
+              value={kind === "investment" ? "expense" : kind}
               onChange={(e) => {
                 const next = e.target.value as typeof kind;
                 setKind(next);
@@ -1226,7 +1289,8 @@ function TransactionDialog({
             <select
               name="accountId"
               required
-              defaultValue={initial?.accountId ?? preferredAccountId}
+              value={sourceAccountId}
+              onChange={(event) => setSourceAccountId(event.target.value)}
             >
               <option value="">Selecciona una cuenta</option>
               {state.accounts.map((a) => (
@@ -1274,13 +1338,18 @@ function TransactionDialog({
           {kind !== "transfer" && (
             <>
               <Field label={kind === "income" ? "Categoría de ingreso" : "Categoría de gasto"}>
-                <select name="categoryId" value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setSubcategoryId(""); }}>
+                <select name="categoryId" value={kind === "investment" ? "__investment__" : categoryId} onChange={(event) => {
+                  if (event.target.value === "__investment__") { setKind("investment"); setCategoryId(state.categories.find(category => !category.parentId && /^(inversión|inversion|inversiones)$/i.test(category.name.trim()) && category.scope !== "income")?.id ?? "uncategorized"); }
+                  else { if (kind === "investment") setKind("expense"); setCategoryId(event.target.value); }
+                  setSubcategoryId("");
+                }}>
+                  {(kind === "expense" || kind === "investment") && <option value="__investment__">Inversión</option>}
                   {state.categories
-                    .filter((category) => !category.parentId && (category.scope === "both" || category.scope === (kind === "income" ? "income" : "expense")))
+                    .filter((category) => !category.parentId && (kind === "income" || !/^(inversión|inversion|inversiones)$/i.test(category.name.trim())) && (category.scope === "both" || category.scope === (kind === "income" ? "income" : "expense")))
                     .map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                 </select>
               </Field>
-              {state.categories.some((category) => category.parentId === categoryId) && (
+              {kind !== "investment" && state.categories.some((category) => category.parentId === categoryId) && (
                 <Field label="Subcategoría">
                   <select value={subcategoryId} onChange={(event) => setSubcategoryId(event.target.value)}>
                     <option value="">Sin subcategoría</option>
@@ -1292,6 +1361,13 @@ function TransactionDialog({
               )}
             </>
           )}
+          {kind === "investment" && <>
+            <Field label="Producto de inversión"><select value={investmentDestination} onChange={(event) => setInvestmentChoice(event.target.value)} required>
+              {investmentProducts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
+              <option value="__new_investment__">Crear nuevo producto de inversión…</option>
+            </select></Field>
+            {creatingInvestment && <Field label="Nombre del nuevo producto de inversión"><input value={investmentName ?? merchant} onChange={(event) => setInvestmentName(event.target.value)} required maxLength={200} placeholder="Usa el nombre del comercio o escribe otro" /><small>Se creará al guardar este movimiento, con saldo inicial cero. El aporte se transferirá desde la cuenta de origen que elijas.</small></Field>}
+          </>}
           {kind === "expense" && (
             <Field label="Factura asociada">
               <select name="billId" defaultValue={transaction?.billId ?? ""}>
@@ -1349,12 +1425,14 @@ function TransactionDialog({
             defaultValue={transaction?.note}
           />
         </Field>
+        {merchant.trim() && <label className="checkbox"><input type="checkbox" name="rememberMerchant" /> {kind === "investment" ? "Recordar este comercio, su categoría y producto de inversión para próximas importaciones" : "Recordar la categoría y nota de este comercio para próximas importaciones"}</label>}
         {transaction && merchant.trim() && (
           <label className="checkbox">
             <input type="checkbox" name="applyToSimilar" /> Aplicar esta
             categoría y nota a todos los movimientos de este comercio
           </label>
         )}
+        {kind === "investment" && <p className="small-note">Este aporte es una transferencia: reduce el origen y el disponible, aumenta la inversión y no cuenta como gasto. La regla recordada se mostrará en la vista previa de los próximos CSV/XLSX.</p>}
         {kind === "transfer" && (
           <p className="small-note">
             El pago de una tarjeta mueve dinero: no crea un gasto nuevo.
@@ -1639,7 +1717,10 @@ function ImportDialog({
                   return (
                     <tr key={row.row}>
                       <td>{row.row}</td>
-                      <td>{row.observation?.merchant ?? "—"}</td>
+                      <td>{row.observation?.merchant ?? "—"}
+                        {row.observation?.counterAccountId && state.accounts.find(account => account.id === row.observation?.counterAccountId)?.kind === "investment" && <small className="import-rule-detail">Inversión: {state.accounts.find(account => account.id === row.observation?.counterAccountId)?.name}</small>}
+                        {row.observation?.categoryId && row.observation.categoryId !== "uncategorized" && <small className="import-rule-detail">{categoryLabel(state, row.observation.categoryId)}</small>}
+                      </td>
                       <td>{row.observation?.date ?? "—"}</td>
                       <td>
                         {row.observation ? (
@@ -1790,6 +1871,31 @@ function ImportDialog({
   );
 }
 
+function InvestmentValues({ account, state, balance, save }: { account: State["accounts"][number]; state: State; balance: string; save: (path: string, data: unknown) => Promise<void> }) {
+  const operationId = useRef(freshId());
+  const [undoError, setUndoError] = useState("");
+  const [undoing, setUndoing] = useState(false);
+  const history = (state.valuations ?? []).filter(value => value.accountId === account.id).sort((a, b) => b.sequence - a.sequence);
+  const latest = history.find(value => !value.voided);
+  return <div className="investment-values">
+    <p className="small-note">Valor declarado manualmente. No consultamos cotizaciones ni calculamos rentabilidad automática. Los aportes y retiros se registran como transferencias; los cambios de valor no son ingresos ni gastos.</p>
+    <DisclosureEditor label="Actualizar valor de inversión">
+      <AppForm submit="Guardar valor actual" onSubmit={async (form) => {
+        await save("/investment-values", { id: operationId.current, accountId: account.id, date: str(form, "date"), valueMinor: amount(form, "value"), note: str(form, "note") });
+        operationId.current = freshId();
+      }}>
+        <Field label="Valor actual de la inversión (COP)"><input name="value" required inputMode="decimal" defaultValue={decimalCOP(balance)} /></Field>
+        <Field label="Fecha de valoración"><input name="date" type="date" required defaultValue={bogotaDate()} min={latest?.date ?? account.openingDate} max={bogotaDate()} /></Field>
+        <Field label="Nota de valoración (opcional)"><input name="note" maxLength={1000} placeholder="Saldo consultado en el extracto…" /></Field>
+      </AppForm>
+    </DisclosureEditor>
+    {undoError && <p role="alert" className="error">{undoError}</p>}
+    <details className="investment-history"><summary>Historial de valores declarados · {history.length}</summary>
+      {history.length ? <ul>{history.map(value => <li key={value.id}><div><strong>{displayDate(value.date)} · {formatCOP(value.valueMinor)}</strong><p>Valor anterior: {formatCOP(value.beforeMinor)} · Ajuste declarado: {formatCOP(value.adjustmentMinor)}</p>{value.note && <p>{value.note}</p>}<small>{value.voided ? "Valoración anulada" : "Declarada por ti"}</small></div>{latest?.id === value.id && <button className="text-button" disabled={undoing} onClick={async () => { setUndoing(true); setUndoError(""); try { await save("/undo", { auditId: `valuation:${value.id}` }); } catch (error) { setUndoError((error as Error).message); } finally { setUndoing(false); } }}>{undoing ? "Deshaciendo…" : "Deshacer valoración"}</button>}</li>)}</ul> : <p className="small-note">La primera valoración quedará aquí. Cada cambio conserva su fecha y nota.</p>}
+    </details>
+  </div>;
+}
+
 function AccountEditor({
   account,
   state,
@@ -1805,7 +1911,7 @@ function AccountEditor({
     [kind, setKind] = useState(account.kind);
   const hasMovements = state.transactions.some(
     (t) => t.accountId === account.id || t.counterAccountId === account.id,
-  );
+  ) || (state.valuations ?? []).some(value => value.accountId === account.id);
   return (
     <DisclosureEditor label="Editar producto" className="account-organization">
       <AppForm
@@ -1822,6 +1928,7 @@ function AccountEditor({
             id: account.id,
             name: str(f, "name"),
             kind,
+            captureAliases: str(f, "captureAliases").split(",").map(value => value.trim()).filter(Boolean),
             openingMinor: hasMovements
               ? account.openingMinor
               : amount(f, "opening"),
@@ -1904,8 +2011,11 @@ function AccountEditor({
             <option value="bank">Cuenta bancaria</option>
             <option value="credit">Tarjeta de crédito</option>
             <option value="cash">Efectivo</option>
+            <option value="pocket">Bolsillo</option>
+            <option value="investment">Inversión</option>
           </select>
         </Field>
+        {(kind === "pocket" || kind === "investment") && <Field label="Alias de destino en SMS (opcional)"><input name="captureAliases" defaultValue={(account.captureAliases ?? []).join(", ")} placeholder="Últimos cuatro dígitos o nombre del destino" /><small>Separa los alias con comas. Un SMS compatible con origen y destino inequívocos moverá el dinero automáticamente. Nunca uses números completos.</small></Field>}
         <div className="form-grid">
           <Field
             label={
@@ -1955,7 +2065,7 @@ function AccountEditor({
             </>
           )}
         </div>
-        {kind !== "credit" && (
+        {(kind === "bank" || kind === "cash") && (
           <label className="checkbox">
             <input
               name="eligible"
@@ -2128,10 +2238,12 @@ function Settings({
   state,
   summary,
   refresh,
+  receiveCash,
 }: {
   state: State;
   summary?: Summary;
   refresh: () => Promise<boolean>;
+  receiveCash: (accountId: string) => void;
 }) {
   const [accountKind, setAccountKind] = useState("bank"),
     [token, setToken] = useState("");
@@ -2177,9 +2289,7 @@ function Settings({
               <small>
                 {a.kind === "credit"
                   ? "Tarjeta de crédito · deuda"
-                  : a.kind === "cash"
-                    ? "Efectivo"
-                    : "Cuenta bancaria"}
+                  : accountKindLabels[a.kind]}
                 {a.institution ? ` · ${a.institution}` : ""}
                 {a.parentAccountId
                   ? ` · Vinculada a ${state.accounts.find((b) => b.id === a.parentAccountId)?.name ?? "cuenta bancaria"}`
@@ -2189,13 +2299,16 @@ function Settings({
             <strong>
               {formatCOP(summary?.balances[a.id] ?? a.openingMinor)}
             </strong>
+            {a.kind === "cash" && <button className="button secondary" onClick={() => receiveCash(a.id)}>Recibir efectivo</button>}
             <AccountEditor
-              key={`${a.id}:${a.name}:${a.kind}:${a.openingMinor}:${a.openingDate}:${a.institution ?? ""}:${a.institutionUrl ?? ""}:${a.imageDataUrl?.length ?? 0}:${a.parentAccountId ?? ""}:${a.closingDay ?? ""}:${a.dueDay ?? ""}:${a.eligible}`}
+              key={`${a.id}:${a.name}:${a.kind}:${a.openingMinor}:${a.openingDate}:${a.institution ?? ""}:${a.institutionUrl ?? ""}:${a.imageDataUrl?.length ?? 0}:${a.parentAccountId ?? ""}:${a.closingDay ?? ""}:${a.dueDay ?? ""}:${a.eligible}:${(a.captureAliases ?? []).join(",")}`}
               account={a}
               state={state}
               save={(data) => save("/accounts", data)}
               saveInstrument={(data) => save("/instruments", data)}
             />
+            {a.kind === "investment" && <InvestmentValues account={a} state={state} balance={summary?.balances[a.id] ?? a.openingMinor} save={save} />}
+            {a.kind === "pocket" && <p className="product-balance-note">Disponible en este bolsillo. No se incluye en el disponible general. Usa una transferencia para agregar o liberar dinero.</p>}
           </div>
         ))}
         {!state.accounts.length && (
@@ -2217,7 +2330,7 @@ function Settings({
         </div>
         <SettingsSection
           title="Agregar producto"
-          description="Cuenta bancaria, tarjeta de crédito o efectivo"
+          description="Cuenta, tarjeta, efectivo, bolsillo o inversión"
           icon="plus"
           open={!state.accounts.length}
         >
@@ -2230,6 +2343,7 @@ function Settings({
                 id: freshId(),
                 name: str(f, "name"),
                 kind: accountKind,
+                captureAliases: str(f, "captureAliases").split(",").map(value => value.trim()).filter(Boolean),
                 openingMinor: amount(f, "opening"),
                 openingDate: str(f, "date"),
                 eligible: f.get("eligible") === "on",
@@ -2302,6 +2416,7 @@ function Settings({
                 </select>
               </Field>
             )}
+            {(accountKind === "pocket" || accountKind === "investment") && <Field label="Alias de destino en SMS (opcional)"><input name="captureAliases" placeholder="Últimos cuatro dígitos o nombre del destino" /><small>Separa los alias con comas. Los SMS de transferencia compatibles podrán reconocer este producto propio y mover el dinero automáticamente.</small></Field>}
             <div className="form-grid">
               <Field label="Tipo de cuenta">
                 <select
@@ -2311,6 +2426,8 @@ function Settings({
                   <option value="bank">Cuenta bancaria</option>
                   <option value="credit">Tarjeta de crédito</option>
                   <option value="cash">Efectivo</option>
+                  <option value="pocket">Bolsillo</option>
+                  <option value="investment">Inversión</option>
                 </select>
               </Field>
               <Field
@@ -2353,17 +2470,17 @@ function Settings({
                 </>
               )}
             </div>
-            {accountKind !== "credit" ? (
+            {(accountKind === "bank" || accountKind === "cash") ? (
               <label className="checkbox">
                 <input name="eligible" type="checkbox" defaultChecked /> Incluir
                 este saldo en el disponible
               </label>
-            ) : (
+            ) : accountKind === "credit" ? (
               <p className="small-note">
                 La tarjeta conserva su propia deuda. Vincularla a una cuenta
                 solo organiza la vista; puedes dejarla independiente.
               </p>
-            )}
+            ) : <p className="small-note">Este saldo queda fuera del disponible general. Registra una transferencia desde tu cuenta para separar dinero aquí; no lo registres como un gasto. El saldo inicial debe representar dinero ya separado.</p>}
             <p className="small-note">
               Esta fecha fija el punto de partida del saldo. Los movimientos
               anteriores quedarán en el historial sin cambiar el saldo actual.
@@ -2376,14 +2493,16 @@ function Settings({
           icon="shield"
         >
           <h3>Tu margen de tranquilidad</h3>
+          <p className="small-note">Los retiros de cajero completos y sin posibles duplicados pasan automáticamente de la cuenta bancaria a Efectivo. Los casos dudosos quedan en Revisar. Recibir efectivo por otro concepto es un ingreso.</p>
           <AppForm
             onSubmit={(f) =>
               save("/settings", {
+                ...(str(f, "cashAccountId") ? { cashAccountId: str(f, "cashAccountId") } : {}),
                 payday: Number(f.get("payday")),
                 reserveMinor: amount(f, "reserve"),
               })
             }
-            key={`${state.settings.payday}-${state.settings.reserveMinor}`}
+            key={`${state.settings.payday}-${state.settings.reserveMinor}-${state.settings.cashAccountId ?? ""}`}
           >
             <Field label="Día de ingreso mensual">
               <input
@@ -2407,6 +2526,7 @@ function Settings({
               El salario esperado no se suma al dinero de hoy. La reserva queda
               fuera del disponible.
             </p>
+            {state.accounts.some(account => account.kind === "cash") && <Field label="Efectivo destino de retiros"><select name="cashAccountId" defaultValue={state.settings.cashAccountId ?? state.accounts.find(account => account.kind === "cash")?.id}>{state.accounts.filter(account => account.kind === "cash").map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select><small>Si tienes varias cuentas de efectivo, elige aquí dónde guardar los retiros.</small></Field>}
           </AppForm>
           <hr />
           <h3>Nueva categoría</h3>

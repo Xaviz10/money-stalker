@@ -4,7 +4,9 @@ import {
   type Capture,
   type Observation,
 } from "../domain/model";
-import { ingestCapture, recordStatement } from "../domain/ledger";
+import { ingestCapture, recordStatement, resolveObservation } from "../domain/ledger";
+import { ensureWithdrawalCash } from "../domain/cash";
+import { bogotaDate } from "../domain/money";
 import type { Repository, Job } from "./repository";
 import { digest } from "./repository";
 import type { Files } from "./storage";
@@ -69,8 +71,13 @@ export async function processJob(
             undefined,
             false,
           ) ??
-          resolveCapturedAccount(state, parsed?.instrumentHint, expectedKind);
-        const counterAccountId =
+          resolveCapturedAccount(state, parsed?.instrumentHint, expectedKind, !parsed?.cashWithdrawal);
+        const sourceAccount = state.accounts.find(account => account.id === accountId);
+        const withdrawal = Boolean(parsed?.cashWithdrawal && input.source === "sms");
+        const cashDestination = withdrawal && sourceAccount?.kind === "bank" && parsed?.date
+          ? ensureWithdrawalCash(state, sourceAccount.openingDate < parsed.date ? sourceAccount.openingDate : parsed.date)
+          : undefined;
+        const counterAccountId = withdrawal ? cashDestination :
           input.counterAccountId ??
           (parsed ? resolveCapturedDestination(state, parsed) : undefined);
         const parsedKind = parsed?.kind ?? input.kind;
@@ -85,7 +92,7 @@ export async function processJob(
           currency: "COP",
           merchant: input.merchant || parsed?.merchant || "",
           kind:
-            parsedKind === "transfer" && !counterAccountId
+            parsedKind === "transfer" && !counterAccountId && !withdrawal
               ? "expense"
               : parsedKind,
           counterAccountId,
@@ -93,12 +100,30 @@ export async function processJob(
           // No bank-reference parser is verified yet. Client-supplied strings cannot establish strong identity.
           status: "review",
           candidates: [],
+          cashWithdrawal: withdrawal || undefined,
           location: input.location,
           parserVersion: parsed?.matched
             ? parsed.parserVersion
             : "structured-capture-v1",
         };
-        ingestCapture(state, observation);
+        const captured = ingestCapture(state, observation);
+        const exactSource = Boolean(accountId) && resolveCapturedAccount(state, parsed?.instrumentHint, "bank", false) === accountId;
+        const destination = state.accounts.find(account => account.id === counterAccountId);
+        const ownProduct = !withdrawal && parsedKind === "transfer" && input.source === "sms" && (destination?.kind === "pocket" || destination?.kind === "investment")
+          && (parsed?.counterInstrumentHint ? resolveCapturedAccount(state, parsed.counterInstrumentHint, undefined, false) === destination.id : !["nequi", "bre-b"].includes(parsed?.counterpartyHint ?? ""));
+        const automaticTransfer = withdrawal || ownProduct;
+        const verifiedValues = Boolean(parsed?.amountMinor && parsed.date && captured.amountMinor === parsed.amountMinor && captured.date === parsed.date);
+        const possibleOldExpense = state.transactions.some(transaction => !transaction.voided && transaction.kind === "expense" && transaction.accountId === captured.accountId && transaction.amountMinor === captured.amountMinor && captured.date && Math.abs(Date.parse(transaction.date) - Date.parse(captured.date)) <= 7 * 86400000);
+        if (automaticTransfer && captured.status === "review" && captured.accountId && captured.counterAccountId && captured.amountMinor && captured.date
+          && sourceAccount?.kind === "bank" && exactSource && verifiedValues && !possibleOldExpense && captured.date >= sourceAccount.openingDate && destination && captured.date >= destination.openingDate
+          && captured.date <= bogotaDate(new Date(job.createdAt)) && !captured.candidates.length) {
+          if (ownProduct) captured.merchant = `Transferencia a ${destination!.name}`;
+          resolveObservation(state, captured.id, "separate", job.createdAt);
+          const audit = state.audit.at(-1);
+          if (audit) audit.action = withdrawal ? "auto-withdrawal" : "auto-product-transfer";
+        } else if (automaticTransfer && captured.status === "review") {
+          captured.reason = possibleOldExpense ? "Existe un gasto de igual valor en una fecha cercana. Revisa antes de registrar esta transferencia." : !captured.counterAccountId ? "Configura la cuenta de efectivo destino del retiro" : captured.candidates.length ? "Transferencia con una posible coincidencia: confirma antes de unir" : "Revisa la cuenta, fecha y valor de la transferencia antes de registrarla";
+        }
       });
     } else {
       const { batchId, offset } = job.payload as {

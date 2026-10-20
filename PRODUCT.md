@@ -45,3 +45,18 @@ Current product implementation is in src/App.tsx, src/finance/, src/design-syste
 ## Account and card organization
 
 Bank institutions group bank accounts. A bank account holds a cash balance and can have multiple debit instruments pointing to that balance. A credit account holds a separate debt balance and may optionally link to a bank account for organization. Credit-only setups are supported; no bank account is required. Organizing a card must not alter or duplicate balances.
+
+## Cash, pockets and investments
+
+A complete Bancolombia ATM-withdrawal SMS with an exact configured bank alias, a financial date on/after the source and destination opening snapshots and no possible prior match is automatically recorded as a bank-to-cash transfer. Create the zero-opening Efectivo product if there is no cash account; reuse the only cash product or the configured cash destination. Multiple destinations, incomplete/historical captures and possible matches require Review. Stable event IDs remain idempotent; linked observations, location, and undo history are retained. Verified savings statement rows explicitly described as ATM withdrawals are previewed as transfers to the same cash destination before confirmation.
+
+Receiving cash for another concept is a normal income into a cash account; it increases cash and eligible available money. ATM withdrawals themselves do not create expense or additional available money.
+
+Bolsillo and Inversión are separate asset products. For manual movements, the owner explicitly chooses any source account, including cash, and the destination product; no SMS is required. Fund and release them with transfers; compatible SMS with an exact configured source and unambiguous owned destination name or masked-suffix alias can record the transfer automatically, while uncertain captures stay in Review; their balances remain outside global available money and inside net worth. Initial amounts represent money already separate from other account balances. The summary shows cash, money available in pockets, and money in investments as distinct totals.
+
+Investment values are declared manually, with a dated history of before/declared values, adjustment, note and record time. Adjustments affect the investment balance and net worth, never liquid available money or income/expense reports. Contributions and withdrawals remain transactions. There are no market prices, forecasts or automatic return calculations. Valuations are entered in date order, retried idempotently, persisted independently, exported, and the latest active valuation can be reversibly annulled.
+
+
+Manual investment contributions offer existing investment products or inline product creation in the movement modal. The new product name defaults to the merchant until the owner changes it, starts at zero, and is saved atomically with the transfer. An explicit remember option saves the merchant, compatible category and investment destination for future CSV/XLSX imports, including the original merchant name when renamed. Import preview displays this classification before duplicate comparison and confirmation; its classification is retained through commit. Only transactions existing before upload are duplicate candidates, and repeated equal rows within one file remain independent.
+
+Investment entry is hierarchical: choose Inversión in the expense-category selector, then select an existing investment product or create one inline. It is stored as a transfer, without requiring a separate investment movement type.

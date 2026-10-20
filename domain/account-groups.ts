@@ -40,6 +40,8 @@ export function groupAccounts(state: Pick<State, "accounts" | "instruments">) {
         a.kind === "credit" && !banks.some((b) => b.id === a.parentAccountId),
     ),
     cash: state.accounts.filter((a) => a.kind === "cash"),
+    pockets: state.accounts.filter((a) => a.kind === "pocket"),
+    investments: state.accounts.filter((a) => a.kind === "investment"),
   };
 }
 

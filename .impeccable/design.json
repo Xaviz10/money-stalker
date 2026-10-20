@@ -481,6 +481,11 @@
         "name": "The Evidence Review Rule",
         "body": "Lead with focused evidence and compact durable progress. On phones, expand the group switcher only when needed. Accept localized COP searches, distinguish unmatched from incomplete evidence, and identify correction records before undo. Capture setup ends with verifying actual evidence received, not token creation.",
         "section": "layout"
+      },
+      {
+        "name": "The Separate Holdings Rule",
+        "body": "Cash withdrawals transfer bank money to cash without new spending. Pocket and investment balances stay outside global available money and inside net worth. Investment values are manually declared, dated and reversible; value adjustments never count as liquid income or expense. Compatible SMS can transfer automatically into an owned pocket or investment only with an exact source, an unambiguous configured destination, complete consistent values and no possible prior match. Manual investment contributions offer existing products or inline creation named after the merchant by default. An explicit remember option applies the merchant category and investment destination to future CSV/XLSX previews; confirmation preserves the preview classification.",
+        "section": "layout"
       }
     ],
     "dos": [
