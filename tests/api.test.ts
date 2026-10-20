@@ -339,3 +339,28 @@ describe('owner-confirmed movement locations', () => {
     expect(rows[0]).toMatchObject({ Lugar: place.name, OrigenLugar: 'google-link', EnlaceLugar: url, GooglePlaceID: '' });
   });
 });
+
+describe('simple Shortcut coordinates', () => {
+  it('accepts top-level coordinates and an optional address string without a location dictionary', async () => {
+    const { api, repo, files } = await setup(); const { token } = await repo.createDevice('owner', 'phone');
+    const body = { eventId: 'flat-location', source: 'sms', observedAt: now, accountId: 'bank', date: '2026-10-10', amountMinor: '2200000', merchant: 'Comercio de prueba', latitude: '4,6', longitude: '-74.1', location: 'Dirección de prueba' };
+    const request = { method: 'POST', path: '/capture-events', token, body };
+    const accepted = await api(request);
+    expect(accepted.status).toBe(202); expect((await api(request)).status).toBe(202);
+    await processJob(repo, files, 'owner', (accepted.body as { eventId: string }).eventId);
+    const state = await repo.read('owner');
+    expect(state.observations).toHaveLength(1);
+    expect(state.observations[0].location).toEqual({ latitude: 4.6, longitude: -74.1, observedAt: now, timestampSource: 'event', fullAddress: 'Dirección de prueba' });
+  });
+  it('preserves a separate sample time and ignores incomplete or invalid coordinate pairs', async () => {
+    const { api, repo, files } = await setup(); const { token } = await repo.createDevice('owner', 'phone');
+    for (const [index, coordinates] of [{ latitude: 4.6, longitude: -74.1, locationObservedAt: '2026-10-17T13:00:02-0500' }, { latitude: 4.6 }, { latitude: '', longitude: '-74' }, { latitude: 100, longitude: -74 }].entries()) {
+      const accepted = await api({ method: 'POST', path: '/capture-events', token, body: { eventId: `simple-${index}`, source: 'wallet', observedAt: now, ...coordinates } });
+      expect(accepted.status).toBe(202);
+      await processJob(repo, files, 'owner', (accepted.body as { eventId: string }).eventId);
+    }
+    const state = await repo.read('owner');
+    expect(state.observations[0].location).toMatchObject({ observedAt: '2026-10-17T13:00:02-05:00', timestampSource: 'sample' });
+    expect(state.observations.slice(1).every(observation => observation.location === undefined)).toBe(true);
+  });
+});

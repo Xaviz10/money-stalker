@@ -1,58 +1,63 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { parseGoogleMapsLink, type GoogleLinkLocation } from '../../domain/location';
+import type { CapturedLocation } from '../../domain/location';
 import { transactionPlaceSchema, type TransactionPlace } from '../../domain/model';
 import { Field } from '../design-system/ui';
 import { post } from '../api';
+import { CaptureMap } from './CaptureMap';
 
-export function PlacePicker({ merchant, onChoose }: { merchant: string; onChoose: (place: TransactionPlace) => void }) {
-  const [query, setQuery] = useState(merchant);
-  const [link, setLink] = useState('');
-  const [name, setName] = useState(merchant);
-  const [address, setAddress] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
+const numeric = (value: string) => /^-?\d+(?:[.,]\d+)?$/.test(value.trim()) ? Number(value.trim().replace(',', '.')) : NaN;
+export function PlacePicker({ merchant, captured, place, onChoose }: { merchant: string; captured: CapturedLocation[]; place?: TransactionPlace; onChoose: (place?: TransactionPlace) => void }) {
+  const initial = place ?? captured[0];
+  const [link, setLink] = useState(place?.url ?? '');
+  const [latitude, setLatitude] = useState(initial ? String(initial.latitude) : '');
+  const [longitude, setLongitude] = useState(initial ? String(initial.longitude) : '');
   const [resolved, setResolved] = useState<GoogleLinkLocation>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [confirmCenter, setConfirmCenter] = useState(false);
+  const revision = useRef(0);
+  useEffect(() => () => { revision.current++; }, []);
+  const point = transactionPlaceSchema.safeParse({ id: `coordinates:${latitude}:${longitude}`, name: merchant || 'Lugar del movimiento', address: place?.address ?? '', latitude: numeric(latitude), longitude: numeric(longitude), source: 'manual' });
+  const preview = point.success ? point.data : undefined;
+  function choose(lat: string, lng: string, url?: string) {
+    const result = transactionPlaceSchema.safeParse({ id: `coordinates:${lat}:${lng}`, name: merchant || 'Lugar del movimiento', address: '', latitude: numeric(lat), longitude: numeric(lng), source: url ? 'google-link' : 'manual', ...(url ? { url } : {}) });
+    if (result.success) { onChoose(result.data); setError(''); }
+    else if (lat || lng) setError('Completa ambas coordenadas: latitud entre −90 y 90 y longitud entre −180 y 180.');
+    else { onChoose(undefined); setError(''); }
+  }
+  async function readLink(value: string) {
+    const current = ++revision.current;
+    setResolved(undefined); setError('');
+    if (!value.trim()) { setBusy(false); return; }
+    setBusy(true);
+    try {
+      const next = parseGoogleMapsLink(value) ?? await post<GoogleLinkLocation>('/places/resolve-link', { url: value.trim() });
+      if (current !== revision.current) return;
+      setResolved(next); setLatitude(String(next.latitude)); setLongitude(String(next.longitude));
+      if (!next.approximate) choose(String(next.latitude), String(next.longitude), next.url);
+    } catch { if (current === revision.current) setError('No pudimos obtener las coordenadas del enlace. Puedes escribirlas o usar tu ubicación actual.'); }
+    finally { if (current === revision.current) setBusy(false); }
+  }
   return <section className="place-picker" aria-label="Elegir o corregir lugar">
-    <h3>Elegir o corregir el lugar</h3>
-    <p className="small-note">Si el SMS llegó tarde, elige el lugar real de la compra. La muestra original del teléfono se conserva por separado.</p>
-    <Field label="Buscar comercio o dirección"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Comercio y ciudad" maxLength={200} /></Field>
-    {query.trim() && <a className="text-link place-search-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query.trim())}`} target="_blank" rel="noreferrer">Buscar en Google Maps</a>}
-    <p className="small-note">Abre el resultado correcto, copia su enlace y pégalo aquí.</p>
-    <Field label="Enlace de Google Maps"><input value={link} onChange={event => { setLink(event.target.value); setResolved(undefined); setReady(false); setError(''); }} inputMode="url" maxLength={2000} placeholder="https://maps.app.goo.gl/…" /></Field>
-    <button type="button" className="button secondary" disabled={busy || !link.trim()} onClick={async () => {
-      setBusy(true); setError(''); setReady(false); setConfirmCenter(false);
-      try {
-        const point = parseGoogleMapsLink(link) ?? await post<GoogleLinkLocation>('/places/resolve-link', { url: link.trim() });
-        setResolved(point); setLatitude(String(point.latitude)); setLongitude(String(point.longitude));
-        setName(point.name || query.trim() || merchant); setReady(true);
-      } catch (e) { setError((e as Error).message); }
-      finally { setBusy(false); }
-    }}>{busy ? 'Leyendo enlace…' : 'Leer enlace'}</button>
-    <details className="manual-place-details" open={ready || undefined}>
-      <summary>Revisar lugar o escribir coordenadas</summary>
-      {resolved?.approximate && <p className="small-note place-link-warning">Este enlace solo indica el centro del mapa, no la posición exacta del comercio. Corrige las coordenadas o copia el enlace de la ficha del lugar antes de usarlo.</p>}
-      <Field label="Nombre del lugar"><input value={name} onChange={event => setName(event.target.value)} maxLength={200} placeholder="Nombre del comercio o lugar" /></Field>
-      <Field label="Dirección del lugar (opcional)"><input value={address} onChange={event => setAddress(event.target.value)} maxLength={500} /></Field>
-      <div className="form-grid">
-        <Field label="Latitud del lugar"><input value={latitude} onChange={event => setLatitude(event.target.value)} inputMode="decimal" placeholder="4.600000" /></Field>
-        <Field label="Longitud del lugar"><input value={longitude} onChange={event => setLongitude(event.target.value)} inputMode="decimal" placeholder="-74.100000" /></Field>
-      </div>
-      {resolved?.approximate && <label className="checkbox"><input type="checkbox" checked={confirmCenter} onChange={event => setConfirmCenter(event.target.checked)} /> Confirmo que las coordenadas mostradas corresponden al lugar que quiero guardar.</label>}
-      <button type="button" className="button secondary" onClick={() => {
-        setError('');
-        if (resolved?.approximate && !confirmCenter) { setError('Confirma las coordenadas del centro del mapa o usa un enlace de la ficha del lugar.'); return; }
-        const numeric = (value: string) => /^-?\d+(?:[.,]\d+)?$/.test(value.trim()) ? Number(value.trim().replace(',', '.')) : NaN;
-        const lat = numeric(latitude), lng = numeric(longitude);
-        const fromLink = resolved && lat === resolved.latitude && lng === resolved.longitude;
-        const result = transactionPlaceSchema.safeParse({ id: `coordinates:${lat}:${lng}`, name: name.trim(), address: address.trim(), latitude: lat, longitude: lng, source: fromLink ? 'google-link' : 'manual', ...(fromLink ? { url: resolved.url } : {}) });
-        if (!result.success) { setError('Escribe el nombre y coordenadas válidas: latitud entre −90 y 90, longitud entre −180 y 180.'); return; }
-        onChoose(result.data); setReady(false);
-      }}>Usar este lugar</button>
-    </details>
+    <Field label="Enlace de Google Maps"><input value={link} onChange={event => { setLink(event.target.value); revision.current++; setBusy(false); setResolved(undefined); setError(''); }} onBlur={() => void readLink(link)} onPaste={event => { const value = event.clipboardData.getData('text'); event.preventDefault(); setLink(value); void readLink(value); }} inputMode="url" maxLength={2000} placeholder="Pega el enlace del lugar" /></Field>
+    {busy && <p className="small-note" role="status">Leyendo enlace…</p>}
+    <div className="form-grid">
+      <Field label="Latitud del lugar"><input value={latitude} onChange={event => { revision.current++; setResolved(undefined); setLatitude(event.target.value); choose(event.target.value, longitude); }} inputMode="decimal" placeholder="4.600000" /></Field>
+      <Field label="Longitud del lugar"><input value={longitude} onChange={event => { revision.current++; setResolved(undefined); setLongitude(event.target.value); choose(latitude, event.target.value); }} inputMode="decimal" placeholder="−74.100000" /></Field>
+    </div>
+    {resolved?.approximate && <label className="checkbox"><input type="checkbox" onChange={event => { if (event.target.checked) choose(latitude, longitude, resolved.url); }} /> Este enlace indica el centro del mapa. Confirmo que corresponde al lugar del movimiento.</label>}
+    {!preview && <button type="button" className="button secondary" disabled={busy} onClick={() => {
+      if (!navigator.geolocation) { setError('Este navegador no permite obtener la ubicación. Pega un enlace o escribe las coordenadas.'); return; }
+      const current = ++revision.current;
+      setBusy(true); setError('');
+      navigator.geolocation.getCurrentPosition(position => {
+        if (current !== revision.current) return;
+        const lat = String(position.coords.latitude), lng = String(position.coords.longitude);
+        setLatitude(lat); setLongitude(lng); setResolved(undefined); setLink(''); choose(lat, lng); setBusy(false);
+      }, () => { if (current !== revision.current) return; setBusy(false); setError('No pudimos obtener tu ubicación. Revisa el permiso del navegador o escribe las coordenadas.'); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    }}>{busy ? 'Obteniendo ubicación…' : 'Usar mi ubicación'}</button>}
     {error && <p className="error" role="alert">{error}</p>}
+    <CaptureMap captured={[]} place={preview} />
+    {place && <button type="button" className="text-button" onClick={() => { revision.current++; setLatitude(''); setLongitude(''); setLink(''); setResolved(undefined); setError(''); setBusy(false); onChoose(undefined); }}>Quitar lugar</button>}
   </section>;
 }

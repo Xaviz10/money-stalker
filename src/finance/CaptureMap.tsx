@@ -13,10 +13,10 @@ const rasterStyle: StyleSpecification = {
 export function CaptureMap({ captured, place }: { captured: CapturedLocation[]; place?: TransactionPlace }) {
   const node = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const evidenceKey = JSON.stringify({ captured, place });
+  const evidenceKey = JSON.stringify({ captured, place: place ? { latitude: place.latitude, longitude: place.longitude } : undefined });
   useEffect(() => {
     const evidence = JSON.parse(evidenceKey) as { captured: CapturedLocation[]; place?: TransactionPlace };
-    const center = evidence.place ?? evidence.captured[0];
+    const center = evidence.place ?? evidence.captured[0] ?? { latitude: 4.6, longitude: -74.1 };
     if (!node.current || !center) return;
     let disposed = false;
     let map: LibreMap | undefined;
@@ -28,7 +28,7 @@ export function CaptureMap({ captured, place }: { captured: CapturedLocation[]; 
       setWorkerUrl(workerURL);
       map = new Map({
         container: node.current, style: styleURL || rasterStyle,
-        center: [center.longitude, center.latitude], zoom: 16,
+        center: [center.longitude, center.latitude], zoom: evidence.place || evidence.captured.length ? 16 : 2,
         attributionControl: false,
         locale: { 'Map.Title': 'Mapa de la ubicación', 'NavigationControl.ZoomIn': 'Acercar', 'NavigationControl.ZoomOut': 'Alejar', 'AttributionControl.ToggleAttribution': 'Créditos del mapa' },
         transformRequest: url => ({ url, referrerPolicy: 'strict-origin-when-cross-origin' }),
@@ -48,14 +48,15 @@ export function CaptureMap({ captured, place }: { captured: CapturedLocation[]; 
     }).catch(failed);
     return () => { disposed = true; window.clearTimeout(timeout); map?.remove(); };
   }, [evidenceKey]);
-  if (!captured.length && !place) return null;
+  const empty = !captured.length && !place;
   return <section className="capture-map" aria-label="Mapa de la ubicación del movimiento">
-    <h3>Ubicación del movimiento</h3>
+
     <div className="capture-map-frame">
       <div ref={node} className="location-map" aria-label="Mapa de la ubicación capturada" hidden={status === 'error'} />
-      {status === 'loading' && <p role="status" className="map-status small-note">Cargando mapa…</p>}
-      {status === 'error' && <p role="status" className="map-status small-note">No se pudo cargar el mapa. Las coordenadas siguen disponibles; usa los enlaces para abrirlas.</p>}
+      {empty && <p role="status" className="map-status small-note">Ubicación sin configurar. Pega un enlace, escribe las coordenadas o usa tu ubicación actual.</p>}
+      {!empty && status === 'loading' && <p role="status" className="map-status small-note">Cargando mapa…</p>}
+      {!empty && status === 'error' && <p role="status" className="map-status small-note">No se pudo cargar el mapa. Las coordenadas siguen disponibles; usa los enlaces para abrirlas.</p>}
     </div>
-    <small>Azul: ubicación del teléfono. Verde: negocio confirmado por ti. La ubicación capturada no confirma el comercio.</small>
+    {!empty && <small>La ubicación no confirma la identidad del comercio.</small>}
   </section>;
 }

@@ -1,3 +1,15 @@
+## Formato sencillo recomendado
+
+En el mismo POST /capture-events, envía `latitude` y `longitude` directamente como números. No envíes la dirección como sustituto de las coordenadas.
+
+```json
+{"eventId":"sms-ejemplo-unico","source":"sms","observedAt":"2026-10-20T12:00:00-05:00","message":"TEXTO ORIGINAL DEL SMS","latitude":4.6,"longitude":-74.1}
+```
+
+Opcionalmente `location` puede ser el texto de la dirección y `locationObservedAt` la hora real de la muestra. Sin esta última se muestra la hora del evento como tal, sin presentarla como hora exacta de la muestra. Pares incompletos o inválidos se omiten sin impedir guardar el evento. El formato detallado sigue siendo compatible.
+
+La edición manual presenta enlace, latitud, longitud y mapa; los enlaces compatibles se resuelven al pegarlos o salir del campo. Un enlace sin coordenadas resolubles muestra un error y permite entrada manual. La ubicación actual solo se solicita al pulsar el botón y nunca se obtiene automáticamente.
+
 # Ubicación en SMS y Wallet
 
 El atajo envía una única solicitud `POST /capture-events`, autenticada con el mismo token revocable del dispositivo. `location` es un diccionario opcional dentro del JSON del evento; no existe una llamada separada para agregar ubicación.

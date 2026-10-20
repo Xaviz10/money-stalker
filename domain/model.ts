@@ -47,6 +47,7 @@ export const transactionInput = z.object({
 });
 export const capturedLocationSchema = coordinate.extend({
   observedAt: isoTimestamp,
+  timestampSource: z.enum(['sample', 'event']).optional(),
   accuracy: z.number().min(0).optional().catch(undefined),
   fullAddress: z.string().trim().max(1000).optional().catch(undefined),
   street: text.optional().catch(undefined), streetNumber: text.optional().catch(undefined),
@@ -58,14 +59,29 @@ export const capturedLocationSchema = coordinate.extend({
     const parsed = new URL(value); return !parsed.username && !parsed.password;
   }).optional().catch(undefined),
 });
+const shortcutCoordinate = (minimum: number, maximum: number) => z.preprocess(value => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return /^-?\d+(?:[.,]\d+)?$/.test(trimmed) ? Number(trimmed.replace(',', '.')) : value;
+}, z.number().min(minimum).max(maximum)).optional().catch(undefined);
 export const captureSchema = z.object({
   eventId: id, source: z.enum(['sms', 'wallet']), observedAt: isoTimestamp,
   instrumentHint: text.optional(), accountId: id.optional(), amountMinor: positive.optional(),
   currency: z.literal('COP').default('COP'), date: date.optional(),
   merchant: text.default(''), kind: z.enum(['expense', 'income', 'transfer', 'refund']).default('expense'),
   counterAccountId: id.optional(), reference: text.optional(), message: z.string().max(3000).optional(),
-  location: capturedLocationSchema.optional().catch(undefined),
-}).strict();
+  latitude: shortcutCoordinate(-90, 90), longitude: shortcutCoordinate(-180, 180),
+  locationObservedAt: isoTimestamp.optional().catch(undefined),
+  location: z.union([capturedLocationSchema, z.string().trim().max(1000)]).optional().catch(undefined),
+}).strict().transform(({ latitude, longitude, locationObservedAt, location, ...event }) => ({
+  ...event,
+  location: location && typeof location === 'object' ? location :
+    latitude !== undefined && longitude !== undefined ? {
+      latitude, longitude, observedAt: locationObservedAt ?? event.observedAt,
+      timestampSource: locationObservedAt ? 'sample' as const : 'event' as const,
+      ...(typeof location === 'string' && location ? { fullAddress: location } : {}),
+    } : undefined,
+}));
 export type Account = z.infer<typeof accountSchema>;
 export const accountKindLabels: Record<Account['kind'], string> = { bank: 'Cuenta bancaria', cash: 'Efectivo', credit: 'Tarjeta de crédito', pocket: 'Bolsillo', investment: 'Inversión' };
 export type Instrument = z.infer<typeof instrumentSchema>;

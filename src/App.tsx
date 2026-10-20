@@ -2734,7 +2734,7 @@ function Settings({
                 </li>
               </ol>
               <p className="shortcut-result">
-                <strong>Una sola solicitud.</strong> Incluye el diccionario opcional location junto al SMS. Si no tienes una muestra válida, omite location y envía el movimiento igualmente.
+                <strong>Una sola solicitud.</strong> Incluye latitude y longitude como números junto al SMS. Si no tienes ubicación, omite ambos campos y envía el movimiento igualmente.
               </p>
             </div>
           </details>
@@ -2815,7 +2815,7 @@ function Settings({
           <details className="shortcut-api-guide location-shortcut-guide">
             <summary>Ubicación opcional · SMS y Wallet</summary>
             <div>
-              <p>Envía <code>location</code> como un diccionario dentro del mismo JSON de <code>/capture-events</code>, junto a <code>eventId</code>, <code>source</code>, <code>observedAt</code> y el SMS o los datos de Wallet. No hay una segunda solicitud.</p>
+              <p>La opción más sencilla: envía <code>latitude</code> y <code>longitude</code> directamente en el JSON del evento, como números obtenidos de Ubicación actual. La dirección es opcional. Puedes añadir <code>locationObservedAt</code> con la hora de la muestra; si falta, se indica la hora del evento.</p><details><summary>Dirección detallada (opcional)</summary><p>También puedes enviar <code>location</code> como un diccionario dentro del mismo JSON de <code>/capture-events</code>, junto a <code>eventId</code>, <code>source</code>, <code>observedAt</code> y el SMS o los datos de Wallet. No hay una segunda solicitud.</p>
               <ol>
                 <li>Genera y conserva el EventId del movimiento. Intenta obtener una sola muestra con <strong>Obtener ubicación actual</strong> antes del envío.</li>
                 <li>Usa <strong>Obtener detalles de ubicaciones</strong> sobre esa misma variable para latitud, longitud y los componentes de dirección disponibles. Guarda la fecha de esa muestra como <code>LocationObservedAt</code>, en ISO 8601.</li>
@@ -2827,7 +2827,7 @@ function Settings({
               <div className="shortcut-field-list">
                 {[["latitude", "Número · Latitud"], ["longitude", "Número · Longitud"], ["observedAt", "Texto · LocationObservedAt"], ["accuracy", "Número · Precisión en metros, si existe"], ["fullAddress", "Texto · Dirección completa"], ["street", "Texto · Calle"], ["streetNumber", "Texto · Número"], ["city", "Texto · Ciudad"], ["state", "Texto · Estado / departamento"], ["postalCode", "Texto · Código postal"], ["region", "Texto · Región"], ["country", "Texto · País"], ["countryCode", "Texto · Código del país"], ["name", "Texto · Nombre recibido, sin confirmar comercio"], ["url", "Texto · URL de Mapas o enlace recibido"]].map(([field, label]) => <span key={field}><code>{field}</code><b>{label}</b></span>)}
               </div>
-              <p className="small-note">Los enlaces a Apple Maps y Google Maps se generan con las coordenadas. La dirección del teléfono no identifica automáticamente al comercio, especialmente si el SMS llegó tarde.</p>
+              <p className="small-note">Los enlaces a Apple Maps y Google Maps se generan con las coordenadas. La dirección del teléfono no identifica automáticamente al comercio, especialmente si el SMS llegó tarde.</p></details>
             </div>
           </details>
           <details className="capture-step">

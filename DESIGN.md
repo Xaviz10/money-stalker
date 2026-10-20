@@ -339,3 +339,6 @@ Captured-location UI separates address, coordinates, sample time and optional pr
 All movement editors, including manual creation and Review before-save correction, expose the same PlacePicker. Search opens Google Maps by merchant/city without requiring a browser key; paste a place link or enter coordinates and explicitly choose it. Camera-center links require an extra confirmation. The confirmed location remains separate from original Shortcut evidence. Show the selected place, coordinates, editable name and remove action; saving the movement persists the choice. Unsupported links show a recoverable inline error and retain the prior selection.
 
 Location maps reserve the same frame height while loading, ready or failed. Render status messages inside that frame so provider errors never shift the movement-save controls during a touch interaction.
+
+
+La edición de ubicación muestra solo enlace de Google Maps, latitud, longitud y mapa siempre presente. Resolver el enlace al pegarlo o salir del campo actualiza la vista; los centros aproximados requieren confirmación. Sin coordenadas se ofrece «Usar mi ubicación», únicamente por acción explícita y con permiso del navegador. La evidencia original del atajo queda en un desplegable y se conserva al corregir el lugar. Guardar el movimiento confirma los cambios.

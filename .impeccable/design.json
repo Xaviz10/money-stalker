@@ -514,7 +514,7 @@
       },
       {
         "name": "The Place Correction Rule",
-        "body": "All movement forms share PlacePicker for explicit place selection via merchant search, pasted Google Maps links or manual coordinates. Preserve original Shortcut location and sample time separately. Camera-center URLs require acknowledgment; invalid or unresolved links retain the current place. Owner confirmation selects a place; saving the movement persists it.",
+        "body": "All movement forms show Google Maps URL, latitude, longitude and a persistent MapLibre frame. Resolve pasted links automatically; camera-center URLs require acknowledgment. Offer current location on explicit action when coordinates are absent. Preserve original Shortcut evidence in a collapsed disclosure. Saving the movement persists the edited place.",
         "section": "layout"
       }
     ],
