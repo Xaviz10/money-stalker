@@ -165,6 +165,11 @@ test("review explains amount changes, preserves a failed match, confirms success
   await expect(page.locator(".review-progress [role=status]")).toContainText(
     "Pistas unidas",
   );
+  const correction = page.locator(".correction-history .audit-row").first();
+  await expect(correction).toContainText("Café de prueba · $ 18.500 · Ahorros");
+  await correction.getByText("Ver cambio y efecto de deshacer").click();
+  await expect(correction).toContainText("Antes: Café de prueba · $ 18.500");
+  await expect(correction).toContainText("Después: Café de prueba · $ 19.000");
   await page.getByRole("button", { name: "Deshacer", exact: true }).click();
   await expect(page.locator(".clue")).toHaveCount(1);
   expect(control.writes).toBe(2);

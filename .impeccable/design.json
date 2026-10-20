@@ -476,6 +476,11 @@
         "name": "The Flat Workspace Rule",
         "body": "Group routine content with border, tone, and spacing. Reserve the shipped overlay shadow for modal elevation.",
         "section": "elevation"
+      },
+      {
+        "name": "The Evidence Review Rule",
+        "body": "Lead with focused evidence and compact durable progress. On phones, expand the group switcher only when needed. Accept localized COP searches, distinguish unmatched from incomplete evidence, and identify correction records before undo. Capture setup ends with verifying actual evidence received, not token creation.",
+        "section": "layout"
       }
     ],
     "dos": [

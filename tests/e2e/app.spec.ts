@@ -74,7 +74,7 @@ test("account → capture → import → review → export works on the project 
     .locator(".register-more")
     .getByRole("button", { name: "Importar archivo" })
     .click();
-  const importDialog = page.getByRole("dialog");
+  const importDialog = page.getByRole("dialog", { name: "Importar movimientos" });
   await expect(importDialog).toContainText(
     "El archivo se agregará a Ahorros de prueba",
   );

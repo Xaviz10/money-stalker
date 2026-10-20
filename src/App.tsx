@@ -69,6 +69,13 @@ type Batch = {
   more?: boolean;
 };
 type ImportProfile = { id: string; label: string; verified: boolean };
+function CopyCaptureValue({ label, value, sensitive = false }: { label: string; value: string; sensitive?: boolean }) {
+  const [feedback, setFeedback] = useState("");
+  return <div className="capture-copy-value"><strong>{label}</strong><code className={sensitive ? "token" : ""}>{value}</code><button type="button" className="button secondary" onClick={async () => {
+    try { await navigator.clipboard.writeText(value); setFeedback("Copiado"); }
+    catch { setFeedback("No se pudo copiar. Selecciona el texto y cópialo manualmente."); }
+  }}>Copiar {label.toLocaleLowerCase("es-CO")}</button><span role="status">{feedback}</span></div>;
+}
 const MAX_ACCOUNT_IMAGE_BYTES = 5 * 1024 * 1024;
 async function prepareAccountArtwork(file: File) {
   if (!file.size) return undefined;
@@ -530,31 +537,30 @@ export function App() {
           />
         </div>
         <main
-          className={`route-content ${page === "resumen" ? "route-dashboard" : ""}`}
+          className={`route-content ${page === "resumen" ? "route-dashboard" : page === "revisar" ? "route-review" : ""}`}
         >
           {page !== "resumen" && page !== "movimientos" && (
             <div className="page-heading">
               <div>
                 <h1>
                   {page === "revisar"
-                    ? "Conectemos las pistas."
+                    ? "Revisar pistas"
                     : page === "reportes"
                       ? "Entiende adónde se fue tu dinero."
                     : page === "design-system"
                       ? "Design system"
                       : title}
                 </h1>
-                <p>
+                {page !== "revisar" && <p>
                   {page === "movimientos"
                     ? "Cada movimiento, con su historia y sin duplicados."
-                    : page === "revisar"
-                      ? "Compara las evidencias. Tú tienes la última palabra."
+
                       : page === "reportes"
                         ? "Explora tus gastos por período, categoría y comercio."
                       : page === "design-system"
                         ? "Las reglas y componentes que mantienen Money Stalker consistente."
                         : "Cuentas bancarias, tarjetas y tu margen de tranquilidad."}
-                </p>
+                </p>}
               </div>
             </div>
           )}
@@ -1483,12 +1489,13 @@ function ImportDialog({
     <dialog
       ref={dialog}
       className="modal import-dialog"
+      aria-labelledby="import-dialog-title"
       onCancel={close}
       onClose={close}
     >
       <div className="section-heading import-dialog-heading">
         <div>
-          <h2>Importar movimientos</h2>
+          <h2 id="import-dialog-title">Importar movimientos</h2>
           <p>
             El archivo se agregará a <strong>{account?.name}</strong> después de
             que revises la vista previa.
@@ -2136,6 +2143,9 @@ function Settings({
     pending: { id: string; error?: string; createdAt: string }[];
   }>();
   const [deviceError, setDeviceError] = useState("");
+  const [captureChecking, setCaptureChecking] = useState(false);
+  const [captureFeedback, setCaptureFeedback] = useState("");
+  const latestCapture = state.observations.filter((item) => item.source === "sms" || item.source === "wallet").sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))[0];
   const loadDevices = useCallback(
     async () => setDevices(await api<typeof devices>("/devices")),
     [],
@@ -2435,7 +2445,10 @@ function Settings({
           description="Asocia tus tarjetas y conecta SMS, Wallet y ubicación"
           icon="card"
         >
-          <h3>1. Asocia las tarjetas que aparecen en tus mensajes</h3>
+          <p className="small-note">Conecta primero SMS. Activa Wallet solo si tu iPhone entrega los datos necesarios. Puedes abrir cualquier paso y continuar después.</p>
+          <details className="capture-step" open={!state.instruments.length}>
+          <summary>1. Asocia tu tarjeta <small>{state.instruments.length ? `${state.instruments.length} ${state.instruments.length === 1 ? "asociada" : "asociadas"}` : "Cuenta y últimos cuatro dígitos"}</small></summary>
+          <div>
           <p className="small-note">
             Una tarjeta débito apunta a su cuenta bancaria; no crea un saldo
             nuevo. Agrega los últimos cuatro dígitos que aparecen en tus SMS,
@@ -2490,8 +2503,9 @@ function Settings({
               Tus cuentas.
             </p>
           )}
-          <hr />
-          <h3>2. Comprueba qué entrega tu iPhone</h3>
+          </div></details>
+          <details className="capture-step">
+          <summary>2. Prueba tu iPhone <small>Comprueba el texto antes de conectar</small></summary><div>
           <p className="small-note shortcut-guide-intro">
             Apple permite activar automatizaciones con Mensajes y Wallet, pero
             no documenta que siempre entreguen el texto, el valor o el comercio.
@@ -2616,8 +2630,9 @@ function Settings({
               .
             </p>
           </div>
-          <hr />
-          <h3>3. Conecta las pruebas que funcionaron</h3>
+          </div></details>
+          <details className="capture-step" open={Boolean(token) || (Boolean(state.instruments.length) && !devices.some((device) => !device.revoked))}>
+          <summary>3. Crea el acceso del iPhone <small>Un acceso privado para SMS y Wallet</small></summary><div>
           <p>
             Crea un acceso privado para este iPhone. El token se guarda solo en
             Atajos y permite enviar capturas; no da acceso a tu sesión ni a tus
@@ -2642,6 +2657,12 @@ function Settings({
               />
             </Field>
           </AppForm>
+          {token && <div className="notice"><div><strong>Copia este acceso ahora; no volverá a mostrarse.</strong><CopyCaptureValue label="Token" value={token} sensitive /><p>Guárdalo en tus Atajos. Usa este mismo acceso para SMS y Wallet.</p><button className="text-button" onClick={() => setToken("")}>Ya lo guardé</button></div></div>}
+          {deviceError && <p className="error" role="alert">{deviceError}</p>}
+          {devices.map((device) => <div className="audit-row" key={device.id}><strong>{device.name}</strong><button className="text-button" disabled={device.revoked} onClick={() => void api(`/devices/${device.id}`, { method: "DELETE" }).then(loadDevices).catch((error) => setDeviceError(error.message))}>{device.revoked ? "Revocado" : "Revocar acceso"}</button></div>)}
+          </div></details>
+          <details className="capture-step" open={devices.some((device) => !device.revoked)}>
+          <summary>4. Conecta el Atajo <small>SMS primero; Wallet y ubicación opcionales</small></summary><div>
           <details className="shortcut-api-guide" open>
             <summary>Atajo real · SMS Bancolombia</summary>
             <div>
@@ -2668,13 +2689,11 @@ function Settings({
                   <strong>Fecha actual</strong> y formato personalizado
                   <code>yyyyMMddHHmmssSSS</code>. Después agrega
                   <strong>Texto</strong> con <code>sms-</code> seguido de esa
-                  fecha. Renombra el resultado como <code>EventId</code>.
+                  fecha. Renombra el resultado como <code>EventId</code>. Conserva este valor y <code>ObservedAt</code> en cada reintento del mismo envío.
                 </li>
                 <li>
                   Agrega <strong>URL</strong> y pega:
-                  <code className="shortcut-endpoint">
-                    {apiURL}/capture-events
-                  </code>
+                  <CopyCaptureValue label="URL de envío" value={`${apiURL}/capture-events`} />
                 </li>
                 <li>
                   Agrega <strong>Obtener contenido de URL</strong> y toca
@@ -2688,6 +2707,7 @@ function Settings({
                   <code>TU_TOKEN</code> por el acceso creado arriba. Agrega
                   <code>Content-Type</code> con
                   <code>application/json</code>.
+                  {token && <CopyCaptureValue label="Authorization" value={`Bearer ${token}`} sensitive />}
                 </li>
                 <li>
                   En el cuerpo JSON agrega exactamente:
@@ -2799,45 +2819,14 @@ function Settings({
               </p>
             </div>
           </details>
-          {token && (
-            <div className="notice">
-              <div>
-                <strong>
-                  Copia este acceso ahora; no volverá a mostrarse.
-                </strong>
-                <code className="token">{token}</code>
-                <small>
-                  Endpoint: {apiURL}/capture-events · Cabecera Authorization:
-                  Bearer TOKEN
-                </small>
-                <br />
-                <button className="text-button" onClick={() => setToken("")}>
-                  Ya lo guardé
-                </button>
-              </div>
-            </div>
-          )}
-          {deviceError && (
-            <p className="error" role="alert">
-              {deviceError}
-            </p>
-          )}
-          {devices.map((d) => (
-            <div className="audit-row" key={d.id}>
-              <strong>{d.name}</strong>
-              <button
-                className="text-button"
-                disabled={d.revoked}
-                onClick={() =>
-                  void api(`/devices/${d.id}`, { method: "DELETE" })
-                    .then(loadDevices)
-                    .catch((e) => setDeviceError(e.message))
-                }
-              >
-                {d.revoked ? "Revocado" : "Revocar acceso"}
-              </button>
-            </div>
-          ))}
+          </div></details>
+          <details className="capture-step">
+          <summary>5. Verifica la primera evidencia <small>El acceso creado aún no confirma la conexión</small></summary><div>
+          <p>Después del primer envío, actualiza y busca el comercio, valor y fecha en Revisar. Una evidencia recibida confirma ese envío; no garantiza que iOS ejecute todas las automatizaciones.</p>
+          <button type="button" className="button secondary" onClick={async () => { setCaptureChecking(true); setCaptureFeedback(""); try { const refreshed = await refresh(); setCaptureFeedback(refreshed ? "Datos actualizados. Revisa la última evidencia recibida." : "No se pudo actualizar. Intenta de nuevo."); } finally { setCaptureChecking(false); } }} disabled={captureChecking}>{captureChecking ? "Comprobando…" : "Comprobar llegada"}</button>
+          <p role="status">{captureFeedback}</p>
+          {latestCapture ? <p className="capture-arrival"><strong>Última evidencia recibida · {latestCapture.source === "sms" ? "SMS" : "Wallet"}</strong><br />{latestCapture.merchant || "Comercio por completar"} · {latestCapture.amountMinor ? formatCOP(latestCapture.amountMinor) : "Valor por completar"}<br /><time dateTime={latestCapture.receivedAt}>{new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }).format(new Date(latestCapture.receivedAt))}</time></p> : <p>Aún no hay evidencias de SMS o Wallet recibidas.</p>}
+          <a className="text-link" href="#/revisar">Abrir pistas para revisar</a>
           <p className="small-note">
             Cuando el iPhone entrega el texto, Money Stalker reconoce SMS
             Bancolombia de compra con tarjeta, pago QR, pago desde cuenta y
@@ -2863,6 +2852,7 @@ function Settings({
               </div>
             </div>
           ) : null}
+          </div></details>
         </SettingsSection>
         <SettingsSection
           title="Facturas y fechas"

@@ -83,9 +83,9 @@ export function parseBancolombiaSMS(message: string): ParsedBankSMS {
     };
 
   const purchase = text.match(
-    /Compraste\s+((?:COP|\$)\s*[\d.,]+)\s+en\s+(.+?)(?=\s+con\s+tu\s+T\.?Cred\b|,\s*el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b)/i,
+    /Compraste\s+((?:COP|\$)\s*[\d.,]+)\s+en\s+(.+?)(?=\s+con\s+tu\s+T\.?(?:Cred|Deb)\b|,\s*el\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b)/i,
   );
-  const card = text.match(/T\.?Cred\s+\*?(\d{4})\b/i);
+  const card = text.match(/T\.?(?:Cred|Deb)\s+\*?(\d{4})\b/i);
   if (purchase && card)
     return {
       ...base,

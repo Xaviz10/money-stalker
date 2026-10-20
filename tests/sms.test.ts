@@ -12,6 +12,15 @@ const now = "2026-10-18T18:00:00Z";
 const formatCases = [
   {
     message:
+      "Bancolombia: Compraste $22.000,00 en RESTAURANTE EJEMPLO con tu T.Deb *1122, el 18/10/2026 a las 10:55. Si tienes dudas, encuentranos aqui: 0000000000 o 000000000000. Estamos cerca.",
+    amountMinor: "2200000",
+    date: "2026-10-18",
+    merchant: "RESTAURANTE EJEMPLO",
+    kind: "expense",
+    instrumentHint: "1122",
+  },
+  {
+    message:
       "Bancolombia: Retiraste $1.060.000,00 en CAJERO_EJEMPLO de tu T.Deb **1122 el 29/08/2026 a las 12:06. Si tienes dudas, llamanos al 0000000000. Estamos cerca",
     amountMinor: "106000000",
     date: "2026-08-29",

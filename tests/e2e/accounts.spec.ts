@@ -164,3 +164,37 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
     ),
   ).toBe(true);
 });
+
+test("capture setup keeps the new access visible and verifies an actual arrival", async ({ page, request }, testInfo) => {
+  await request.post(`${apiBase}/accounts`, { data: {
+    id: "capture-bank", name: "Cuenta de captura", kind: "bank",
+    openingMinor: "0", openingDate: "2026-01-01", eligible: true,
+  } });
+  await request.post(`${apiBase}/instruments`, { data: {
+    id: "capture-card", name: "Débito de prueba", accountId: "capture-bank", aliases: ["1122"],
+  } });
+  await page.goto("./#/cuentas");
+  const setup = page.locator(".settings-section").filter({ has: page.getByText("Configurar capturas automáticas", { exact: true }) });
+  await setup.locator(":scope > summary").click();
+  await setup.getByLabel("Nombre del dispositivo").fill("iPhone de prueba");
+  await setup.getByRole("button", { name: "Crear acceso para mi iPhone" }).click();
+  await expect(setup.getByText("Copia este acceso ahora; no volverá a mostrarse.")).toBeVisible();
+  // Read the ephemeral test token locally; never include it in screenshots.
+  const token = await setup.locator("code.token").first().textContent();
+  await setup.getByRole("button", { name: "Ya lo guardé" }).click();
+  await setup.locator(".capture-step").filter({ has: page.getByText("4. Conecta el Atajo") }).locator(":scope > summary").click();
+  const arrival = setup.locator(".capture-step").filter({ has: page.getByText("5. Verifica la primera evidencia") });
+  await arrival.locator(":scope > summary").click();
+  await expect(arrival).toContainText("Aún no hay evidencias de SMS o Wallet recibidas.");
+  await request.post(`${apiBase}/capture-events`, { headers: { Authorization: `Bearer ${token}` }, data: {
+    eventId: "setup-arrival", source: "wallet", accountId: "capture-bank", amountMinor: "2200000",
+    merchant: "Comercio de prueba", date: "2026-10-17", observedAt: "2026-10-17T18:00:00Z",
+  } });
+  await expect.poll(async () => (await (await request.get(`${apiBase}/state`)).json()).observations.length).toBe(1);
+  await arrival.getByRole("button", { name: "Comprobar llegada" }).click();
+  await expect(arrival).toContainText("Última evidencia recibida · Wallet");
+  await expect(arrival).toContainText("Comercio de prueba · $ 22.000");
+  await expect(setup.locator("code.token")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("capture-setup.png"), fullPage: true });
+});

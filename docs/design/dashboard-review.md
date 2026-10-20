@@ -19,3 +19,9 @@ OWN-WORLD: ultramarine account rail, white workspace, ink type, citron available
 FIRST VIEWPORT: top navigation; grouped accounts at left; global funds minus commitments and available in the main work area; recent activity below; pending evidence and category spending at right.
 SIGNATURE: account selection narrows the activity and spending work areas while the global available amount stays explicitly labeled as total across accounts.
 FORM: preserve the selected reference's spatial hierarchy; use real components, native controls, a single typography family and token-driven styling.
+
+## Review refinement
+
+Keep the active decision near the top: compact route heading, sticky progress, search, and focused evidence. The completion eye remains in the cleared state. Phones use an expandable group switcher; reopening the route restores the selected evidence and its group. Complete unmatched evidence is ready for a new movement, while incomplete evidence explicitly asks for missing fields. Search accepts localized COP values. Correction rows identify the record and time, with expandable change and undo details.
+
+Capture configuration is a sequence of native disclosures: associate, test, create access, connect, verify arrival. A created token is not a successful connection. Keep it visible immediately after creation and show the latest real evidence received when checking arrival.

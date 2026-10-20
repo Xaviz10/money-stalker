@@ -29,7 +29,8 @@ test("clears progress from a deleted review queue", async ({ page }) => {
 test("review queue shows progress and registers repeated purchases individually or in a batch", async ({
   page,
   request,
-}) => {
+  isMobile,
+}, testInfo) => {
   await request.post(`${apiBase}/accounts`, {
     data: {
       id: "bank",
@@ -84,6 +85,20 @@ test("review queue shows progress and registers repeated purchases individually 
   await page.goto("./#/revisar");
   await expect(page.getByText("5 pendientes", { exact: true })).toBeVisible();
   await expect(page.getByText("0 resueltas", { exact: true })).toBeVisible();
+  if (isMobile) await page.getByRole("button", { name: /Cambiar grupo/ }).click();
+  const search = page.getByRole("searchbox", { name: "Buscar pistas" });
+  for (const value of ["15.000", "15000", "$ 15.000"]) {
+    await search.fill(value);
+    await expect(page.getByText("3 visibles", { exact: true })).toBeVisible();
+  }
+  await search.fill("");
+  await page.getByRole("button", { name: /Parqueadero.*2 pistas/ }).click();
+  await page.reload();
+  await expect(page.locator(".review-focus h3")).toHaveText("Parqueadero");
+  await expect(page.getByRole("heading", { name: "Sin movimiento coincidente" })).toBeVisible();
+  await expect(page.getByText("Esta evidencia está lista para registrarse como un movimiento nuevo.")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("review-ready.png"), fullPage: true });
+  if (isMobile) await page.getByRole("button", { name: /Cambiar grupo/ }).click();
   await page.getByRole("button", { name: /Peaje.*3 pistas/ }).click();
   await page.getByRole("button", { name: "Preparar 3 como distintos" }).click();
   await expect(
@@ -131,6 +146,10 @@ test("review queue shows progress and registers repeated purchases individually 
   await expect(page.locator(".review-progress [role=status]")).toContainText(
     "5 de 5 pistas resueltas",
   );
+  const history = page.locator(".correction-history .audit-row");
+  await expect(history.first()).toContainText("Parqueadero · $ 12.000 · Ahorros");
+  await history.first().getByText("Ver cambio y efecto de deshacer").click();
+  await expect(history.first()).toContainText("se retira el movimiento");
   const state = await (await request.get(`${apiBase}/state`)).json();
   expect(state.transactions).toHaveLength(5);
   expect(

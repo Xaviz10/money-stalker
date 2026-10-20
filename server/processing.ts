@@ -57,7 +57,8 @@ export async function processJob(
         const expectedKind =
           parsed?.instrumentHint &&
           parsed.kind === "expense" &&
-          /Compraste/i.test(input.message ?? "")
+          /Compraste/i.test(input.message ?? "") &&
+          /T\.?Cred\b/i.test(input.message ?? "")
             ? "credit"
             : "bank";
         const accountId =
