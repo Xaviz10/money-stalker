@@ -16,7 +16,7 @@ try {
     ["icon-maskable-512.png", 512, true],
   ]) {
     const page = await browser.newPage({ viewport: { width: size, height: size } });
-    await page.setContent(`<style>html,body{margin:0}svg{display:block;width:100vw;height:100vh}</style>${maskable ? svg.replace('rx="112"', 'rx="0"') : svg}`);
+    await page.setContent(`<style>html,body{margin:0}svg{display:block;width:100vw;height:100vh}</style>${maskable ? svg.replace('rx="112"', 'rx="0"').replace('translate(328 352)', 'translate(300 320)') : svg}`);
     await page.locator("svg").screenshot({ path: new URL(`../public/${filename}`, import.meta.url).pathname, omitBackground: true });
     await page.close();
   }
