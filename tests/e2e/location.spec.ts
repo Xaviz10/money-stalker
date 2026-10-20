@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator } from '@playwright/test';
 const api = `http://127.0.0.1:${process.env.E2E_API_PORT ?? '8787'}/api`;
 async function capturedMovement(request: APIRequestContext, register = true) {
   await request.post(`${api}/test/reset`);
@@ -9,12 +9,20 @@ async function capturedMovement(request: APIRequestContext, register = true) {
   const state = await (await request.get(`${api}/state`)).json();
   if (register) expect((await request.post(`${api}/reviews`, { data: { observationId: state.observations[0].id, action: 'separate' } })).ok()).toBe(true);
 }
+async function editLocation(dialog: Locator) {
+  const button = dialog.getByRole('button', { name: 'Editar ubicación', exact: true });
+  if (await button.isVisible()) await button.click();
+}
 test('simple location editor resolves links, saves corrections and preserves capture evidence', async ({ page, request }, info) => {
   await capturedMovement(request);
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
   await page.goto('./#/movimientos');
   await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await expect(dialog.getByLabel('Enlace de Google Maps')).not.toBeVisible();
+  await expect(dialog.getByLabel('Latitud del lugar')).not.toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Ver en Google Maps', exact: true })).toHaveAttribute('href', 'https://www.google.com/maps/search/?api=1&query=4.6%2C-74.1');
+  await editLocation(dialog);
   await expect(dialog.getByLabel('Latitud del lugar')).toHaveValue('4.6');
   await dialog.getByLabel('Enlace de Google Maps').fill('https://www.google.com/maps/place/Prueba/data=!3d4.65!4d-74.15');
   await dialog.getByLabel('Enlace de Google Maps').blur();
@@ -39,6 +47,7 @@ test('empty map offers current location and handles denied permission', async ({
   await page.goto('./#/movimientos');
   await page.getByRole('button', { name: 'Nuevo movimiento', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Nuevo movimiento', exact: true });
+  await editLocation(dialog);
   await dialog.getByText('Ubicación y negocio', { exact: true }).click();
   await expect(dialog.getByText(/Ubicación sin configurar/)).toBeVisible();
   await expect(dialog.locator('.capture-map-frame')).toBeVisible();
@@ -49,6 +58,7 @@ test('empty map offers current location and handles denied permission', async ({
   await dialog.getByRole('button', { name: 'Usar mi ubicación' }).click();
   await expect(dialog.getByLabel('Latitud del lugar')).toHaveValue('4.7');
   await expect(dialog.getByLabel('Longitud del lugar')).toHaveValue('-74.2');
+  await editLocation(dialog);
   await dialog.getByRole('button', { name: 'Quitar lugar' }).click();
   await expect(dialog.getByText(/Ubicación sin configurar/)).toBeVisible();
   await page.screenshot({ path: info.outputPath('empty-location.png') });
@@ -62,6 +72,7 @@ test('MapLibre renders saved coordinates and keeps the map stable while editing'
   await page.goto('./#/movimientos');
   await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await editLocation(dialog);
   await expect(dialog.locator('.maplibregl-canvas')).toBeVisible();
   await expect(dialog.getByText('Cargando mapa…', { exact: true })).toHaveCount(0);
   await expect(dialog.getByText(/No se pudo cargar el mapa/)).toHaveCount(0);
@@ -86,10 +97,11 @@ test('verified shared place links update MapLibre and preserve the original evid
   const tilePaths: string[] = [];
   await page.route('https://tile.openstreetmap.org/**', route => { tilePaths.push(new URL(route.request().url()).pathname); return route.fulfill({ contentType: 'image/png', body: tile }); });
   let requests = 0;
-  await page.route('**/api/places/resolve-link', route => { requests++; return route.fulfill({ json: { latitude: 4.65, longitude: -74.15, approximate: false, url: 'https://maps.google.com/?q=Comercio+de+prueba&ftid=0x1:0x2' } }); });
+  await page.route('**/api/places/resolve-link', route => { requests++; return route.fulfill({ json: { latitude: 4.65, longitude: -74.15, approximate: false, name: 'Restaurante sintético', url: 'https://maps.google.com/?q=Comercio+de+prueba&ftid=0x1:0x2' } }); });
   await page.goto('./#/revisar');
   await page.getByRole('button', { name: 'Editar antes de guardar', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Editar antes de guardar', exact: true });
+  await editLocation(dialog);
   const input = dialog.getByLabel('Enlace de Google Maps');
   // Pasting then blurring must not restart an already completed lookup.
   await input.focus();
@@ -100,6 +112,11 @@ test('verified shared place links update MapLibre and preserve the original evid
   });
   await expect(dialog.getByLabel('Latitud del lugar')).toHaveValue('4.65');
   await expect(dialog.getByLabel('Longitud del lugar')).toHaveValue('-74.15');
+  await expect(dialog.getByLabel('Enlace de Google Maps')).not.toBeVisible();
+  await expect(dialog.getByLabel('Latitud del lugar')).not.toBeVisible();
+  await expect(dialog.locator('.place-name')).toHaveText('Restaurante sintético');
+  await expect(dialog.getByLabel('Comercio o descripción')).toHaveValue('COMERCIO DE PRUEBA');
+  await expect(dialog.getByRole('link', { name: 'Ver en Google Maps', exact: true })).toHaveAttribute('href', 'https://maps.google.com/?q=Comercio+de+prueba&ftid=0x1:0x2');
   await expect(dialog.locator('.maplibregl-canvas')).toBeVisible();
   // Verify the map actually requests tiles covering the resolved point, so a
   // swapped coordinate order or an unchanged generic viewport cannot pass.
@@ -120,8 +137,17 @@ test('verified shared place links update MapLibre and preserve the original evid
   await dialog.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const state = await (await request.get(`${api}/state`)).json();
-  expect(state.transactions[0].place).toMatchObject({ latitude: 4.65, longitude: -74.15, source: 'google-link' });
+  expect(state.transactions[0].merchant).toBe('COMERCIO DE PRUEBA');
+  expect(state.transactions[0].place).toMatchObject({ name: 'Restaurante sintético', latitude: 4.65, longitude: -74.15, source: 'google-link' });
   expect(state.observations[0].location).toEqual(original);
+  await page.goto('./#/movimientos');
+  await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
+  const savedDialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await expect(savedDialog.locator('.place-name')).toHaveText('Restaurante sintético');
+  await expect(savedDialog.getByLabel('Enlace de Google Maps')).not.toBeVisible();
+  await expect(savedDialog.getByRole('link', { name: 'Ver en Google Maps', exact: true })).toBeVisible();
+  await savedDialog.locator('.place-picker').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('saved-compact-location.png') });
 });
 
 test('explicit camera coordinates require confirmation before they are saved', async ({ page, request }) => {
@@ -130,6 +156,7 @@ test('explicit camera coordinates require confirmation before they are saved', a
   await page.goto('./#/movimientos');
   await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await editLocation(dialog);
   await dialog.getByLabel('Enlace de Google Maps').fill('https://www.google.com/maps/@4.65,-74.15,17z');
   await dialog.getByLabel('Enlace de Google Maps').blur();
   const confirmation = dialog.getByRole('checkbox', { name: /Ubicación aproximada del enlace/ });
@@ -147,6 +174,7 @@ test('unresolvable shared links preserve the previously selected place', async (
   await page.goto('./#/movimientos');
   await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await editLocation(dialog);
   await dialog.getByLabel('Latitud del lugar').fill('4.65');
   await dialog.getByLabel('Longitud del lugar').fill('-74.15');
   await dialog.getByLabel('Enlace de Google Maps').fill('https://maps.app.goo.gl/unavailable');
@@ -165,6 +193,7 @@ test('unverified shared place leaves a new movement without a pin or guessed coo
   await page.goto('./#/movimientos');
   await page.getByRole('button', { name: 'Nuevo movimiento', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Nuevo movimiento', exact: true });
+  await editLocation(dialog);
   await dialog.getByLabel('Comercio o descripción').fill('Comercio sintético');
   await dialog.getByLabel('Valor (COP)').fill('22.000');
   await dialog.getByText('Ubicación y negocio', { exact: true }).click();
@@ -187,6 +216,7 @@ test('merchant location can be applied to existing movements and reused or remov
   await page.goto('./#/movimientos');
   await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).first().click();
   let dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await editLocation(dialog);
   // Some existing rows have no evidence, so the section may begin collapsed.
   if (!(await dialog.getByLabel('Latitud del lugar').isVisible())) await dialog.getByText('Ubicación y negocio', { exact: true }).click();
   await dialog.getByLabel('Latitud del lugar').fill('4.65');
@@ -195,6 +225,7 @@ test('merchant location can be applied to existing movements and reused or remov
   await dialog.getByLabel('Aplicar esta ubicación a todos los movimientos de este comercio', { exact: true }).check();
   await dialog.getByText('Ubicación y negocio', { exact: true }).click();
   await dialog.getByText('Ubicación y negocio', { exact: true }).click();
+  await editLocation(dialog);
   await expect(dialog.getByLabel('Aplicar esta ubicación a todos los movimientos de este comercio', { exact: true })).toBeChecked();
   await dialog.getByLabel('Recordar esta ubicación para próximos movimientos de este comercio', { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('merchant-location-options.png') });
@@ -208,12 +239,15 @@ test('merchant location can be applied to existing movements and reused or remov
   expect(state.aliases[0].place.latitude).toBe(4.65);
   await page.getByRole('button', { name: 'Nuevo movimiento', exact: true }).click();
   dialog = page.getByRole('dialog', { name: 'Nuevo movimiento', exact: true });
+  await editLocation(dialog);
   await dialog.getByText('Ubicación y negocio', { exact: true }).click();
   await expect(dialog.getByLabel('Latitud del lugar')).toHaveValue('');
   await dialog.getByLabel('Comercio o descripción').fill('COMERCIO DE PRUEBA');
   await expect(dialog.getByLabel('Latitud del lugar')).toHaveValue('4.65');
   await expect(dialog.getByLabel('Longitud del lugar')).toHaveValue('-74.15');
+  await editLocation(dialog);
   await expect(dialog.getByText(/Ubicación recordada para este comercio/)).toBeVisible();
+  await editLocation(dialog);
   await dialog.getByRole('button', { name: 'Quitar lugar', exact: true }).click();
   await expect(dialog.getByLabel('Latitud del lugar')).toHaveValue('');
   await dialog.getByLabel('Valor (COP)').fill('77.000');

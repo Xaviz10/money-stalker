@@ -1409,18 +1409,17 @@ function TransactionDialog({
           <summary>
             <span>
               <strong>Ubicación y negocio</strong>
-              <small>
+              {(!place || !locationOpen) && <small>
                 {place
                   ? place.name
                   : locationEvidence.length
                     ? "Ubicación capturada por el atajo"
                     : "Opcional"}
-              </small>
+              </small>}
             </span>
             <Icon name="location" size={18} />
           </summary>
           {locationOpen && <>
-            {rememberedPlace && !placeTouched && !chosenPlace && <p className="small-note remembered-place-note">Ubicación recordada para este comercio. Puedes cambiarla solo para este movimiento.</p>}
             <TransactionMap
               merchant={merchant}
               captured={locationEvidence.map(
@@ -1430,14 +1429,15 @@ function TransactionDialog({
               onPlaceChange={(next) => {
                 setPlaceTouched(true);
                 setPlace(next);
-                if (next) setMerchant(next.name);
               }}
-            />
+            >
+            {rememberedPlace && !placeTouched && !chosenPlace && <p className="small-note remembered-place-note">Ubicación recordada para este comercio. Puedes cambiarla solo para este movimiento.</p>}
             {place && merchant.trim() && <div className="merchant-place-options">
               <label className="checkbox"><input type="checkbox" name="rememberMerchantPlace" checked={rememberPlaceChoice} onChange={event => setRememberPlaceChoice(event.target.checked)} /> Recordar esta ubicación para próximos movimientos de este comercio</label>
               {transaction && <label className="checkbox"><input type="checkbox" name="applyPlaceToSimilar" checked={applyPlaceChoice} onChange={event => setApplyPlaceChoice(event.target.checked)} /> Aplicar esta ubicación a todos los movimientos de este comercio</label>}
               <p className="small-note">Úsala para todo el comercio solo si el nombre identifica la misma sede. La ubicación original de cada atajo se conserva.</p>
             </div>}
+            </TransactionMap>
           </>}
         </details>
         <Field label="Nota">

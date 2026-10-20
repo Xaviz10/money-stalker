@@ -2150,11 +2150,11 @@ input[type="checkbox"] {
 .merchant-place-options {
   display: grid;
   gap: var(--space-3);
-  padding: 0 15px 15px;
+  padding: 0;
   min-width: 0;
 }
 .merchant-place-options > * { margin: 0; min-width: 0; }
-.remembered-place-note { margin: 0; padding: 15px; }
+.remembered-place-note { margin: 0; padding: 0; }
 .captured-location-list {
   display: grid;
   gap: var(--space-2);
@@ -5395,3 +5395,11 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 .capture-map-frame > .location-map { height: 100%; border: 0; border-radius: 0; }
 .capture-map-frame > .map-status { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; margin: 0; background: var(--color-canvas); pointer-events: none; }
 @media (max-width: 600px) { .capture-map-frame { height: 240px; } }
+
+.place-summary { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); min-width: 0; }
+.place-name { min-width: 0; overflow-wrap: anywhere; }
+.place-summary > .text-button { flex-shrink: 0; }
+.place-edit-fields { display: grid; gap: var(--space-3); min-width: 0; }
+.place-edit-fields[hidden] { display: none; }
+.place-edit-fields > .text-button, .place-edit-fields > .button, .place-map-cta { justify-self: start; max-width: 100%; white-space: normal; }
+@media (max-width: 360px) { .place-summary { align-items: start; flex-direction: column; gap: var(--space-1); } }

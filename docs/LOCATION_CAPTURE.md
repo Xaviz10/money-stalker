@@ -8,7 +8,7 @@ En el mismo POST /capture-events, envía `latitude` y `longitude` directamente c
 
 Opcionalmente `location` puede ser el texto de la dirección y `locationObservedAt` la hora real de la muestra. Sin esta última se muestra la hora del evento como tal, sin presentarla como hora exacta de la muestra. Pares incompletos o inválidos se omiten sin impedir guardar el evento. El formato detallado sigue siendo compatible.
 
-La edición manual presenta enlace, latitud, longitud y mapa; los enlaces compatibles se resuelven al pegarlos o salir del campo. Un enlace sin coordenadas resolubles muestra un error y permite entrada manual. La ubicación actual solo se solicita al pulsar el botón y nunca se obtiene automáticamente.
+La edición manual muestra enlace, latitud, longitud y mapa cuando no hay ubicación. Si ya hay datos, muestra el nombre del lugar y el mapa, con **Ver en Google Maps** y **Editar ubicación**. Este último abre los campos y las opciones para recordar o aplicar el lugar a otros movimientos; **Listo** vuelve a la vista compacta. Los enlaces compatibles se resuelven al pegarlos o salir del campo. Un enlace sin coordenadas resolubles muestra un error y permite entrada manual. La ubicación actual solo se solicita al pulsar el botón y nunca se obtiene automáticamente.
 
 # Ubicación en SMS y Wallet
 
@@ -76,7 +76,7 @@ Fuentes: [MapLibre raster sources](https://maplibre.org/maplibre-gl-js/docs/exam
 
 La misma sección **Ubicación y negocio** está disponible al crear un movimiento manual, editar uno guardado o usar **Editar antes de guardar** en Revisión. Puede elegirse otro lugar aunque el SMS ya tenga coordenadas: la muestra original, su dirección y su fecha siguen asociadas a la observación. El lugar confirmado se guarda aparte en `transaction.place`.
 
-MapLibre representa el mapa; no incluye un directorio de comercios. El editor muestra enlace de Google Maps, latitud, longitud y mapa. Al pegar el enlace o salir del campo se preparan las coordenadas; guardar el movimiento persiste la selección. Si no hay coordenadas se ofrece **Usar mi ubicación**, siempre por acción explícita y con permiso del navegador.
+MapLibre representa el mapa; no incluye un directorio de comercios. El editor vacío muestra enlace de Google Maps, latitud, longitud y mapa; una ubicación configurada usa la vista compacta descrita arriba. Al pegar el enlace o salir del campo se preparan las coordenadas; guardar el movimiento persiste la selección. Si no hay coordenadas se ofrece **Usar mi ubicación**, siempre por acción explícita y con permiso del navegador.
 
 Se interpretan enlaces completos con coordenadas de la ficha o consultas de coordenadas. Una URL que solo contiene `@latitud,longitud` o un centro de mapa se marca como aproximada y requiere confirmación explícita: el centro de la cámara puede no ser el comercio. No se adivinan lugares a partir de rutas con múltiples destinos o enlaces ambiguos.
 
@@ -97,3 +97,9 @@ Al editar un movimiento también puede marcarse **Aplicar esta ubicación a todo
 Usar la opción global solo cuando el nombre identifica la misma sede. El lugar recordado se propone en movimientos manuales y al editar capturas; una elección específica tiene prioridad. **Quitar lugar** permite guardar ese movimiento sin la ubicación recordada y mantiene la regla para otros movimientos. Las capturas de SMS/Wallet usan la regla al registrar el movimiento; la ubicación del teléfono se conserva como evidencia separada y nunca se convierte automáticamente en regla de comercio.
 
 CSV/XLSX incluye la ubicación recordada en la observación de la vista previa y mantiene esa elección al confirmar, incluso si la regla cambia después de revisar el archivo. Las reglas permanecen dentro del hogar del usuario. Ninguna regla se aplica automáticamente a movimientos históricos: se requiere seleccionar la opción de aplicarla a todos.
+
+## Nombre del lugar y acceso a Google Maps
+
+Los enlaces verificados guardan el nombre extraído de la misma entidad de Google en `TransactionPlace.name`; se prefiere su nombre comercial a la dirección completa. Los enlaces completos pueden aportar el nombre de su ruta `/maps/place/...`. Si no existe un nombre verificable, se conserva el nombre previo o un rótulo genérico. Seleccionar una ubicación no cambia automáticamente `transaction.merchant`: el descriptor financiero sigue siendo editable por el usuario y es la clave de sus reglas por comercio.
+
+**Ver en Google Maps** permanece disponible tanto en la vista compacta como durante la edición, incluso si falla el mapa. Usa el enlace de Google validado cuando corresponde al lugar elegido, o un enlace generado por coordenadas; las capturas del teléfono mantienen además sus enlaces originales dentro de su desplegable de evidencia.

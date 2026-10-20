@@ -44,9 +44,14 @@ describe('identity-verified Google Maps places', () => {
     const request = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: page } }))
       .mockResolvedValueOnce(html([[[1000, -120, 38]], null, [entity()]], '<meta property="og:image" content="https://maps.google.com/maps/api/staticmap?center=38,-120">'));
-    expect(await resolveGoogleMapsLink('https://maps.app.goo.gl/synthetic?g_st=ic', request)).toEqual({ latitude: 4.6, longitude: -74.1, approximate: false, url: page });
+    expect(await resolveGoogleMapsLink('https://maps.app.goo.gl/synthetic?g_st=ic', request)).toEqual({ latitude: 4.6, longitude: -74.1, approximate: false, name: 'Comercio sintético', url: page });
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[1][0]).toBe('https://www.google.com/maps?cid=2&output=embed');
+  });
+  it('returns the business label from the matched entity rather than its full address or another place', async () => {
+    const record = [featureId, 'Comercio, dirección completa', [4.6, -74.1], '2'];
+    const request = vi.fn().mockResolvedValue(html([[[record, '  Nombre  del comercio  ', ['Dirección sintética']]], [[entity([38, -120], '0x3:0x4', '4'), 'Otro lugar']]]));
+    expect(await resolveGoogleMapsLink(page, request)).toMatchObject({ name: 'Nombre del comercio', latitude: 4.6, longitude: -74.1 });
   });
   it('never treats generic preview metadata, camera state or another business as place evidence', async () => {
     for (const payload of [[], [[[1000, -120, 38]]], [entity([38, -120], '0x3:0x4', '4')], [entity([4.6, -74.1], featureId, '4')]]) {

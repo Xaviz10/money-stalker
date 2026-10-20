@@ -67,19 +67,21 @@ function embedData(script: string): unknown[] {
 /** Only read a coordinate tuple attached to the exact requested place identity. */
 function entityPoint(data: unknown[], expected: PlaceIdentity, url: string): GoogleLinkLocation | undefined {
   const points: GoogleLinkLocation[] = [];
-  const pending: unknown[] = [...data];
+  const pending: { value: unknown; parent?: unknown[] }[] = data.map(value => ({ value }));
   let visited = 0;
   while (pending.length) {
     if (++visited > 20000) throw new Error(unreadable);
-    const entry = pending.pop();
+    const { value: entry, parent } = pending.pop()!;
     if (!Array.isArray(entry)) continue;
     const identity = typeof entry[0] === 'string' ? featureID(entry[0]) : undefined;
     if (identity && identity.cid === expected.cid && (!expected.featureId || identity.featureId === expected.featureId) && entry[3] === expected.cid && Array.isArray(entry[2]) && entry[2].length === 2) {
       const [latitude, longitude] = entry[2];
       if (typeof latitude !== 'number' || typeof longitude !== 'number' || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) throw new Error(unreadable);
-      points.push({ latitude, longitude, url, approximate: false });
+      const label = parent?.[0] === entry && typeof parent[1] === 'string' ? parent[1] : entry[1];
+      const name = typeof label === 'string' ? label.trim().replace(/\s+/g, ' ').slice(0, 200) : undefined;
+      points.push({ latitude, longitude, ...(name ? { name } : {}), url, approximate: false });
     }
-    for (const child of entry) if (Array.isArray(child)) pending.push(child);
+    for (const child of entry) if (Array.isArray(child)) pending.push({ value: child, parent: entry });
   }
   if (new Set(points.map(point => `${point.latitude},${point.longitude}`)).size > 1) throw new Error(unreadable);
   return points[0];

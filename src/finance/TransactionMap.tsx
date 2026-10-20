@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { PlacePicker } from "./PlacePicker";
 import { appleMapsURL, capturedAddress, googleMapsURL } from "../../domain/location";
 import type { Capture, TransactionPlace } from "../../domain/model";
@@ -5,9 +6,9 @@ type CapturedLocation = NonNullable<Capture["location"]>;
 function locationTime(value: string) {
   return new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }).format(new Date(value));
 }
-export function TransactionMap({ captured, merchant, place, onPlaceChange }: { captured: CapturedLocation[]; merchant: string; place?: TransactionPlace; onPlaceChange: (place?: TransactionPlace) => void }) {
+export function TransactionMap({ captured, merchant, place, onPlaceChange, children }: { children?: ReactNode; captured: CapturedLocation[]; merchant: string; place?: TransactionPlace; onPlaceChange: (place?: TransactionPlace) => void }) {
  return <div className="transaction-map">
-  <PlacePicker merchant={merchant} captured={captured} place={place} onChoose={onPlaceChange} />
+  <PlacePicker merchant={merchant} captured={captured} place={place} onChoose={onPlaceChange}>{children}</PlacePicker>
       {captured.length > 0 && (
         <details className="captured-location-list"><summary>Ubicación original del atajo</summary>
           {captured.map((location) => (
