@@ -31,7 +31,7 @@ export const accountSchema = z.object({
   institution: text.optional(), institutionUrl: institutionUrl.optional(), imageDataUrl: accountImage.optional(),
   parentAccountId: id.optional(), captureAliases: z.array(text.min(1).refine(value => !/\d{5,}/.test(value), 'Usa nombres o solo los últimos cuatro dígitos')).max(10).optional(),
 });
-export const instrumentSchema = z.object({ id, name: text.min(1), accountId: id, aliases: z.array(text.min(1)).max(10) });
+export const instrumentSchema = z.object({ id, name: text.min(1), accountId: id, aliases: z.array(text.min(1).refine(value => !/\d{5,}/.test(value), 'Usa nombres o solo los últimos cuatro dígitos')).max(10) });
 export const categorySchema = z.object({
   id, name: text.min(1), scope: z.enum(['expense', 'income', 'both']).default('expense'), parentId: id.optional(),
 });

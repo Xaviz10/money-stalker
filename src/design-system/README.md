@@ -86,3 +86,7 @@ Reuse existing tokens/components before adding a new one. Promote a repeated, sa
 Use primary-blue outlines at 12–18% opacity on light surfaces and white at 16% on the blue rail. Decorative elements have `aria-hidden`, ignore pointer events and remain static. Reserve their own space; hide heading motifs below 380px rather than squeezing text. The `Eyes` companion keeps its dark capsule and −12° inclination.
 
 The favicon and installed-app icons use primary blue `#1949db`, the complete eye mark in the lower-right corner, and faint coin/receipt outlines. Maskable variants inset the mark for platform cropping. Edit `public/icon.svg` and regenerate PNGs with `scripts/generate-icons.mjs`; keep favicon, Apple touch and PWA assets consistent. See the live variants at `#/design-system` and the portable rules in root `DESIGN.md`.
+
+## Product setup
+
+The account creation form asks for type, name, opening balance/date, then SMS identity for non-cash products. Bank accounts offer “Agregar tarjeta débito ahora”; the optional card shares the source balance and saves with the account as one operation. Keep visual personalization and organization in the collapsed “Más opciones” disclosure. Product editing owns future alias changes and “Agregar tarjeta débito”; the shared iPhone connection keeps four primary steps and a final optional later-card form. SMS identification status never implies that an automation is connected.

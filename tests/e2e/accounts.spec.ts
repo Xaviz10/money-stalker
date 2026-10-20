@@ -27,11 +27,12 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   await expect(page.locator(".standalone-cards")).toContainText(
     "Nu independiente",
   );
-  await create.locator("summary").click();
+  await create.locator(":scope > summary").click();
   await create.getByLabel("Tipo de cuenta").selectOption("bank");
   await create
     .getByLabel("Nombre de la cuenta", { exact: true })
     .fill("Ahorros");
+  await create.getByText("Más opciones · banco, imagen y organización", { exact: true }).click();
   await create.getByLabel("Banco o entidad (opcional)").fill("Bancolombia");
   await create.getByLabel("Saldo inicial (COP)").fill("1.000.000");
   await create.getByLabel("Fecha del saldo inicial").fill("2026-01-01");
@@ -44,6 +45,7 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
     has: page.getByText("Configurar capturas automáticas", { exact: true }),
   });
   await instrument.locator(":scope > summary").click();
+  await instrument.getByText("Agregar una tarjeta o alias después", { exact: false }).click();
   await instrument.getByLabel("Nombre de tarjeta").fill("Visa débito");
   await instrument.getByLabel("Cuenta asociada").selectOption(bank.id);
   await instrument.getByLabel("Alias separados por comas").fill("1234");
@@ -182,8 +184,8 @@ test("capture setup keeps the new access visible and verifies an actual arrival"
   // Read the ephemeral test token locally; never include it in screenshots.
   const token = await setup.locator("code.token").first().textContent();
   await setup.getByRole("button", { name: "Ya lo guardé" }).click();
-  await setup.locator(".capture-step").filter({ has: page.getByText("4. Conecta el Atajo") }).locator(":scope > summary").click();
-  const arrival = setup.locator(".capture-step").filter({ has: page.getByText("5. Verifica la primera evidencia") });
+  await setup.locator(".capture-step").filter({ has: page.getByText("3. Conecta el Atajo") }).locator(":scope > summary").click();
+  const arrival = setup.locator(".capture-step").filter({ has: page.getByText("4. Verifica la primera evidencia") });
   await arrival.locator(":scope > summary").click();
   await expect(arrival).toContainText("Aún no hay evidencias de SMS o Wallet recibidas.");
   await request.post(`${apiBase}/capture-events`, { headers: { Authorization: `Bearer ${token}` }, data: {
@@ -197,4 +199,40 @@ test("capture setup keeps the new access visible and verifies an actual arrival"
   await expect(setup.locator("code.token")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("capture-setup.png"), fullPage: true });
+});
+
+test("product setup includes SMS aliases and optional debit, with another card added later", async ({ page, request }, info) => {
+  await page.goto("./#/cuentas");
+  const create = page.locator(".settings-section").filter({ has: page.getByText("Agregar producto", { exact: true }) });
+  await create.getByLabel("Nombre de la cuenta", { exact: true }).fill("Ahorros iniciales");
+  await create.getByLabel("Saldo inicial (COP)").fill("1.000.000");
+  await create.getByLabel("Fecha del saldo inicial").fill("2026-01-01");
+  await create.getByLabel("Alias del producto en SMS (opcional)").fill("3344");
+  await create.getByLabel("Agregar tarjeta débito ahora").check();
+  await create.getByLabel("Alias de la tarjeta débito en SMS", { exact: true }).fill("5566");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: info.outputPath("initial-product-sms.png"), fullPage: true });
+  await create.getByRole("button", { name: "Guardar", exact: true }).click();
+  const row = page.locator(".account-row").filter({ has: page.getByText("Ahorros iniciales", { exact: true }) });
+  await expect(row).toContainText("Identificación SMS configurada");
+  let state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.accounts).toHaveLength(1);
+  expect(state.accounts[0].captureAliases).toEqual(["3344"]);
+  expect(state.instruments).toHaveLength(1);
+  expect(state.instruments[0]).toMatchObject({ name: "Débito · Ahorros iniciales", accountId: state.accounts[0].id, aliases: ["5566"] });
+  await row.getByText("Editar producto", { exact: true }).click();
+  await expect(row.getByLabel("Alias del producto en SMS (opcional)")).toHaveValue("3344");
+  await row.getByText("Agregar tarjeta débito", { exact: true }).click();
+  await row.getByLabel("Nombre de la tarjeta débito (opcional)").fill("Segunda débito");
+  await row.getByLabel("Alias de la tarjeta débito en SMS", { exact: true }).fill("7788");
+  await row.getByRole("button", { name: "Guardar tarjeta débito", exact: true }).click();
+  state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.accounts).toHaveLength(1);
+  expect(state.instruments).toHaveLength(2);
+  const device = await (await request.post(`${apiBase}/devices`, { data: { name: "iPhone sintético" } })).json();
+  await request.post(`${apiBase}/capture-events`, { headers: { Authorization: `Bearer ${device.token}` }, data: { eventId: "initial-debit-capture", source: "sms", observedAt: "2026-10-20T18:00:00Z", message: "Bancolombia: Compraste $22.000,00 en COMERCIO EJEMPLO con tu T.Deb *5566, el 18/10/2026 a las 10:55." } });
+  await expect.poll(async () => (await (await request.get(`${apiBase}/state`)).json()).observations.length).toBe(1);
+  state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.observations[0].accountId).toBe(state.accounts[0].id);
+  expect(state.observations[0].amountMinor).toBe("2200000");
 });

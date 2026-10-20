@@ -129,3 +129,24 @@ describe('evidence reconciliation and corrections', () => {
   it('stores incomplete evidence without inventing a purchase', () => { const s = setup(); ingestCapture(s, observation('missing', { amountMinor: undefined })); expect(s.transactions).toHaveLength(0); expect(dashboard(s, '2026-10-17').incomplete).toBe(1); });
   it('rejects cross-account merges and undo over later edits', () => { const s = setup(); ingestCapture(s, observation('one')); resolveObservation(s, 'one', 'separate', at); ingestCapture(s, observation('missing', { accountId: 'bank', amountMinor: undefined })); expect(() => mergeObservation(s, 'missing', s.transactions[0].id, at)).toThrow(); editTransaction(s, s.transactions[0].id, { merchant: 'A' }, at); const audit = s.audit.at(-1)!.id; editTransaction(s, s.transactions[0].id, { merchant: 'B' }, at); expect(() => undo(s, audit, at)).toThrow(/posteriores/); });
 });
+
+describe('product setup and initial debit identity', () => {
+  it('saves one bank balance and its debit card atomically and retries without duplicates', () => {
+    const state = emptyState();
+    const input = { id: 'new-bank', name: 'Ahorros', kind: 'bank', openingMinor: '10000000', openingDate: '2026-01-01', captureAliases: ['3344'], initialInstrument: { id: 'new-debit', name: 'Débito', aliases: ['5566'] } };
+    configure(state, 'accounts', input);
+    configure(state, 'accounts', input);
+    expect(state.accounts).toHaveLength(1);
+    expect(state.instruments).toEqual([{ id: 'new-debit', name: 'Débito', accountId: 'new-bank', aliases: ['5566'] }]);
+    expect(dashboard(state, '2026-10-20').availableMinor).toBe('10000000');
+  });
+  it('leaves no account when its initial card alias conflicts or exposes a full number', () => {
+    const state = setup();
+    configure(state, 'instruments', { id: 'existing', name: 'Débito existente', accountId: 'bank', aliases: ['5566'] });
+    const before = structuredClone(state);
+    for (const alias of ['5566', '1234567890123456']) {
+      expect(() => configure(state, 'accounts', { id: 'other-bank', name: 'Otra', kind: 'bank', openingMinor: '0', openingDate: '2026-01-01', initialInstrument: { id: 'other-debit', name: 'Otra débito', aliases: [alias] } })).toThrow();
+      expect(state).toEqual(before);
+    }
+  });
+});

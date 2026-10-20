@@ -19,6 +19,7 @@ test("category set and product artwork stay clear and editable", async ({
     has: page.getByText("Agregar producto", { exact: true }),
   });
   await create.getByLabel("Nombre de la cuenta").fill("Ahorros con identidad");
+  await create.getByText("Más opciones · banco, imagen y organización", { exact: true }).click();
   await create.getByLabel("Banco o entidad (opcional)").fill("Bancolombia");
   await create
     .getByLabel("Sitio web del banco (opcional)")

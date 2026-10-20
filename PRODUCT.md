@@ -62,3 +62,5 @@ Manual investment contributions offer existing investment products or inline pro
 Investment entry is hierarchical: choose Inversión in the expense-category selector, then select an existing investment product or create one inline. It is stored as a transfer, without requiring a separate investment movement type.
 
 The approved visual identity extends the tilted eye companion with faint coins, receipts, pockets and financial evidence trails across the frontend. These are decorative brand details; they do not imply extra transactions, analysis or evidence.
+
+Initial product setup includes the SMS alias on each non-cash product. A bank may include its debit card in the same atomic save, sharing one balance; debit cards can also be added later from the product editor or capture setup. Product identity and shared iPhone connection remain distinct. Optional institution/artwork/organization settings are collapsed to keep the opening setup short.

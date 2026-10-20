@@ -92,6 +92,17 @@ export function configure(state: State, kind: string, input: unknown) {
     state.settings = next; return;
   }
   if (kind === 'accounts') {
+    const setup = accountSchema.extend({ initialInstrument: instrumentSchema.omit({ accountId: true }).optional() }).parse(input);
+    if (setup.initialInstrument) {
+      if (setup.kind !== 'bank' && setup.kind !== 'credit') throw new DomainError('Solo una cuenta bancaria o tarjeta de crédito puede tener una tarjeta asociada');
+      if (state.instruments.some(instrument => instrument.id === setup.initialInstrument!.id && instrument.accountId !== setup.id)) throw new DomainError('Esta tarjeta ya pertenece a otro producto');
+      const { initialInstrument, ...account } = setup;
+      const staged = { ...state, accounts: [...state.accounts], instruments: [...state.instruments] };
+      configure(staged, 'accounts', account);
+      configure(staged, 'instruments', { ...initialInstrument, accountId: setup.id });
+      state.accounts = staged.accounts; state.instruments = staged.instruments;
+      return;
+    }
     const item = accountSchema.parse(input), old = state.accounts.find(a => a.id === item.id);
     if (item.parentAccountId) {
       if (item.kind !== 'credit') throw new DomainError('Solo una tarjeta de crédito puede vincularse a una cuenta bancaria');

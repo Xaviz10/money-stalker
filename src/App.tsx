@@ -1911,6 +1911,7 @@ function AccountEditor({
 }) {
   const [saved, setSaved] = useState(false),
     [kind, setKind] = useState(account.kind);
+  const newDebitId = useRef(freshId());
   const hasMovements = state.transactions.some(
     (t) => t.accountId === account.id || t.counterAccountId === account.id,
   ) || (state.valuations ?? []).some(value => value.accountId === account.id);
@@ -2017,7 +2018,7 @@ function AccountEditor({
             <option value="investment">Inversión</option>
           </select>
         </Field>
-        {(kind === "pocket" || kind === "investment") && <Field label="Alias de destino en SMS (opcional)"><input name="captureAliases" defaultValue={(account.captureAliases ?? []).join(", ")} placeholder="Últimos cuatro dígitos o nombre del destino" /><small>Separa los alias con comas. Un SMS compatible con origen y destino inequívocos moverá el dinero automáticamente. Nunca uses números completos.</small></Field>}
+        {kind !== "cash" && <Field label={kind === "pocket" || kind === "investment" ? "Alias de destino en SMS (opcional)" : "Alias del producto en SMS (opcional)"}><input name="captureAliases" defaultValue={(account.captureAliases ?? []).join(", ")} placeholder="Últimos cuatro dígitos o nombre del destino" /><small>{kind === "pocket" || kind === "investment" ? "Separa los alias con comas. Un SMS compatible con origen y destino inequívocos podrá reconocer este destino propio." : "Usa el nombre o los últimos cuatro dígitos que aparecen en el SMS, separados por comas."} Nunca uses números completos.</small></Field>}
         <div className="form-grid">
           <Field
             label={
@@ -2135,10 +2136,20 @@ function AccountEditor({
           (instrument) => instrument.accountId === account.id,
         ) && (
           <p className="small-note">
-            Todavía no hay una tarjeta o alias asociado. Puedes agregarlo en
-            Capturas automáticas.
+            Puedes agregar una tarjeta después en Capturas automáticas. Los alias del producto se editan arriba.
           </p>
         )}
+        {account.kind === "bank" && <DisclosureEditor label="Agregar tarjeta débito">
+          <AppForm submit="Guardar tarjeta débito" onSubmit={async f => {
+            await saveInstrument({ id: newDebitId.current, accountId: account.id,
+              name: str(f, "name").trim() || `Débito · ${account.name}`,
+              aliases: str(f, "aliases").split(",").map(value => value.trim()).filter(Boolean) });
+            newDebitId.current = freshId();
+          }}>
+            <Field label="Nombre de la tarjeta débito (opcional)"><input name="name" maxLength={200} placeholder={`Débito · ${account.name}`} /></Field>
+            <Field label="Alias de la tarjeta débito en SMS"><input name="aliases" aria-label="Alias de la tarjeta débito en SMS" required placeholder="Últimos cuatro dígitos" /><small>Comparte el saldo de esta cuenta. Nunca escribas el número completo.</small></Field>
+          </AppForm>
+        </DisclosureEditor>}
       </section>
     </DisclosureEditor>
   );
@@ -2249,6 +2260,9 @@ function Settings({
 }) {
   const [accountKind, setAccountKind] = useState("bank"),
     [token, setToken] = useState("");
+  const [addDebitCard, setAddDebitCard] = useState(false);
+  const productSetupIds = useRef({ account: freshId(), instrument: freshId() });
+  const [productSaved, setProductSaved] = useState(false);
   const [newCategoryScope, setNewCategoryScope] = useState<"expense" | "income">("expense");
   const [devices, setDevices] = useState<
     { id: string; name: string; revoked: boolean }[]
@@ -2297,6 +2311,7 @@ function Settings({
                   ? ` · Vinculada a ${state.accounts.find((b) => b.id === a.parentAccountId)?.name ?? "cuenta bancaria"}`
                   : ""}
               </small>
+              {a.kind !== "cash" && <small className="product-sms-status">{[...(a.captureAliases ?? []), ...state.instruments.filter(instrument => instrument.accountId === a.id).flatMap(instrument => instrument.aliases)].length ? "Identificación SMS configurada" : "SMS sin configurar · puedes hacerlo en Editar producto"}</small>}
             </div>
             <strong>
               {formatCOP(summary?.balances[a.id] ?? a.openingMinor)}
@@ -2336,157 +2351,70 @@ function Settings({
           icon="plus"
           open={!state.accounts.length}
         >
-          <AppForm
-            onSubmit={async (f) => {
-              const artwork = await prepareAccountArtwork(
-                f.get("artwork") as File,
-              );
-              await save("/accounts", {
-                id: freshId(),
-                name: str(f, "name"),
-                kind: accountKind,
-                captureAliases: str(f, "captureAliases").split(",").map(value => value.trim()).filter(Boolean),
-                openingMinor: amount(f, "opening"),
-                openingDate: str(f, "date"),
-                eligible: f.get("eligible") === "on",
-                ...(str(f, "institution").trim()
-                  ? { institution: str(f, "institution").trim() }
-                  : {}),
-                ...(str(f, "institutionUrl").trim()
-                  ? { institutionUrl: str(f, "institutionUrl").trim() }
-                  : {}),
-                ...(artwork ? { imageDataUrl: artwork } : {}),
-                ...(accountKind === "credit"
-                  ? {
-                      closingDay: Number(f.get("closing")),
-                      dueDay: Number(f.get("due")),
-                      ...(str(f, "parentAccountId")
-                        ? { parentAccountId: str(f, "parentAccountId") }
-                        : {}),
-                    }
-                  : {}),
-              });
-            }}
-          >
-            <Field label="Nombre de la cuenta">
-              <input
-                name="name"
-                required
-                placeholder="Ahorros, Visa crédito…"
-                maxLength={200}
-              />
-            </Field>
-            <Field label="Banco o entidad (opcional)">
-              <input
-                name="institution"
-                placeholder="Bancolombia, Nu…"
-                maxLength={200}
-              />
-            </Field>
-            {accountKind === "bank" && (
-              <Field label="Sitio web del banco (opcional)">
-                <input
-                  name="institutionUrl"
-                  type="url"
-                  inputMode="url"
-                  placeholder="https://www.bancolombia.com"
-                  maxLength={500}
-                />
-                <small>Intentaremos mostrar su favicon directamente.</small>
-              </Field>
-            )}
-            <Field label="Imagen del producto (opcional)">
-              <input
-                name="artwork"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-              />
-              <small>Úsala para personalizar una cuenta o tarjeta.</small>
-            </Field>
-            {accountKind === "credit" && (
-              <Field label="Cuenta bancaria vinculada (opcional)">
-                <select name="parentAccountId" defaultValue="">
-                  <option value="">Tarjeta independiente</option>
-                  {state.accounts
-                    .filter((a) => a.kind === "bank")
-                    .map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.institution ? `${a.institution} · ` : ""}
-                        {a.name}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-            )}
-            {(accountKind === "pocket" || accountKind === "investment") && <Field label="Alias de destino en SMS (opcional)"><input name="captureAliases" placeholder="Últimos cuatro dígitos o nombre del destino" /><small>Separa los alias con comas. Los SMS de transferencia compatibles podrán reconocer este producto propio y mover el dinero automáticamente.</small></Field>}
+          <p className="small-note">Empieza por el saldo y cómo reconocer este producto en los SMS. Después conecta tu iPhone una sola vez para todas tus cuentas.</p>
+          {productSaved && <p role="status" className="product-setup-success">Producto guardado. Puedes conectar tu iPhone en Capturas automáticas o agregar otro producto.</p>}
+          <AppForm onSubmit={async (f) => {
+            const artwork = await prepareAccountArtwork(f.get("artwork") as File);
+            const aliases = (key: string) => str(f, key).split(",").map(value => value.trim()).filter(Boolean);
+            await save("/accounts", {
+              id: productSetupIds.current.account,
+              name: str(f, "name"), kind: accountKind,
+              captureAliases: aliases("captureAliases"),
+              openingMinor: amount(f, "opening"), openingDate: str(f, "date"),
+              eligible: f.get("eligible") === "on",
+              ...(str(f, "institution").trim() ? { institution: str(f, "institution").trim() } : {}),
+              ...(str(f, "institutionUrl").trim() ? { institutionUrl: str(f, "institutionUrl").trim() } : {}),
+              ...(artwork ? { imageDataUrl: artwork } : {}),
+              ...(accountKind === "bank" && addDebitCard ? { initialInstrument: {
+                id: productSetupIds.current.instrument,
+                name: str(f, "debitName").trim() || `Débito · ${str(f, "name").trim()}`,
+                aliases: aliases("debitAliases"),
+              } } : {}),
+              ...(accountKind === "credit" ? {
+                closingDay: Number(f.get("closing")), dueDay: Number(f.get("due")),
+                ...(str(f, "parentAccountId") ? { parentAccountId: str(f, "parentAccountId") } : {}),
+              } : {}),
+            });
+            productSetupIds.current = { account: freshId(), instrument: freshId() };
+            setAddDebitCard(false); setProductSaved(true);
+          }}>
+            <Field label="Tipo de cuenta"><select value={accountKind} onChange={event => { setAccountKind(event.target.value); setAddDebitCard(false); setProductSaved(false); }}>
+              <option value="bank">Cuenta bancaria</option><option value="credit">Tarjeta de crédito</option><option value="cash">Efectivo</option><option value="pocket">Bolsillo</option><option value="investment">Inversión</option>
+            </select></Field>
+            <Field label="Nombre de la cuenta"><input name="name" required placeholder="Ahorros, Visa crédito, Viaje…" maxLength={200} /></Field>
             <div className="form-grid">
-              <Field label="Tipo de cuenta">
-                <select
-                  value={accountKind}
-                  onChange={(e) => setAccountKind(e.target.value)}
-                >
-                  <option value="bank">Cuenta bancaria</option>
-                  <option value="credit">Tarjeta de crédito</option>
-                  <option value="cash">Efectivo</option>
-                  <option value="pocket">Bolsillo</option>
-                  <option value="investment">Inversión</option>
-                </select>
-              </Field>
-              <Field
-                label={
-                  accountKind === "credit"
-                    ? "Deuda inicial (COP)"
-                    : "Saldo inicial (COP)"
-                }
-              >
-                <input
-                  name="opening"
-                  required
-                  inputMode="decimal"
-                  placeholder="0"
-                />
-              </Field>
-              <Field label="Fecha del saldo inicial">
-                <input
-                  name="date"
-                  required
-                  type="date"
-                  defaultValue={bogotaDate()}
-                  max={bogotaDate()}
-                />
-              </Field>
-              {accountKind === "credit" && (
-                <>
-                  <Field label="Día de corte">
-                    <input
-                      name="closing"
-                      type="number"
-                      min="1"
-                      max="31"
-                      required
-                    />
-                  </Field>
-                  <Field label="Día de pago">
-                    <input name="due" type="number" min="1" max="31" required />
-                  </Field>
-                </>
-              )}
+              <Field label={accountKind === "credit" ? "Deuda inicial (COP)" : "Saldo inicial (COP)"}><input name="opening" required inputMode="decimal" placeholder="0" /></Field>
+              <Field label="Fecha del saldo inicial"><input name="date" required type="date" defaultValue={bogotaDate()} max={bogotaDate()} /></Field>
             </div>
-            {(accountKind === "bank" || accountKind === "cash") ? (
-              <label className="checkbox">
-                <input name="eligible" type="checkbox" defaultChecked /> Incluir
-                este saldo en el disponible
-              </label>
-            ) : accountKind === "credit" ? (
-              <p className="small-note">
-                La tarjeta conserva su propia deuda. Vincularla a una cuenta
-                solo organiza la vista; puedes dejarla independiente.
-              </p>
-            ) : <p className="small-note">Este saldo queda fuera del disponible general. Registra una transferencia desde tu cuenta para separar dinero aquí; no lo registres como un gasto. El saldo inicial debe representar dinero ya separado.</p>}
-            <p className="small-note">
-              Esta fecha fija el punto de partida del saldo. Los movimientos
-              anteriores quedarán en el historial sin cambiar el saldo actual.
-            </p>
+            <p className="small-note">Usa el saldo de esa fecha. Los movimientos anteriores se conservarán en el historial sin cambiarlo.</p>
+            {accountKind !== "cash" && <section className="product-capture-setup">
+              <h3>Cómo aparece en tus SMS</h3>
+              <Field label={accountKind === "pocket" || accountKind === "investment" ? "Alias de destino en SMS (opcional)" : "Alias del producto en SMS (opcional)"}>
+                <input name="captureAliases" placeholder={accountKind === "pocket" || accountKind === "investment" ? "Nombre del destino o últimos cuatro dígitos" : "Últimos cuatro dígitos que muestra el SMS"} />
+                <small>Guarda solo el nombre o los últimos cuatro dígitos, separados por comas. Nunca el número completo. Puedes completarlo después en Editar producto.</small>
+              </Field>
+              {accountKind === "bank" && <>
+                <label className="checkbox"><input type="checkbox" checked={addDebitCard} onChange={event => setAddDebitCard(event.target.checked)} /> Agregar tarjeta débito ahora</label>
+                {addDebitCard ? <div className="form-grid">
+                  <Field label="Nombre de la tarjeta débito (opcional)"><input name="debitName" maxLength={200} placeholder="Débito · usa el nombre de la cuenta" /></Field>
+                  <Field label="Alias de la tarjeta débito en SMS"><input name="debitAliases" aria-label="Alias de la tarjeta débito en SMS" required placeholder="Últimos cuatro dígitos" /><small>Usa los que aparecen junto a T.Deb en el mensaje. Las compras descontarán el saldo de esta cuenta.</small></Field>
+                </div> : <p className="small-note">Puedes añadir la tarjeta después. La tarjeta débito comparte el saldo de la cuenta.</p>}
+              </>}
+              {accountKind === "credit" && <p className="small-note">Usa los últimos cuatro dígitos que aparecen junto a T.Cred. Las compras aumentarán la deuda de esta tarjeta.</p>}
+              {(accountKind === "pocket" || accountKind === "investment") && <p className="small-note">Un SMS compatible con origen y destino inequívocos podrá reconocer este producto como propio.</p>}
+            </section>}
+            {accountKind === "credit" && <div className="form-grid">
+              <Field label="Día de corte"><input name="closing" type="number" min="1" max="31" required /></Field>
+              <Field label="Día de pago"><input name="due" type="number" min="1" max="31" required /></Field>
+            </div>}
+            <details className="product-optional-settings"><summary>Más opciones · banco, imagen y organización</summary><div>
+              <Field label="Banco o entidad (opcional)"><input name="institution" placeholder="Bancolombia, Nu…" maxLength={200} /></Field>
+              {accountKind === "bank" && <Field label="Sitio web del banco (opcional)"><input name="institutionUrl" type="url" inputMode="url" placeholder="https://www.bancolombia.com" maxLength={500} /><small>Intentaremos mostrar su favicon.</small></Field>}
+              <Field label="Imagen del producto (opcional)"><input name="artwork" type="file" accept="image/jpeg,image/png,image/webp" /></Field>
+              {accountKind === "credit" && <Field label="Cuenta bancaria vinculada (opcional)"><select name="parentAccountId" defaultValue=""><option value="">Tarjeta independiente</option>{state.accounts.filter(account => account.kind === "bank").map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select><small>Organiza la tarjeta sin mezclar su deuda con el saldo de la cuenta.</small></Field>}
+              {(accountKind === "bank" || accountKind === "cash") && <label className="checkbox"><input name="eligible" type="checkbox" defaultChecked /> Incluir este saldo en el disponible</label>}
+            </div></details>
+            {(accountKind === "pocket" || accountKind === "investment") && <p className="small-note">Este saldo ya debe estar separado de tus otras cuentas. Para agregar dinero después, registra una transferencia; no es un gasto ni se incluye en el disponible general.</p>}
           </AppForm>
         </SettingsSection>
         <SettingsSection
@@ -2564,70 +2492,12 @@ function Settings({
         </SettingsSection>
         <SettingsSection
           title="Configurar capturas automáticas"
-          description="Asocia tus tarjetas y conecta SMS, Wallet y ubicación"
+          description="Conecta el iPhone una vez para tus productos"
           icon="card"
         >
-          <p className="small-note">Conecta primero SMS. Activa Wallet solo si tu iPhone entrega los datos necesarios. Puedes abrir cualquier paso y continuar después.</p>
-          <details className="capture-step" open={!state.instruments.length}>
-          <summary>1. Asocia tu tarjeta <small>{state.instruments.length ? `${state.instruments.length} ${state.instruments.length === 1 ? "asociada" : "asociadas"}` : "Cuenta y últimos cuatro dígitos"}</small></summary>
-          <div>
-          <p className="small-note">
-            Una tarjeta débito apunta a su cuenta bancaria; no crea un saldo
-            nuevo. Agrega los últimos cuatro dígitos que aparecen en tus SMS,
-            por ejemplo los últimos cuatro dígitos visibles en cada mensaje.
-            Nunca guardes números completos.
-          </p>
-          <p className="small-note">
-            Para una tarjeta de crédito, créala primero arriba como una cuenta
-            de tipo <strong>Tarjeta de crédito</strong>. Después asocia aquí sus
-            alias de SMS y Wallet. El tipo débito o crédito depende de la cuenta
-            elegida.
-          </p>
-          <AppForm
-            onSubmit={(f) =>
-              save("/instruments", {
-                id: freshId(),
-                name: str(f, "name"),
-                accountId: str(f, "accountId"),
-                aliases: str(f, "aliases")
-                  .split(",")
-                  .map((v) => v.trim())
-                  .filter(Boolean),
-              })
-            }
-          >
-            <Field label="Nombre de tarjeta">
-              <input name="name" required placeholder="Débito · Wallet" />
-            </Field>
-            <Field label="Cuenta asociada">
-              <select name="accountId" required>
-                <option value="">Selecciona una cuenta</option>
-                {state.accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ·{" "}
-                    {a.kind === "credit"
-                      ? "crédito"
-                      : a.kind === "bank"
-                        ? "débito"
-                        : "efectivo"}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Alias separados por comas">
-              <input name="aliases" placeholder="1122, wallet-debito" />
-            </Field>
-          </AppForm>
-          {state.instruments.length > 0 && (
-            <p className="small-note capture-product-note">
-              Para cambiar una tarjeta o sus alias, abre <strong>Editar
-              producto</strong> junto a la cuenta o tarjeta correspondiente en
-              Tus cuentas.
-            </p>
-          )}
-          </div></details>
+          <p className="small-note">Los alias se configuran al agregar o editar cada producto. Aquí conectas el iPhone para enviar los SMS de todas tus cuentas. Configurar un alias todavía no conecta la automatización.</p>
           <details className="capture-step">
-          <summary>2. Prueba tu iPhone <small>Comprueba el texto antes de conectar</small></summary><div>
+          <summary>1. Prueba tu iPhone <small>Comprueba el texto antes de conectar</small></summary><div>
           <p className="small-note shortcut-guide-intro">
             Apple permite activar automatizaciones con Mensajes y Wallet, pero
             no documenta que siempre entreguen el texto, el valor o el comercio.
@@ -2754,7 +2624,7 @@ function Settings({
           </div>
           </div></details>
           <details className="capture-step" open={Boolean(token) || (Boolean(state.instruments.length) && !devices.some((device) => !device.revoked))}>
-          <summary>3. Crea el acceso del iPhone <small>Un acceso privado para SMS y Wallet</small></summary><div>
+          <summary>2. Crea el acceso del iPhone <small>Un acceso privado para SMS y Wallet</small></summary><div>
           <p>
             Crea un acceso privado para este iPhone. El token se guarda solo en
             Atajos y permite enviar capturas; no da acceso a tu sesión ni a tus
@@ -2784,7 +2654,7 @@ function Settings({
           {devices.map((device) => <div className="audit-row" key={device.id}><strong>{device.name}</strong><button className="text-button" disabled={device.revoked} onClick={() => void api(`/devices/${device.id}`, { method: "DELETE" }).then(loadDevices).catch((error) => setDeviceError(error.message))}>{device.revoked ? "Revocado" : "Revocar acceso"}</button></div>)}
           </div></details>
           <details className="capture-step" open={devices.some((device) => !device.revoked)}>
-          <summary>4. Conecta el Atajo <small>SMS primero; Wallet y ubicación opcionales</small></summary><div>
+          <summary>3. Conecta el Atajo <small>SMS primero; Wallet y ubicación opcionales</small></summary><div>
           <details className="shortcut-api-guide" open>
             <summary>Atajo real · SMS Bancolombia</summary>
             <div>
@@ -2943,7 +2813,7 @@ function Settings({
           </details>
           </div></details>
           <details className="capture-step">
-          <summary>5. Verifica la primera evidencia <small>El acceso creado aún no confirma la conexión</small></summary><div>
+          <summary>4. Verifica la primera evidencia <small>El acceso creado aún no confirma la conexión</small></summary><div>
           <p>Después del primer envío, actualiza y busca el comercio, valor y fecha en Revisar. Una evidencia recibida confirma ese envío; no garantiza que iOS ejecute todas las automatizaciones.</p>
           <button type="button" className="button secondary" onClick={async () => { setCaptureChecking(true); setCaptureFeedback(""); try { const refreshed = await refresh(); setCaptureFeedback(refreshed ? "Datos actualizados. Revisa la última evidencia recibida." : "No se pudo actualizar. Intenta de nuevo."); } finally { setCaptureChecking(false); } }} disabled={captureChecking}>{captureChecking ? "Comprobando…" : "Comprobar llegada"}</button>
           <p role="status">{captureFeedback}</p>
@@ -2974,6 +2844,64 @@ function Settings({
               </div>
             </div>
           ) : null}
+          </div></details>
+          <details className="capture-step">
+          <summary>Agregar una tarjeta o alias después <small>Opcional · los alias iniciales se guardan al agregar el producto</small></summary>
+          <div>
+          <p className="small-note">
+            Una tarjeta débito apunta a su cuenta bancaria; no crea un saldo
+            nuevo. Agrega los últimos cuatro dígitos que aparecen en tus SMS,
+            por ejemplo los últimos cuatro dígitos visibles en cada mensaje.
+            Nunca guardes números completos.
+          </p>
+          <p className="small-note">
+            Para una tarjeta de crédito, créala primero arriba como una cuenta
+            de tipo <strong>Tarjeta de crédito</strong>. Después asocia aquí sus
+            alias de SMS y Wallet. El tipo débito o crédito depende de la cuenta
+            elegida.
+          </p>
+          <AppForm
+            onSubmit={(f) =>
+              save("/instruments", {
+                id: freshId(),
+                name: str(f, "name"),
+                accountId: str(f, "accountId"),
+                aliases: str(f, "aliases")
+                  .split(",")
+                  .map((v) => v.trim())
+                  .filter(Boolean),
+              })
+            }
+          >
+            <Field label="Nombre de tarjeta">
+              <input name="name" required placeholder="Débito · Wallet" />
+            </Field>
+            <Field label="Cuenta asociada">
+              <select name="accountId" required>
+                <option value="">Selecciona una cuenta</option>
+                {state.accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ·{" "}
+                    {a.kind === "credit"
+                      ? "crédito"
+                      : a.kind === "bank"
+                        ? "débito"
+                        : "efectivo"}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Alias separados por comas">
+              <input name="aliases" placeholder="1122, wallet-debito" />
+            </Field>
+          </AppForm>
+          {state.instruments.length > 0 && (
+            <p className="small-note capture-product-note">
+              Para cambiar una tarjeta o sus alias, abre <strong>Editar
+              producto</strong> junto a la cuenta o tarjeta correspondiente en
+              Tus cuentas.
+            </p>
+          )}
           </div></details>
         </SettingsSection>
         <SettingsSection

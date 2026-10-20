@@ -5225,3 +5225,13 @@ hr {
 @media (max-width: 380px) {
   .dashboard-intro > .evidence-trail, .page-heading > .evidence-trail { display: none; }
 }
+
+/* Product setup: essentials first, SMS identity beside the product. */
+.product-capture-setup { border-top: 1px solid var(--color-line); padding-top: 20px; display: grid; gap: 14px; }
+.product-capture-setup h3 { font-size: 15px; margin: 0; }
+.product-capture-setup .small-note { margin: 0; }
+.product-optional-settings { border-top: 1px solid var(--color-line); padding-top: 16px; }
+.product-optional-settings > summary { color: var(--color-primary); cursor: pointer; font-size: 13px; font-weight: 650; }
+.product-optional-settings > div { display: grid; gap: 16px; padding-top: 18px; }
+.product-setup-success { color: var(--color-success); background: var(--color-success-bg); padding: 12px 16px; border-radius: var(--radius-control); font-size: 13px; }
+.product-sms-status { color: var(--color-muted); }
