@@ -2660,7 +2660,8 @@ function Settings({
                   Agrega <strong>Formatear fecha</strong>. Como entrada elige la
                   variable <strong>Fecha actual</strong> y usa formato
                   <strong>ISO 8601</strong>. Renombra el resultado como
-                  <code>ObservedAt</code>.
+                  <code>ObservedAt</code>. Esa es la opción correcta aunque el
+                  resultado termine en <code>-0500</code> o <code>-05:00</code>.
                 </li>
                 <li>
                   Agrega otro <strong>Formatear fecha</strong> con

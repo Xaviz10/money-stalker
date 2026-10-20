@@ -14,6 +14,8 @@ Both shortcuts call `POST /capture-events` with:
 - `observedAt`, the time the shortcut received or observed the source event
 - `source`, either `sms` or `wallet`
 
+For **Format Date** in Apple Shortcuts, select the built-in **ISO 8601** option. The API accepts both timezone forms produced across iOS versions, such as `-0500` and `-05:00`, and stores the normalized extended form.
+
 The endpoint returns HTTP 202 only after the event and processing marker are durably saved. A retry with the same event ID and same payload is safe. Reusing the ID with different financial data is rejected.
 
 ## SMS automation

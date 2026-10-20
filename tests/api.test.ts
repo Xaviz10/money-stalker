@@ -64,6 +64,18 @@ describe('authorization and capture', () => {
     expect(visible.observations[0]).toMatchObject({ status: 'review', location: { latitude: 5.12345, longitude: -73.12345, accuracy: 18, observedAt: now } });
     expect((await api({ method: 'GET', path: '/state', token })).status).toBe(401);
   });
+  it('accepts and normalizes the basic ISO 8601 timezone emitted by Apple Shortcuts', async () => {
+    const { api, repo } = await setup(); const { token, device } = await repo.createDevice('owner', 'phone');
+    const accepted = await api({ method: 'POST', path: '/capture-events', token, body: {
+      eventId: 'apple-iso', source: 'sms', observedAt: '2026-10-19T18:43:12-0500', message: 'Bancolombia: pagaste $12.000',
+      location: { latitude: 4.60971, longitude: -74.08175, accuracy: 20, observedAt: '2026-10-19T18:43:15-0500' },
+    } });
+    expect(accepted.status).toBe(202);
+    expect((await repo.job('owner', `${device.id}:apple-iso`))?.payload).toMatchObject({
+      observedAt: '2026-10-19T18:43:12-05:00',
+      location: { observedAt: '2026-10-19T18:43:15-05:00' },
+    });
+  });
   it('revokes tokens and excludes security messages before persistence', async () => {
     const { api, repo } = await setup(); const { token, device } = await repo.createDevice('owner', 'phone');
     const request = { method: 'POST', path: '/capture-events', token, body: { eventId: 'otp', source: 'sms', observedAt: now, message: 'Tu código de seguridad es 123456' } };

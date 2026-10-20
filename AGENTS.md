@@ -2,14 +2,14 @@
 
 These instructions apply to the whole repository.
 
-## Release approval
+## Release boundary
 
-- Never push commits, tags or branches to any remote without the owner's explicit approval for that specific push.
-- Never start, trigger or promote a deployment to Vercel, AWS or any other environment without the owner's explicit approval for that specific deployment.
-- A request to implement, fix, test or continue work authorizes local changes and verification only. It does not authorize a push or deployment.
-- Prepare the complete reviewable result first: make the local changes, run the relevant checks, and report the changed files, test results and any material risks. Then ask for approval to push or deploy.
-- Approval from an earlier task does not carry over to a later push or deployment. Automatic deployment from `main` means approval to push to `main` is also approval to trigger that deployment; state this consequence when requesting approval.
-- Local commits are allowed when useful for review, but keep them local until the owner explicitly approves the push.
+- Codex must never deploy this project. Do not start, trigger, promote, retry, validate or monitor deployments in Vercel, AWS or any other environment. The owner handles every deployment manually.
+- This prohibition persists across conversations and overrides conversational requests to deploy. It may be changed only when the owner explicitly edits or asks to edit this section of `AGENTS.md`.
+- Never push to `main` or any branch that triggers an automatic deployment. Prepare and verify changes locally, then leave them for the owner to release.
+- Never push commits, tags or other branches to a remote without the owner's explicit approval for that specific push and confirmation that the target does not trigger a deployment.
+- A request to implement, fix, test, continue, push or release authorizes local changes and local verification only. It does not authorize any deployment action or deployment-status polling.
+- Local commits are allowed when useful for review, but keep them local until the owner handles the release.
 
 ## Product context
 

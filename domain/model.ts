@@ -8,6 +8,11 @@ export const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => {
 export const minor = z.string().regex(/^(0|[1-9]\d{0,16})$/);
 export const positive = minor.refine(v => BigInt(v) > 0n, 'El valor debe ser mayor que cero');
 const text = z.string().trim().max(200);
+// Apple Shortcuts' ISO 8601 date formatter can emit the basic timezone form
+// (`-0500`). Normalize it to RFC 3339's extended form before Zod validates it.
+export const isoTimestamp = z.string().trim()
+  .transform(value => value.replace(/([+-]\d{2})(\d{2})$/, '$1:$2'))
+  .pipe(z.iso.datetime({ offset: true }));
 const institutionUrl = z.url({ protocol: /^https$/ }).max(500).refine(value => {
   const parsed = new URL(value);
   return !parsed.username && !parsed.password;
@@ -39,13 +44,13 @@ export const transactionInput = z.object({
   status: z.enum(['provisional', 'posted']).default('posted'), reference: text.optional(), place: transactionPlaceSchema.optional(),
 });
 export const captureSchema = z.object({
-  eventId: id, source: z.enum(['sms', 'wallet']), observedAt: z.iso.datetime({ offset: true }),
+  eventId: id, source: z.enum(['sms', 'wallet']), observedAt: isoTimestamp,
   instrumentHint: text.optional(), accountId: id.optional(), amountMinor: positive.optional(),
   currency: z.literal('COP').default('COP'), date: date.optional(),
   merchant: text.default(''), kind: z.enum(['expense', 'income', 'transfer', 'refund']).default('expense'),
   counterAccountId: id.optional(), reference: text.optional(), message: z.string().max(3000).optional(),
   location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180),
-    accuracy: z.number().min(0), observedAt: z.iso.datetime({ offset: true }) }).optional(),
+    accuracy: z.number().min(0), observedAt: isoTimestamp }).optional(),
 }).strict();
 export type Account = z.infer<typeof accountSchema>;
 export type Instrument = z.infer<typeof instrumentSchema>;
