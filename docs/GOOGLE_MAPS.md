@@ -1,10 +1,7 @@
-# Google Maps setup
+# Mapas y enlaces de Google Maps
 
-The main captured-location map uses MapLibre GL JS (see `LOCATION_CAPTURE.md`). Money Stalker loads Google Maps only when the owner expands the optional business-confirmation section of a movement editor. The transaction API stores the selected place ID, display name, address and coordinates; it never stores the Google API key.
+El mapa del editor usa MapLibre GL JS y no necesita una clave de Google. El usuario puede pegar un enlace de Google Maps o escribir coordenadas; sin coordenadas puede solicitar su ubicación actual.
 
-1. In Google Cloud, use a billing-enabled project and enable **Maps JavaScript API** and **Places API (New)**.
-2. Create a browser API key. Under **Application restrictions**, choose **Websites** and allow `https://money-stalker.vercel.app/*`. Add the exact Vercel preview domains only if maps are needed in previews.
-3. Under **API restrictions**, allow only **Maps JavaScript API** and **Places API (New)**.
-4. In Vercel, add `VITE_GOOGLE_MAPS_API_KEY` as a Production environment variable and redeploy. This is a public browser configuration value by design; domain and API restrictions protect it. Never use an unrestricted key.
+El servidor resuelve las redirecciones permitidas y, cuando es necesario, lee metadatos limitados de la página final. Los centros de vista previa son aproximados y requieren confirmación antes de guardarlos como lugar del movimiento. No se usa la API de Places ni se geocodifica el nombre del comercio automáticamente.
 
-When the key is absent or Google Maps cannot load, the main MapLibre map, saved evidence and coordinate links remain available. Financial capture continues normally.
+Consulta [LOCATION_CAPTURE.md](LOCATION_CAPTURE.md) para conocer formatos, límites, privacidad y funcionamiento sin conexión. Los lugares guardados anteriormente con un Google Place ID siguen siendo compatibles.

@@ -16,6 +16,9 @@ export function PlacePicker({ merchant, captured, place, onChoose }: { merchant:
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const revision = useRef(0);
+  const lastRead = useRef('');
+  const beforeConfirmation = useRef<TransactionPlace | undefined>(place);
+  const [confirmed, setConfirmed] = useState(false);
   useEffect(() => () => { revision.current++; }, []);
   const point = transactionPlaceSchema.safeParse({ id: `coordinates:${latitude}:${longitude}`, name: merchant || 'Lugar del movimiento', address: place?.address ?? '', latitude: numeric(latitude), longitude: numeric(longitude), source: 'manual' });
   const preview = point.success ? point.data : undefined;
@@ -26,8 +29,12 @@ export function PlacePicker({ merchant, captured, place, onChoose }: { merchant:
     else { onChoose(undefined); setError(''); }
   }
   async function readLink(value: string) {
+    const key = value.trim();
+    if (key && lastRead.current === key) return;
+    lastRead.current = key;
     const current = ++revision.current;
-    setResolved(undefined); setError('');
+    beforeConfirmation.current = place;
+    setConfirmed(false); setResolved(undefined); setError('');
     if (!value.trim()) { setBusy(false); return; }
     setBusy(true);
     try {
@@ -35,17 +42,17 @@ export function PlacePicker({ merchant, captured, place, onChoose }: { merchant:
       if (current !== revision.current) return;
       setResolved(next); setLatitude(String(next.latitude)); setLongitude(String(next.longitude));
       if (!next.approximate) choose(String(next.latitude), String(next.longitude), next.url);
-    } catch { if (current === revision.current) setError('No pudimos obtener las coordenadas del enlace. Puedes escribirlas o usar tu ubicación actual.'); }
+    } catch { if (current === revision.current) { lastRead.current = ''; setError('No pudimos obtener las coordenadas del enlace. Puedes escribirlas o usar tu ubicación actual.'); } }
     finally { if (current === revision.current) setBusy(false); }
   }
   return <section className="place-picker" aria-label="Elegir o corregir lugar">
-    <Field label="Enlace de Google Maps"><input value={link} onChange={event => { setLink(event.target.value); revision.current++; setBusy(false); setResolved(undefined); setError(''); }} onBlur={() => void readLink(link)} onPaste={event => { const value = event.clipboardData.getData('text'); event.preventDefault(); setLink(value); void readLink(value); }} inputMode="url" maxLength={2000} placeholder="Pega el enlace del lugar" /></Field>
+    <Field label="Enlace de Google Maps"><input value={link} onChange={event => { setLink(event.target.value); lastRead.current = ""; revision.current++; setBusy(false); setResolved(undefined); setError(''); }} onBlur={() => void readLink(link)} onPaste={event => { const value = event.clipboardData.getData('text'); event.preventDefault(); setLink(value); void readLink(value); }} inputMode="url" maxLength={2000} placeholder="Pega el enlace del lugar" /></Field>
     {busy && <p className="small-note" role="status">Leyendo enlace…</p>}
     <div className="form-grid">
       <Field label="Latitud del lugar"><input value={latitude} onChange={event => { revision.current++; setResolved(undefined); setLatitude(event.target.value); choose(event.target.value, longitude); }} inputMode="decimal" placeholder="4.600000" /></Field>
       <Field label="Longitud del lugar"><input value={longitude} onChange={event => { revision.current++; setResolved(undefined); setLongitude(event.target.value); choose(latitude, event.target.value); }} inputMode="decimal" placeholder="−74.100000" /></Field>
     </div>
-    {resolved?.approximate && <label className="checkbox"><input type="checkbox" onChange={event => { if (event.target.checked) choose(latitude, longitude, resolved.url); }} /> Este enlace indica el centro del mapa. Confirmo que corresponde al lugar del movimiento.</label>}
+    {resolved?.approximate && <label className="checkbox"><input type="checkbox" checked={confirmed} onChange={event => { setConfirmed(event.target.checked); if (event.target.checked) choose(latitude, longitude, resolved.url); else onChoose(beforeConfirmation.current); }} /> Ubicación aproximada del enlace. Confirmo que el punto del mapa corresponde al lugar del movimiento.</label>}
     {!preview && <button type="button" className="button secondary" disabled={busy} onClick={() => {
       if (!navigator.geolocation) { setError('Este navegador no permite obtener la ubicación. Pega un enlace o escribe las coordenadas.'); return; }
       const current = ++revision.current;

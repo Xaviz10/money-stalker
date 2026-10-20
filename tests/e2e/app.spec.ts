@@ -157,6 +157,7 @@ test("account → capture → import → review → export works on the project 
   await expect(
     page.getByText("Ubicación capturada por el atajo"),
   ).toBeVisible();
+  await page.getByText("Ubicación original del atajo", { exact: true }).click();
   await expect(
     page.getByRole("link", { name: "Abrir en Google Maps" }),
   ).toHaveAttribute(

@@ -78,3 +78,73 @@ test('MapLibre renders saved coordinates and keeps the map stable while editing'
   expect((await (await request.get(`${api}/state`)).json()).observations[0].location.city).toBe('Ciudad de Prueba');
 });
 
+
+test('shared preview links update MapLibre and require confirmation before saving', async ({ page, request }, info) => {
+  await capturedMovement(request, false);
+  const original = (await (await request.get(`${api}/state`)).json()).observations[0].location;
+  const tile = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/png', body: tile }));
+  let requests = 0;
+  await page.route('**/api/places/resolve-link', route => { requests++; return route.fulfill({ json: { latitude: 4.65, longitude: -74.15, approximate: true, url: 'https://maps.google.com/?q=Comercio+de+prueba&ftid=synthetic' } }); });
+  await page.goto('./#/revisar');
+  await page.getByRole('button', { name: 'Editar antes de guardar', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar antes de guardar', exact: true });
+  const input = dialog.getByLabel('Enlace de Google Maps');
+  // Match the paste → checkbox interaction: blur must not start another lookup.
+  await input.focus();
+  await input.evaluate(el => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text', 'https://maps.app.goo.gl/synthetic?g_st=ic');
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  });
+  await expect(dialog.getByLabel('Latitud del lugar')).toHaveValue('4.65');
+  await expect(dialog.getByLabel('Longitud del lugar')).toHaveValue('-74.15');
+  await expect(dialog.locator('.maplibregl-canvas')).toBeVisible();
+  const confirmation = dialog.getByRole('checkbox', { name: /Ubicación aproximada del enlace/ });
+  await expect(confirmation).not.toBeChecked();
+  await confirmation.check();
+  await expect(confirmation).toBeChecked();
+  expect(requests).toBe(1);
+  await dialog.locator('.place-picker').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('shared-map-preview.png') });
+  expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await dialog.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  const state = await (await request.get(`${api}/state`)).json();
+  expect(state.transactions[0].place).toMatchObject({ latitude: 4.65, longitude: -74.15, source: 'google-link' });
+  expect(state.observations[0].location).toEqual(original);
+});
+
+test('unconfirmed preview coordinates are not silently saved as the merchant place', async ({ page, request }) => {
+  await capturedMovement(request);
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.route('**/api/places/resolve-link', route => route.fulfill({ json: { latitude: 4.65, longitude: -74.15, approximate: true, url: 'https://maps.google.com/?q=Comercio+de+prueba' } }));
+  await page.goto('./#/movimientos');
+  await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await dialog.getByLabel('Enlace de Google Maps').fill('https://maps.app.goo.gl/synthetic');
+  await dialog.getByLabel('Enlace de Google Maps').blur();
+  const confirmation = dialog.getByRole('checkbox', { name: /Ubicación aproximada del enlace/ });
+  await confirmation.check();
+  await confirmation.uncheck();
+  await dialog.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect((await (await request.get(`${api}/state`)).json()).transactions[0].place).toBeUndefined();
+});
+
+test('unresolvable shared links preserve the previously selected place', async ({ page, request }) => {
+  await capturedMovement(request);
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.route('**/api/places/resolve-link', route => route.fulfill({ status: 400, json: { error: 'Enlace no disponible' } }));
+  await page.goto('./#/movimientos');
+  await page.getByRole('button', { name: 'COMERCIO DE PRUEBA', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar movimiento', exact: true });
+  await dialog.getByLabel('Latitud del lugar').fill('4.65');
+  await dialog.getByLabel('Longitud del lugar').fill('-74.15');
+  await dialog.getByLabel('Enlace de Google Maps').fill('https://maps.app.goo.gl/unavailable');
+  await dialog.getByLabel('Enlace de Google Maps').blur();
+  await expect(dialog.getByRole('alert')).toContainText('No pudimos obtener las coordenadas');
+  await dialog.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect((await (await request.get(`${api}/state`)).json()).transactions[0].place).toMatchObject({ latitude: 4.65, longitude: -74.15, source: 'manual' });
+});

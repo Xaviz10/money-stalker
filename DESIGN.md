@@ -342,3 +342,5 @@ Location maps reserve the same frame height while loading, ready or failed. Rend
 
 
 La edición de ubicación muestra solo enlace de Google Maps, latitud, longitud y mapa siempre presente. Resolver el enlace al pegarlo o salir del campo actualiza la vista; los centros aproximados requieren confirmación. Sin coordenadas se ofrece «Usar mi ubicación», únicamente por acción explícita y con permiso del navegador. La evidencia original del atajo queda en un desplegable y se conserva al corregir el lugar. Guardar el movimiento confirma los cambios.
+
+Los enlaces compartidos de Google pueden producir un centro aproximado a partir de sus metadatos. Mostrarlo en MapLibre con confirmación explícita («Ubicación aproximada del enlace»); no presentarlo como ubicación exacta del comercio. Pegar un enlace y después salir del campo no debe reiniciar una resolución ya completada.

@@ -514,7 +514,7 @@
       },
       {
         "name": "The Place Correction Rule",
-        "body": "All movement forms show Google Maps URL, latitude, longitude and a persistent MapLibre frame. Resolve pasted links automatically; camera-center URLs require acknowledgment. Offer current location on explicit action when coordinates are absent. Preserve original Shortcut evidence in a collapsed disclosure. Saving the movement persists the edited place.",
+        "body": "All movement forms show Google Maps URL, latitude, longitude and a persistent MapLibre frame. Resolve pasted links automatically. Camera-center URLs and HTML preview centers require explicit acknowledgment; never claim an exact merchant point from preview metadata. Pasting then blurring must not restart a completed lookup. Offer current location on explicit action when coordinates are absent. Preserve original Shortcut evidence in a collapsed disclosure. Saving the movement persists the edited place.",
         "section": "layout"
       }
     ],
