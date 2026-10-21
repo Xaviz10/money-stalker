@@ -227,7 +227,7 @@ test("movement filters close directly and separate category from subcategory", a
   page,
 }) => {
   await page.goto("./#/movimientos");
-  await page.getByText("Filtros y acciones", { exact: true }).first().click();
+  await page.locator(".register-more > summary").click();
   const panel = page.locator(".register-more-panel");
   await panel.getByLabel("Categoría", { exact: true }).selectOption("car");
   await expect(panel.getByLabel("Subcategoría (opcional)")).toBeVisible();

@@ -130,7 +130,7 @@ test("manual investments offer existing products and inline creation, then CSV r
   await editor.getByRole("button", { name: "Registrar movimiento", exact: true }).click();
   await expect(editor).not.toBeVisible();
   await page.getByRole("link", { name: "Movimientos", exact: true }).click();
-  await page.getByText("Filtros y acciones", { exact: true }).click();
+  await page.locator(".register-more > summary").click();
   await page.locator(".register-more").getByRole("button", { name: "Importar archivo" }).click();
   const importDialog = page.getByRole("dialog", { name: "Importar movimientos" });
   await importDialog.getByLabel("Archivo CSV o Excel").setInputFiles({ name: "investment.csv", mimeType: "text/csv", buffer: Buffer.from("Fecha;Descripcion;Valor;Moneda;Tipo\n2026-10-18;FONDO SINTÉTICO;25.000,00;COP;gasto") });
