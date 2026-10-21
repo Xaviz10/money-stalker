@@ -328,3 +328,9 @@ Native React Native/Expo is a later option if usage proves a need for better loc
 6. Run a real statement cycle, measure cleanup time, capture coverage, reconciliation accuracy and actual cost, then expand.
 
 The first milestone is complete when an unchanged bank export imports correctly, an earlier captured purchase is matched without duplication, and the resulting spending total is explainable. That is the foundation for reliable reminders, mortgages in pesos or UVR, informed purchase decisions, and an affordable ChatGPT connection.
+
+## Mortgage implementation update — 2026-10-21
+
+The local implementation now includes separate mortgage products, payment allocation and pending distribution, Bancolombia monthly/annual XLSX previews, evidence-to-payment reconciliation, reversible dated debt snapshots, and equivalent monthly COP/UVR abono comparisons. It reuses existing hosting/storage and requests public official UVR on demand, without a new scheduler. See `docs/LOANS.md` for behavior, explicit assumptions, verification commands and remaining evidence requirements; see `ARCHITECTURE.md` for the updated storage/data flow and growth costs.
+
+Phase 4A is not a claim of complete bank-contract fidelity: exact daily/early-payment conventions, independent lender COP reference periods and complete subsidy/insurance conditions remain validation requirements. Refinancing, purchase of the debt and UVR/peso switching require actual dated quotes and remain the documented next stage. Phase 4B purchase affordability and ChatGPT integration remain separate future work.

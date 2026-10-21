@@ -1,3 +1,4 @@
+import { loanCostMinor } from '../domain/loans';
 import { appleMapsURL, googleMapsURL } from "../domain/location";
 import { DEFAULT_CASH_ID } from "../domain/cash";
 import { createHash } from "node:crypto";
@@ -542,7 +543,7 @@ export function exportRecords(
   format: "csv" | "xlsx",
   accountId?: string,
 ): { bytes: Buffer; type: string } {
-  const records = state.transactions
+  const records: Record<string, string>[] = state.transactions
     .filter(
       (t) =>
         !t.voided &&
@@ -583,6 +584,11 @@ export function exportRecords(
       EnlaceLugar: t.place?.url ?? "",
       Referencia: t.reference ?? "",
       Nota: t.note,
+      TipoPagoCredito: t.loanPayment?.purpose ?? "",
+      DesgloseCredito: JSON.stringify(t.loanPayment?.allocation ?? null),
+      DocumentoCredito: t.loanPayment?.documentId ?? "",
+      VencimientoCredito: t.loanPayment?.dueDate ?? "",
+      GastoCreditoCOP: t.kind === "loan_payment" ? decimalCOP(loanCostMinor(t)) : "",
     }));
   const valuationRecords = (state.valuations ?? []).filter(value => !accountId || value.accountId === accountId).map(value => ({
     ID: value.id, Cuenta: state.accounts.find(account => account.id === value.accountId)?.name ?? value.accountId,
@@ -610,12 +616,18 @@ export function exportRecords(
     "OrigenLugar",
     "EnlaceLugar",
     "Referencia",
-    "Nota",
+    "Nota", "TipoPagoCredito", "DesgloseCredito", "DocumentoCredito", "VencimientoCredito", "GastoCreditoCOP", "CapitalConfirmado", "DenominacionCredito", "DiferenciaCapital",
   ];
   if (format === "csv") for (const value of valuationRecords) records.push({
-    ID: value.ID, Fecha: value.Fecha, Cuenta: value.Cuenta, Destino: "", Tipo: "valoracion", ValorCOP: value.ValorDeclaradoCOP, Moneda: "COP", Comercio: "Valor declarado de inversión", Categoria: "", Estado: value.Estado,
+    ID: value.ID, Fecha: value.Fecha, Cuenta: value.Cuenta, Destino: "", Tipo: "valoracion", ValorCOP: value.ValorDeclaradoCOP, Moneda: "COP", Comercio: "Valor declarado de inversión", Categoria: "", Estado: value.Estado, TipoPagoCredito: "", DesgloseCredito: "", DocumentoCredito: "",
     Evidencias: "", Ubicaciones: "", DetalleUbicaciones: "[]", Lugar: "", DireccionLugar: "", UbicacionLugar: "", GooglePlaceID: "", OrigenLugar: "", EnlaceLugar: "", Referencia: "", Nota: `${value.Nota} · Antes: ${value.ValorAnteriorCOP} COP · Ajuste: ${value.AjusteCOP} COP · ${value.Registrada}`,
   });
+  const loanSnapshots = state.loanSnapshots.filter(s => !accountId || s.loanId === accountId).map(s => ({
+    ID: s.id, Cuenta: state.accounts.find(a => a.id === s.loanId)?.name ?? s.loanId, Fecha: s.date,
+    CapitalConfirmado: s.principal, DenominacionCredito: state.loans.find(l => l.id === s.loanId)?.denomination ?? '',
+    DiferenciaCapital: s.difference, Estado: s.voided ? 'Anulado' : 'Confirmado', Nota: s.reason, DocumentoCredito: s.documentId ?? '',
+  }));
+  if (format === 'csv') records.push(...loanSnapshots.map(s => ({ ...s, Tipo: 'ajuste_deuda', ValorCOP: '', Moneda: s.DenominacionCredito })));
   const sanitized = records.map((row) =>
     Object.fromEntries(Object.entries(row).map(([k, v]) => [k, safeCell(v)])),
   );
@@ -660,6 +672,13 @@ export function exportRecords(
     "Categorias",
   );
   if (valuationRecords.length) XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(valuationRecords.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, safeCell(value)])))), "Valoraciones");
+  const loanSheets = {
+    Creditos: state.loans.filter(l => !accountId || l.id === accountId).map(l => ({ ID: l.id, Denominacion: l.denomination, CapitalInicial: l.principal ?? '', FechaInicial: l.balanceDate ?? '', Tasa: l.ratePercent ?? '', Convencion: l.rateConvention, Plazo: String(l.remainingMonths ?? ''), Subsidio: JSON.stringify(l.subsidy ?? null) })),
+    SaldosCredito: loanSnapshots,
+    EscenariosCredito: state.loanScenarios.filter(s => !accountId || s.loanId === accountId).map(s => ({ ID: s.id, Credito: s.loanId, Nombre: s.name, Supuestos: JSON.stringify(s) })),
+    DocumentosCredito: state.loanDocuments.filter(d => !accountId || d.loanId === accountId).map(d => ({ ID: d.id, Credito: d.loanId, Archivo: d.filename, Periodo: d.period ?? '', Estado: d.status, Perfil: d.profile })),
+  };
+  for (const [name, rows] of Object.entries(loanSheets)) if (rows.length) XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, safeCell(value)])))), name);
   return {
     bytes: XLSX.write(book, { type: "buffer", bookType: "xlsx" }),
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

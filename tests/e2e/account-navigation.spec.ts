@@ -6,6 +6,7 @@ test('product selection stays clear in the mobile selector and compact desktop r
   for (const [id, name] of [['daily', 'Cuenta diaria'], ['savings', 'Ahorros para proyectos personales']]) {
     await request.post(`${api}/accounts`, { data: { id, name, kind: 'bank', institution: 'Banco de prueba', openingMinor: '10000000', openingDate: '2026-01-01' } });
   }
+  await request.post(`${api}/accounts`, { data: { id: 'mortgage', name: 'Crédito vivienda de prueba', kind: 'loan', openingMinor: '0', openingDate: '2026-01-01' } });
   await page.goto('./#/movimientos');
   const mobile = (page.viewportSize()?.width ?? 1280) <= 850;
   if (mobile) {
@@ -25,6 +26,12 @@ test('product selection stays clear in the mobile selector and compact desktop r
     await expect(page.locator('.rail-account.selected')).toContainText('Ahorros para proyectos personales');
     await page.getByRole('button', { name: 'Contraer menú de cuentas', exact: true }).click();
   }
+  await page.getByRole('link', { name: 'Créditos', exact: true }).click();
+  const selector = page.locator('button[aria-controls="accounts-panel"]');
+  if (mobile) { await selector.click(); await expect(selector).toHaveAttribute('aria-expanded', 'true'); }
+  await page.getByRole('button', { name: 'Crédito vivienda de prueba · Crédito hipotecario', exact: true }).click();
+  await expect(page.locator('.loan-product-heading h2')).toHaveText('Crédito vivienda de prueba');
+  if (mobile) { await expect(selector).toHaveAttribute('aria-expanded', 'false'); await expect(selector).toContainText('Crédito vivienda de prueba'); }
   await page.screenshot({ path: info.outputPath('account-navigation.png'), fullPage: true });
 });
 

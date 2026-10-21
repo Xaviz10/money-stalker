@@ -368,3 +368,14 @@ The mobile product disclosure uses primary-blue emphasis, a wrapping selected pr
 Above 850px, the account rail can collapse to an 80px icon column using its labeled expand/collapse control. Keep product selection highlights, accessible product names and hover/focus name/type tooltips. Compact mode omits debit aliases (which share their bank balance), group headings and net-worth details. Expanding restores the full hierarchy; mobile keeps the full disclosure independently.
 
 Compact product icons show the product name and type in a tooltip on hover or keyboard focus. Tooltips render outside the scrolling rail, remain hoverable, dismiss with Escape and use the rail palette. The collapse control uses `rail-hover` for its hover surface.
+
+
+### Mortgage products and comparisons
+
+Créditos is a dedicated top-navigation destination and a separate product-rail section. Preserve Accounts first, shared Field/button/table patterns, the eye identity and existing colors. The detail has Resumen, Movimientos, Documentos and Simulador. On narrow screens, tabs remain reachable and wide evidence/amortization tables scroll inside their container. Unknown principal says “Sin confirmar”; net worth with unknown debt says “Patrimonio parcial”.
+
+A payment offers Cuota ordinaria, Abono a capital · reducir plazo, Abono a capital · reducir cuota, and Adelanto de cuotas. A remembered destination never supplies a purpose or allocation. A visible checkbox separates confirmed bank breakdowns from pending distribution. Principal reduces debt; interest, insurance, late interest and fees are expense. Editing and reversing keep the same movement and its evidence.
+
+Document upload accepts multiple Bancolombia mortgage XLSX files sequentially, with independent preview/confirmation, history/projection/subsidy labels, gaps and warnings. Reconciliation chooses an existing payment, its same-date component rows, purpose and UVR conversion when needed. The dated balance adjustment requires a reason, explains closing-date inclusion and exposes its reversible history without implying a cash expense.
+
+Simular abono and Registrar pago are distinct actions. The comparison shares the same inputs across Sin abonos, Reducir plazo and Reducir cuota. Show payoff dates **with year**, insurance, gross interest, subsidy, total cash and reserve impact. Default lower installments release cash; maintaining a monthly budget is an explicit advanced option. Charts use readable line colors and dash patterns, accompanied by exact tables and CSV export. Label the monthly approximation, inflation assumptions, missing terms, stale scenarios and dated official quotes. Refinancing is documented future work, not an active control.

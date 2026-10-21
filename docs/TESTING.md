@@ -48,3 +48,9 @@ Inspect `test-results` error context and retained traces locally when a failure 
 References: [Playwright locator guidance](https://playwright.dev/docs/locators), [Playwright best practices](https://playwright.dev/docs/best-practices). CI verification steps live in `.github/workflows/checks.yml`.
 
 Local validation of this correction (2026-10-21): reproduced the original missing-name timeout before the fix; the complete E2E suite then passed all 86 tests using installed Google Chrome through `PLAYWRIGHT_CHROME_PATH`. `npm run check` passed repository safety, TypeScript, all 130 unit tests and the production build. This is local evidence, not a claim that hosted CI has rerun or passed. No application UI or infrastructure was changed by this correction.
+
+## Mortgage extension verification (2026-10-21)
+
+`npm run check` passed the secret scan, TypeScript, all 148 unit tests and the production build. The full `npm run test:e2e` passed all 92 desktop/mobile tests using Playwright's installed Chromium engine, without a browser substitution. `npm run test:e2e:iphone` passed all 52 WebKit tests across widths 320, 375, 390 and 430. Both browser suites used isolated ephemeral local servers; the iPhone run used separate ports and artifact output. Existing account-navigation coverage was extended alongside the new mortgage flows. Fresh desktop, mobile and iPhone screenshots also received an independent visual review with no material fixes outstanding.
+
+Private mortgage workbooks were read locally without changing or publishing them. Native UVR comparison covers two bank projection periods within the explicit approximation tolerances in [LOANS.md](LOANS.md); it does not establish exact contractual daily accrual. Independent bank COP schedules remain unavailable, so bank conformance in pesos is not verified. Synthetic financial tests do not replace that evidence. No deployment, remote push or deployed-state verification was performed.

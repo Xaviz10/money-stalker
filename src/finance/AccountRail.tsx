@@ -1,3 +1,5 @@
+import { loanBalance } from '../../domain/loans';
+import { bogotaDate } from '../../domain/money';
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { accountKindLabels, type Account, type State } from "../../domain/model";
@@ -77,7 +79,7 @@ export function AccountRail({
             ? "Crédito · deuda"
             : accountKindLabels[a.kind]}
         </small>
-        <b>{balances ? formatCOP(balances[a.id] ?? "0") : "—"}</b>
+        <b>{a.kind === "loan" && !loanBalance(state, a.id, bogotaDate()).known ? "Sin confirmar" : balances ? formatCOP(balances[a.id] ?? "0") : "—"}</b>
       </span>
       <Icon name="chevron" size={14} />
     </button>
@@ -160,6 +162,7 @@ export function AccountRail({
         )}
         {groups.pockets.length > 0 && <section className="pocket-accounts"><h2>Bolsillos</h2>{groups.pockets.map(account => row(account))}</section>}
         {groups.investments.length > 0 && <section className="investment-accounts"><h2>Inversiones</h2>{groups.investments.map(account => row(account))}</section>}
+        {groups.loans.length > 0 && <section className="loan-accounts"><h2>Créditos</h2>{groups.loans.map(account => row(account))}</section>}
         {!state.accounts.length && (
           <div className="rail-empty">
             <Icon name="wallet" size={29} />
@@ -174,11 +177,11 @@ export function AccountRail({
       </div>
       <div className="rail-companion" aria-hidden="true"><EvidenceTrail variant="holdings" /><Eyes /></div>
       <div className="rail-worth">
-        <span>Patrimonio neto</span>
+        <span>{state.accounts.some(a => a.kind === "loan" && !loanBalance(state, a.id, bogotaDate()).known) ? "Patrimonio parcial" : "Patrimonio neto"}</span>
         <strong>
           {balances ? formatCOP(netWorthMinor(state.accounts, balances)) : "—"}
         </strong>
-        <small>Activos menos deuda de tarjetas.</small>
+        <small>Activos menos deudas.{state.loans.some(l => l.denomination === "UVR") ? " UVR con la última cotización confirmada." : ""}</small>
       </div>
     </aside>
   );

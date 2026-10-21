@@ -10,6 +10,7 @@ import {
 import {
   emptyState,
   accountKindLabels,
+  loanPurposes,
   type State,
   type Observation,
   type Transaction,
@@ -29,6 +30,8 @@ import {
 import { Dashboard, displayDate, SurfaceLoading } from "./finance/Dashboard";
 import { ReviewDesk } from "./finance/ReviewDesk";
 import { Reports } from "./finance/Reports";
+import { Loans } from './finance/Loans';
+import { LoanPaymentFields } from './finance/LoanPaymentFields';
 import { AccountRail } from "./finance/AccountRail";
 import { AccountArtwork } from "./finance/AccountArtwork";
 import { CategoryIcon } from "./finance/CategoryIcon";
@@ -134,6 +137,7 @@ const nav = [
   ["resumen", "Resumen", "overview"],
   ["movimientos", "Movimientos", "arrows"],
   ["reportes", "Reportes", "overview"],
+  ["creditos", "Créditos", "loan"],
   ["revisar", "Revisar", "check"],
   ["cuentas", "Cuentas y ajustes", "wallet"],
 ] as const;
@@ -173,6 +177,7 @@ function flowLabel(record: FlowRecord, selectedAccount: string, state: State) {
   if (record.kind === "refund") return "Devolución";
   if (record.kind === "expense")
     return selected?.kind === "credit" ? "Compra" : "Gasto";
+  if (record.kind === 'loan_payment') return 'Pago de crédito';
   const incoming = isIncoming(record, selectedAccount);
   if (incoming && selected?.kind === "credit") return "Pago recibido";
   const destination = state.accounts.find(
@@ -269,6 +274,7 @@ export function App() {
   const [editing, setEditing] = useState<Transaction | Observation | "new">();
   const [movementPreset, setMovementPreset] = useState<{ accountId: string; kind: "income" }>();
   const [importing, setImporting] = useState(initialPage === "importar");
+  const [loanInitialTab, setLoanInitialTab] = useState<string>();
   const [loading, setLoading] = useState(false),
     [notice, setNotice] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<string>();
@@ -473,6 +479,7 @@ export function App() {
     }
     setSelectedAccount(id);
     setAccountsOpen(false);
+    if (state.accounts.some(a => a.id === id && a.kind === 'loan')) { location.hash = '#/creditos'; return; }
     location.hash = "#/resumen";
   };
   return (
@@ -611,6 +618,7 @@ export function App() {
                         ? "Explora tus gastos por período, categoría y comercio."
                       : page === "design-system"
                         ? "Las reglas y componentes que mantienen Money Stalker consistente."
+                      : page === "creditos" ? "Tu deuda, los pagos confirmados y el efecto de cada abono."
                         : "Cuentas bancarias, tarjetas y tu margen de tranquilidad."}
                 </p>}
               </div>
@@ -653,7 +661,7 @@ export function App() {
               balances={summary?.balances}
               selectedAccount={movementAccount}
               open={setEditing}
-              openImport={() => setImporting(true)}
+              openImport={() => { if (state.accounts.some(a => a.id === movementAccount && a.kind === "loan")) { setSelectedAccount(movementAccount); setLoanInitialTab("documents"); location.hash = "#/creditos"; } else setImporting(true); }}
               onError={setError}
             />
           )}
@@ -674,6 +682,7 @@ export function App() {
           {page === "cuentas" && (
             <Settings state={state} summary={summary} refresh={refresh} receiveCash={(accountId) => { setMovementPreset({ accountId, kind: "income" }); setEditing("new"); }} />
           )}
+          {page === 'creditos' && <Loans initialTab={loanInitialTab} state={state} summary={summary} selectedAccount={selectedAccount} refresh={refresh} edit={setEditing} />}
           {page === "design-system" && <DesignSystem />}
           <footer className="footer">
             <span>Money Stalker · COP · Colombia</span>
@@ -776,7 +785,7 @@ function TransactionTable({
                           expense: "Gasto",
                           income: "Ingreso",
                           transfer: "Transferencia",
-                          refund: "Devolución",
+                          refund: "Devolución", loan_payment: "Pago de crédito",
                         }[t.kind]}
                     </button>
                     <span className="register-details">
@@ -1275,6 +1284,8 @@ function TransactionDialog({
   const [sourceAccountId, setSourceAccountId] = useState(initial?.accountId ?? preferredAccountId ?? "");
   const [investmentChoice, setInvestmentChoice] = useState<string | undefined>(initialInvestment ? initial?.counterAccountId : undefined);
   const [investmentName, setInvestmentName] = useState<string>();
+  const [loanChoice, setLoanChoice] = useState(initial?.kind === "loan_payment" ? initial.counterAccountId ?? "__new_loan__" : state.accounts.find(a => a.kind === "loan")?.id ?? "__new_loan__");
+  const newLoanId = useRef(freshId());
   const newInvestmentId = useRef(freshId());
   const investmentProducts = state.accounts.filter(account => account.kind === "investment" && account.id !== sourceAccountId);
   const normalizedMerchant = merchant.normalize("NFKC").trim().toLocaleLowerCase("es-CO").replace(/\s+/g, " ");
@@ -1316,7 +1327,7 @@ function TransactionDialog({
     <dialog
       ref={dialog}
       className="modal"
-      aria-labelledby="transaction-dialog-title"
+      aria-label={isObservation ? "Editar antes de guardar" : transaction ? "Editar movimiento" : "Nuevo movimiento"}
       onCancel={close}
     >
       <div className="section-heading">
@@ -1387,7 +1398,8 @@ function TransactionDialog({
             date: str(f, "date"),
             accountId: str(f, "accountId"),
             counterAccountId: kind === "investment" ? (creatingInvestment ? newInvestmentId.current : investmentDestination) :
-              kind === "transfer" ? str(f, "counterAccountId") : null,
+              kind === "loan_payment" ? (loanChoice === "__new_loan__" ? newLoanId.current : loanChoice) : kind === "transfer" ? str(f, "counterAccountId") : null,
+            ...(kind === "loan_payment" ? { loanPayment: { ...(transaction?.loanPayment?.documentId && f.get("unlinkLoanDocument") !== "on" ? { documentId: transaction.loanPayment.documentId, documentRowIds: transaction.loanPayment.documentRowIds } : {}), purpose: str(f, "loanPurpose"), ...(str(f, "loanDueDate") ? { dueDate: str(f, "loanDueDate") } : {}), ...(f.get("allocationConfirmed") === "on" ? { allocation: Object.fromEntries(["principalMinor", "interestMinor", "lateInterestMinor", "insuranceMinor", "feesMinor"].map(key => [key, amount(f, key)]).concat(str(f, "principalUnits") ? [["principalUnits", str(f, "principalUnits")], ["uvrValue", str(f, "paymentUvrValue")], ["uvrDate", str(f, "date")]] : [])) } : {}) }, ...(loanChoice === "__new_loan__" ? { loanProduct: { id: newLoanId.current, name: str(f, "loanName") } } : {}) } : { loanPayment: null }),
             ...(creatingInvestment ? { investmentProduct: { id: newInvestmentId.current, name: (investmentName ?? merchant).trim() } } : {}),
             rememberMerchant: f.get("rememberMerchant") === "on",
             rememberMerchantPlace: Boolean(place && merchant.trim() && rememberPlaceChoice),
@@ -1457,9 +1469,10 @@ function TransactionDialog({
               onChange={(e) => {
                 const next = e.target.value as typeof kind;
                 setKind(next);
+                if (next === "loan_payment") { setCategoryId("loans-housing"); setSubcategoryId(""); }
                 const scope = next === "income" ? "income" : "expense";
                 const selected = state.categories.find((item) => item.id === (subcategoryId || categoryId));
-                if (next !== "transfer" && selected?.scope !== "both" && selected?.scope !== scope) {
+                if (next !== "transfer" && next !== "loan_payment" && selected?.scope !== "both" && selected?.scope !== scope) {
                   setCategoryId("uncategorized");
                   setSubcategoryId("");
                 }
@@ -1469,6 +1482,7 @@ function TransactionDialog({
               <option value="income">Ingreso</option>
               <option value="transfer">Transferencia / pago de tarjeta</option>
               <option value="refund">Devolución</option>
+              <option value="loan_payment">Pago de crédito hipotecario</option>
             </select>
           </Field>
           <Field label="Fecha">
@@ -1488,7 +1502,7 @@ function TransactionDialog({
               onChange={(event) => setSourceAccountId(event.target.value)}
             >
               <option value="">Selecciona una cuenta</option>
-              {state.accounts.map((a) => (
+              {state.accounts.filter(a => a.kind !== "loan" && (kind !== "loan_payment" || ["bank", "cash"].includes(a.kind))).map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
@@ -1530,15 +1544,16 @@ function TransactionDialog({
               onChange={(event) => setMerchant(event.target.value)}
             />
           </Field>
-          {kind !== "transfer" && (
+          {kind !== "transfer" && kind !== "loan_payment" && (
             <>
               <Field label={kind === "income" ? "Categoría de ingreso" : "Categoría de gasto"}>
                 <select name="categoryId" value={kind === "investment" ? "__investment__" : categoryId} onChange={(event) => {
-                  if (event.target.value === "__investment__") { setKind("investment"); setCategoryId(state.categories.find(category => !category.parentId && /^(inversión|inversion|inversiones)$/i.test(category.name.trim()) && category.scope !== "income")?.id ?? "uncategorized"); }
+                  if (event.target.value === "__loan__") { setKind("loan_payment"); setCategoryId("loans-housing"); }
+                  else if (event.target.value === "__investment__") { setKind("investment"); setCategoryId(state.categories.find(category => !category.parentId && /^(inversión|inversion|inversiones)$/i.test(category.name.trim()) && category.scope !== "income")?.id ?? "uncategorized"); }
                   else { if (kind === "investment") setKind("expense"); setCategoryId(event.target.value); }
                   setSubcategoryId("");
                 }}>
-                  {(kind === "expense" || kind === "investment") && <option value="__investment__">Inversión</option>}
+                  {(kind === "expense" || kind === "investment") && <><option value="__investment__">Inversión</option><option value="__loan__">Pago de crédito hipotecario</option></>}
                   {state.categories
                     .filter((category) => !category.parentId && (kind === "income" || !/^(inversión|inversion|inversiones)$/i.test(category.name.trim())) && (category.scope === "both" || category.scope === (kind === "income" ? "income" : "expense")))
                     .map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
@@ -1556,6 +1571,7 @@ function TransactionDialog({
               )}
             </>
           )}
+          {kind === "loan_payment" && <LoanPaymentFields state={state} loanId={loanChoice} onLoanChange={setLoanChoice} initial={transaction?.loanPayment ?? (initial && "loanPayment" in initial ? initial.loanPayment : undefined)} />}
           {kind === "investment" && <>
             <Field label="Producto de inversión"><select value={investmentDestination} onChange={(event) => setInvestmentChoice(event.target.value)} required>
               {investmentProducts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
@@ -1628,8 +1644,8 @@ function TransactionDialog({
             defaultValue={transaction?.note}
           />
         </Field>
-        {merchant.trim() && <label className="checkbox"><input type="checkbox" name="rememberMerchant" /> {kind === "investment" ? "Recordar este comercio, su categoría y producto de inversión para próximas importaciones" : "Recordar la categoría y nota de este comercio para próximas importaciones"}</label>}
-        {transaction && merchant.trim() && (
+        {merchant.trim() && <label className="checkbox"><input type="checkbox" name="rememberMerchant" /> {kind === "loan_payment" ? "Recordar este comercio y el crédito para próximas importaciones (sin asumir tipo ni desglose)" : kind === "investment" ? "Recordar este comercio, su categoría y producto de inversión para próximas importaciones" : "Recordar la categoría y nota de este comercio para próximas importaciones"}</label>}
+        {transaction && kind !== "loan_payment" && merchant.trim() && (
           <label className="checkbox">
             <input type="checkbox" name="applyToSimilar" /> Aplicar esta
             categoría y nota a todos los movimientos de este comercio
@@ -2216,7 +2232,7 @@ function AccountEditor({
             <option value="credit">Tarjeta de crédito</option>
             <option value="cash">Efectivo</option>
             <option value="pocket">Bolsillo</option>
-            <option value="investment">Inversión</option>
+            <option value="investment">Inversión</option><option value="loan">Crédito hipotecario</option>
           </select>
         </Field>
         {kind !== "cash" && <Field label={kind === "pocket" || kind === "investment" ? "Alias de destino en SMS (opcional)" : "Alias del producto en SMS (opcional)"}><input name="captureAliases" defaultValue={(account.captureAliases ?? []).join(", ")} placeholder="Últimos cuatro dígitos o nombre del destino" /><small>{kind === "pocket" || kind === "investment" ? "Separa los alias con comas. Un SMS compatible con origen y destino inequívocos podrá reconocer este destino propio." : "Usa el nombre o los últimos cuatro dígitos que aparecen en el SMS, separados por comas."} Nunca uses números completos.</small></Field>}
@@ -2525,6 +2541,7 @@ function Settings({
               save={(data) => save("/accounts", data)}
               saveInstrument={(data) => save("/instruments", data)}
             />
+            {a.kind === "loan" && <a className="text-link" href="#/creditos">Configurar crédito, conciliar y simular abonos</a>}
             {a.kind === "investment" && <InvestmentValues account={a} state={state} balance={summary?.balances[a.id] ?? a.openingMinor} save={save} />}
             {a.kind === "pocket" && <p className="product-balance-note">Disponible en este bolsillo. No se incluye en el disponible general. Usa una transferencia para agregar o liberar dinero.</p>}
           </div>
@@ -2580,7 +2597,7 @@ function Settings({
             setAddDebitCard(false); setProductSaved(true);
           }}>
             <Field label="Tipo de cuenta"><select value={accountKind} onChange={event => { setAccountKind(event.target.value); setAddDebitCard(false); setProductSaved(false); }}>
-              <option value="bank">Cuenta bancaria</option><option value="credit">Tarjeta de crédito</option><option value="cash">Efectivo</option><option value="pocket">Bolsillo</option><option value="investment">Inversión</option>
+              <option value="bank">Cuenta bancaria</option><option value="credit">Tarjeta de crédito</option><option value="cash">Efectivo</option><option value="pocket">Bolsillo</option><option value="investment">Inversión</option><option value="loan">Crédito hipotecario</option>
             </select></Field>
             <Field label="Nombre de la cuenta"><input name="name" required placeholder="Ahorros, Visa crédito, Viaje…" maxLength={200} /></Field>
             <div className="form-grid">
@@ -3130,6 +3147,7 @@ function Settings({
                 name: str(f, "name"),
                 amountMinor: amount(f, "amount"),
                 dueDate: str(f, "due"),
+                ...(str(f, "loanId") ? { loanId: str(f, "loanId") } : {}),
               })
             }
           >
@@ -3140,6 +3158,7 @@ function Settings({
               <Field label="Valor de factura (COP)">
                 <input name="amount" required inputMode="decimal" />
               </Field>
+              <Field label="Crédito asociado (opcional)"><select name="loanId"><option value="">Otro compromiso</option>{state.accounts.filter(a => a.kind === "loan").map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></Field>
               <Field label="Fecha de vencimiento">
                 <input name="due" type="date" required />
               </Field>

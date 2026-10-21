@@ -91,7 +91,7 @@ function Activity({
                           expense: "Gasto",
                           income: "Ingreso",
                           transfer: "Transferencia",
-                          refund: "Devolución",
+                          refund: "Devolución", loan_payment: "Pago de crédito",
                         }[t.kind]}
                     </strong>
                     <small className="mobile-transaction-meta">

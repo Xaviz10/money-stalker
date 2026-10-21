@@ -4,11 +4,13 @@ export const merchantKey = (value: string) => value.normalize("NFKC").trim().toL
 export function rememberMerchant(state: State, transaction: TransactionInput, originalMerchant?: string) {
   if (!transaction.merchant.trim()) throw new DomainError("Agrega el comercio antes de guardar una regla");
   const destination = state.accounts.find(account => account.id === transaction.counterAccountId && account.kind === "investment");
+  const loan = state.accounts.find(account => account.id === transaction.counterAccountId && account.kind === 'loan');
   const keys = [...new Set([originalMerchant, transaction.merchant].filter((value): value is string => Boolean(value?.trim())).map(merchantKey))];
   for (const key of keys) {
     const previous = state.aliases.find(item => item.id === key);
     const rule: MerchantRule = { ...(previous?.place ? { place: structuredClone(previous.place) } : {}), id: key, merchant: key, categoryId: transaction.categoryId, note: transaction.note,
       ...(transaction.kind === "transfer" && destination ? { investmentAccountId: destination.id } : {}),
+      ...(transaction.kind === 'loan_payment' && loan ? { loanAccountId: loan.id } : {}),
       ...(key !== merchantKey(transaction.merchant) ? { displayMerchant: transaction.merchant } : {}),
     };
     const index = state.aliases.findIndex(item => item.id === key);
@@ -29,6 +31,11 @@ export function classifyImportedMerchant(state: Pick<State, "accounts" | "catego
   const rule = state.aliases.find(item => item.merchant === merchantKey(observation.merchant));
   const result = { ...observation, categoryId: observation.categoryId ?? "uncategorized", note: observation.note ?? "" };
   if (!rule) return result;
+  if (rule.loanAccountId && !observation.cashWithdrawal && ['expense', 'loan_payment'].includes(observation.kind)) {
+    if (!state.accounts.some(a => a.id === rule.loanAccountId && a.kind === 'loan')) throw new DomainError('El crédito recordado ya no existe; corrige la asociación');
+    result.kind = 'loan_payment'; result.counterAccountId = rule.loanAccountId;
+    result.loanPayment = { purpose: 'unconfirmed' };
+  }
   if (!result.place && rule.place) result.place = structuredClone(rule.place);
   if (rule.investmentAccountId && !observation.cashWithdrawal && (observation.kind === "expense" || observation.kind === "transfer") && observation.accountId !== rule.investmentAccountId) {
     if (!state.accounts.some(account => account.id === rule.investmentAccountId && account.kind === "investment")) throw new DomainError("La inversión recordada para este comercio ya no existe; corrige la regla antes de importar");

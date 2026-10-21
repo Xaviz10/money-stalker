@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { expenseMovements } from '../../domain/loans';
 import type { State, Transaction } from "../../domain/model";
 import { bogotaDate, formatCOP } from "../../domain/money";
 import { CategoryIcon } from "./CategoryIcon";
@@ -677,7 +678,7 @@ export function Reports({
   };
   const rows = useMemo(
     () =>
-      state.transactions.filter(
+      expenseMovements(state.transactions).filter(
         (transaction) =>
           !transaction.voided &&
           transaction.date >= from &&

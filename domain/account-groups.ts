@@ -42,6 +42,7 @@ export function groupAccounts(state: Pick<State, "accounts" | "instruments">) {
     cash: state.accounts.filter((a) => a.kind === "cash"),
     pockets: state.accounts.filter((a) => a.kind === "pocket"),
     investments: state.accounts.filter((a) => a.kind === "investment"),
+    loans: state.accounts.filter((a) => a.kind === "loan"),
   };
 }
 
@@ -52,7 +53,7 @@ export function netWorthMinor(
   return accounts
     .reduce(
       (sum, a) =>
-        sum + (a.kind === "credit" ? -1n : 1n) * BigInt(balances[a.id] ?? "0"),
+        sum + (a.kind === "credit" || a.kind === "loan" ? -1n : 1n) * BigInt(balances[a.id] ?? "0"),
       0n,
     )
     .toString();

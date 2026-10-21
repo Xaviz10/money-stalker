@@ -42,7 +42,7 @@ const db = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions
 type Item = { pk: string; sk: string; value?: unknown; revision?: number; workPk?: string; workSk?: string; expiresAt?: number };
 const stateItems = (state: State): Map<string, unknown> => {
   const map = new Map<string, unknown>([['settings', state.settings]]);
-  for (const key of ['accounts', 'instruments', 'categories', 'bills', 'transactions', 'observations', 'audit', 'aliases', 'valuations'] as const)
+  for (const key of ['accounts', 'instruments', 'categories', 'bills', 'transactions', 'observations', 'audit', 'aliases', 'valuations', 'loans', 'loanSnapshots', 'loanDocuments', 'loanScenarios'] as const)
     for (const value of state[key] ?? []) map.set(`${key}#${value.id}`, value);
   return map;
 };

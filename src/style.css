@@ -5604,3 +5604,57 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
     overflow-y: auto;
   }
 }
+
+/* Mortgage workbench extends the account register and shared form vocabulary. */
+.loans-workspace { min-width: 0; }
+.loan-toolbar { display: flex; align-items: start; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
+.loan-toolbar > .field { min-width: min(340px, 100%); }
+.loan-create { max-width: 420px; }
+.loan-create > summary, .loan-details > summary { cursor: pointer; font-weight: 650; padding-block: 16px; }
+.loan-product-heading { display: flex; align-items: center; gap: 18px; margin-block: 24px; }
+.loan-product-heading h2 { margin: 0 0 6px; }
+.loan-product-heading p { margin: 0; }
+.loan-current-balance { margin-left: auto; display: grid; text-align: right; gap: 6px; }
+.loan-current-balance strong { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.loan-tabs { display: flex; gap: 24px; overflow-x: auto; border-bottom: 1px solid var(--color-line); margin-bottom: 28px; }
+.loan-tabs button { border: 0; border-bottom: 2px solid transparent; background: none; color: inherit; cursor: pointer; padding: 16px 0; font: inherit; white-space: nowrap; }
+.loan-tabs button.active { color: var(--color-primary); border-bottom-color: currentColor; font-weight: 700; }
+.loan-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; margin-block: 24px 36px; }
+.loan-facts dt { font-size: .85rem; margin-bottom: 8px; }
+.loan-facts dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
+.loan-details { border-top: 1px solid var(--color-line); margin-block: 24px; padding-bottom: 16px; }
+.loan-form { margin-block: 18px; max-width: 100%; }
+.loan-form > fieldset, .loan-payment-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.loan-payment-fields { grid-column: 1 / -1; padding-block: 16px; border-top: 1px solid var(--color-line); }
+.loan-payment-fields legend { padding-top: 12px; font-weight: 700; }
+.loan-form .form-grid { margin-bottom: 18px; }
+.loan-form .checkbox { margin-block: 16px; }
+.loan-form > fieldset > .button { margin-top: 16px; }
+.loan-table-scroll { max-width: 100%; overflow-x: auto; margin-block: 20px; }
+.loan-table-scroll table { width: 100%; border-collapse: collapse; font-size: .875rem; font-variant-numeric: tabular-nums; }
+.loan-table-scroll th, .loan-table-scroll td { text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--color-line); white-space: nowrap; }
+.loan-table-scroll th { font-weight: 650; }
+.loan-table-scroll tbody th { white-space: normal; min-width: 170px; }
+.loan-history, .loan-document-list { list-style: none; padding: 0; }
+.loan-history li, .loan-document-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; padding-block: 16px; border-bottom: 1px solid var(--color-line); }
+.loan-document-list button { overflow-wrap: anywhere; text-align: left; }
+.loan-document-list span { font-size: .8rem; }
+.loan-candidates { max-height: 360px; overflow-y: auto; }
+.loan-chart { margin: 32px 0; }
+.loan-chart svg { display: block; width: 100%; max-height: 280px; }
+.loan-chart figcaption { font-weight: 650; margin-bottom: 16px; }
+.loan-line-base { stroke: var(--color-muted); color: var(--color-muted); }
+.loan-line-term { stroke: var(--color-primary); color: var(--color-primary); }
+.loan-line-installment { stroke: var(--color-success); color: var(--color-success); stroke-dasharray: 7 4; }
+.loan-chart-legend { display: flex; flex-wrap: wrap; gap: 24px; padding-left: 18px; font-size: .85rem; }
+.loan-document-preview { margin-top: 36px; }
+@media (max-width: 700px) {
+  .loan-toolbar, .loan-product-heading { flex-wrap: wrap; gap: 18px; }
+  .loan-current-balance { width: 100%; text-align: left; margin: 0; }
+  .loan-facts { grid-template-columns: 1fr; }
+  .loan-tabs { gap: 20px; }
+  .loan-document-list li, .loan-history li { flex-direction: column; gap: 8px; }
+  .loan-comparison { min-width: 620px; }
+}
+
+@media (max-width: 400px) { .loan-tabs { gap: 10px; font-size: .8125rem; } }

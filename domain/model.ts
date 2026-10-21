@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { LoanTerms, LoanSnapshot, LoanDocument, LoanScenario } from './loan-model';
 
 export const id = z.string().min(1).max(200).regex(/^[\w:.-]+$/);
 export const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => {
@@ -27,7 +28,7 @@ export const transactionPlaceSchema = coordinate.extend({
   url: z.url({ protocol: /^https$/ }).max(2000).refine(value => { const parsed = new URL(value); return !parsed.username && !parsed.password; }).optional(),
 });
 export const accountSchema = z.object({
-  id, name: text.min(1), kind: z.enum(['bank', 'cash', 'credit', 'pocket', 'investment']), openingMinor: minor,
+  id, name: text.min(1), kind: z.enum(['bank', 'cash', 'credit', 'pocket', 'investment', 'loan']), openingMinor: minor,
   openingDate: date, closingDay: z.number().int().min(1).max(31).optional(),
   dueDay: z.number().int().min(1).max(31).optional(), eligible: z.boolean().default(true),
   institution: text.optional(), institutionUrl: institutionUrl.optional(), imageDataUrl: accountImage.optional(),
@@ -37,11 +38,15 @@ export const instrumentSchema = z.object({ id, name: text.min(1), accountId: id,
 export const categorySchema = z.object({
   id, name: text.min(1), scope: z.enum(['expense', 'income', 'both']).default('expense'), parentId: id.optional(),
 });
-export const billSchema = z.object({ id, name: text.min(1), amountMinor: positive, dueDate: date, paidTransactionId: id.optional() });
+export const billSchema = z.object({ id, name: text.min(1), amountMinor: positive, dueDate: date, paidTransactionId: id.optional(), loanId: id.optional() });
 export const settingsSchema = z.object({ payday: z.number().int().min(1).max(31), reserveMinor: minor, cashAccountId: id.optional() });
+export const loanPurposes = { ordinary: 'Cuota ordinaria', term: 'Abono a capital · reducir plazo', installment: 'Abono a capital · reducir cuota', advance: 'Adelanto de cuotas', unconfirmed: 'Tipo de pago pendiente de confirmar' } as const;
+export const loanAllocationSchema = z.object({ principalMinor: minor.default('0'), interestMinor: minor.default('0'), lateInterestMinor: minor.default('0'), insuranceMinor: minor.default('0'), feesMinor: minor.default('0'), principalUnits: z.string().regex(/^\d{1,17}(\.\d{1,8})?$/).optional(), uvrValue: z.string().regex(/^\d{1,8}(\.\d{1,8})?$/).optional(), uvrDate: date.optional() });
+export const loanPaymentSchema = z.object({ purpose: z.enum(['ordinary', 'term', 'installment', 'advance', 'unconfirmed']), dueDate: date.optional(), allocation: loanAllocationSchema.optional(), documentId: id.optional(), documentRowIds: z.array(id).max(30).optional() });
 export const transactionInput = z.object({
   id, accountId: id, counterAccountId: id.optional(), date, amountMinor: positive,
-  kind: z.enum(['expense', 'income', 'transfer', 'refund']), merchant: text.default(''),
+  kind: z.enum(['expense', 'income', 'transfer', 'refund', 'loan_payment']), merchant: text.default(''),
+  loanPayment: loanPaymentSchema.optional(),
   categoryId: id.default('uncategorized'), note: z.string().max(1000).default(''), billId: id.optional(),
   status: z.enum(['provisional', 'posted']).default('posted'), reference: text.optional(), place: transactionPlaceSchema.optional(),
 });
@@ -83,7 +88,7 @@ export const captureSchema = z.object({
     } : undefined,
 }));
 export type Account = z.infer<typeof accountSchema>;
-export const accountKindLabels: Record<Account['kind'], string> = { bank: 'Cuenta bancaria', cash: 'Efectivo', credit: 'Tarjeta de crédito', pocket: 'Bolsillo', investment: 'Inversión' };
+export const accountKindLabels: Record<Account['kind'], string> = { bank: 'Cuenta bancaria', cash: 'Efectivo', credit: 'Tarjeta de crédito', pocket: 'Bolsillo', investment: 'Inversión', loan: 'Crédito hipotecario' };
 export type Instrument = z.infer<typeof instrumentSchema>;
 export type Category = z.infer<typeof categorySchema>;
 export type Bill = z.infer<typeof billSchema>;
@@ -97,6 +102,7 @@ export type Observation = {
   id: string; source: 'sms' | 'wallet' | 'statement'; observedAt: string; receivedAt: string;
   date?: string; accountId?: string; amountMinor?: string; currency: 'COP'; merchant: string;
   kind: TransactionInput['kind']; counterAccountId?: string; reference?: string;
+  loanPayment?: TransactionInput['loanPayment'];
   status: 'review' | 'linked' | 'ignored'; transactionId?: string; candidates: string[]; reason?: string;
   location?: Capture['location']; parserVersion: string; cashWithdrawal?: boolean; categoryId?: string; note?: string; place?: TransactionPlace;
 };
@@ -104,10 +110,11 @@ export const valuationInput = z.object({ id, accountId: id, date, valueMinor: mi
 export type InvestmentValuation = z.infer<typeof valuationInput> & { at: string; sequence: number; beforeMinor: string; adjustmentMinor: string; voided?: boolean };
 export type Audit = { id: string; at: string; action: string; transactionId?: string;
   beforeTransaction?: Transaction; beforeObservation?: Observation; expectedRevision?: number; undone?: boolean;
-  batchId?: string; batchSize?: number; valuationId?: string };
-export type MerchantRule = { id: string; merchant: string; categoryId?: string; note?: string; investmentAccountId?: string; displayMerchant?: string; place?: TransactionPlace };
-export const movementOptionsSchema = z.object({ rememberMerchant: z.boolean().default(false), rememberMerchantPlace: z.boolean().default(false), skipMerchantPlace: z.boolean().default(false), investmentProduct: z.object({ id, name: text.min(1) }).optional() });
+  batchId?: string; batchSize?: number; valuationId?: string; loanSnapshotId?: string };
+export type MerchantRule = { id: string; merchant: string; categoryId?: string; note?: string; investmentAccountId?: string; loanAccountId?: string; displayMerchant?: string; place?: TransactionPlace };
+export const movementOptionsSchema = z.object({ rememberMerchant: z.boolean().default(false), rememberMerchantPlace: z.boolean().default(false), skipMerchantPlace: z.boolean().default(false), investmentProduct: z.object({ id, name: text.min(1) }).optional(), loanProduct: z.object({ id, name: text.min(1) }).optional() });
 export type State = {
+  loans: LoanTerms[]; loanSnapshots: LoanSnapshot[]; loanDocuments: LoanDocument[]; loanScenarios: LoanScenario[];
   valuations: InvestmentValuation[]; accounts: Account[]; instruments: Instrument[]; categories: Category[]; bills: Bill[];
   transactions: Transaction[]; observations: Observation[]; audit: Audit[];
   aliases: MerchantRule[]; settings: Settings;
@@ -171,6 +178,7 @@ export const defaultCategories: Category[] = [
   { id: 'other-income', name: 'Otros ingresos', scope: 'income' },
 ];
 export function normalizeDefaultCategories(state: State) {
+  state.loans ??= []; state.loanSnapshots ??= []; state.loanDocuments ??= []; state.loanScenarios ??= [];
   state.valuations ??= [];
   for (const category of defaultCategories) {
     const existing = state.categories.find(c => c.id === category.id);
@@ -192,7 +200,7 @@ export function normalizeUnlinkedTransfers(state: State) {
   for (const observation of state.observations) normalizeUnlinkedTransfer(state, observation);
 }
 export function emptyState(): State {
-  return { valuations: [], accounts: [], instruments: [], categories: defaultCategories.map(category => ({ ...category })),
+  return { loans: [], loanSnapshots: [], loanDocuments: [], loanScenarios: [], valuations: [], accounts: [], instruments: [], categories: defaultCategories.map(category => ({ ...category })),
     bills: [], transactions: [], observations: [], audit: [], aliases: [], settings: { payday: 1, reserveMinor: '0' } };
 }
 export class DomainError extends Error { constructor(message: string, public status = 400) { super(message); } }

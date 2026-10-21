@@ -40,7 +40,7 @@ export function AccountArtwork({
           ? "card"
           : account.kind === "cash"
             ? "wallet"
-            : account.kind === "pocket" ? "pocket" : account.kind === "investment" ? "investment" : "bank"
+            : account.kind === "loan" ? "loan" : account.kind === "pocket" ? "pocket" : account.kind === "investment" ? "investment" : "bank"
       }
       size={size}
     />

@@ -2,6 +2,7 @@ import { accountSchema, billSchema, categorySchema, instrumentSchema, settingsSc
   DomainError, normalizeUnlinkedTransfer, requireValue, type State, type Transaction, type TransactionInput, type Observation, type Entry, type Account } from './model';
 import { ensureWithdrawalCash } from './cash';
 import { bogotaDate, nextPayday } from './money';
+import { loanPaymentEntries, createLoanForMovement, loanBalance, expenseMovements } from './loans';
 
 const clone = <T>(value: T): T => structuredClone(value);
 export { merchantKey } from './merchant-rules';
@@ -24,6 +25,8 @@ function captureCandidates(state: State, observation: Observation): Transaction[
 }
 const findAccount = (state: State, id: string) => requireValue(state.accounts.find(a => a.id === id), 'Cuenta desconocida');
 function entries(state: State, t: TransactionInput): Entry[] {
+  const loanEntries = loanPaymentEntries(state, t);
+  if (t.kind === 'loan_payment') return loanEntries;
   const account = findAccount(state, t.accountId);
   const line = (accountId: string, debit: boolean): Entry => ({ accountId, debitMinor: debit ? t.amountMinor : '0', creditMinor: debit ? '0' : t.amountMinor });
   if (t.kind === 'transfer') {
@@ -45,7 +48,7 @@ function entries(state: State, t: TransactionInput): Entry[] {
 }
 function linkBill(state: State, t: Transaction) {
   if (!t.billId) return;
-  if (t.kind !== 'expense') throw new DomainError('Asocia la factura al gasto, no al pago de la tarjeta');
+  if (t.kind !== 'expense' && t.kind !== 'loan_payment') throw new DomainError('Asocia la factura al gasto o al pago del crédito');
   const bill = requireValue(state.bills.find(b => b.id === t.billId), 'Factura desconocida');
   if (bill.paidTransactionId && bill.paidTransactionId !== t.id) throw new DomainError('La factura ya tiene un pago');
   if (bill.amountMinor !== t.amountMinor) throw new DomainError('El pago de la factura debe coincidir con su valor; ajusta la factura primero');
@@ -64,7 +67,7 @@ export function addTransaction(state: State, input: unknown, at: string, observa
   const options = movementOptionsSchema.parse(input);
   if (options.rememberMerchant && !value.merchant.trim()) throw new DomainError('Agrega el comercio antes de guardar una regla');
   if (options.rememberMerchantPlace && (!value.merchant.trim() || !value.place)) throw new DomainError('Elige un comercio y una ubicación antes de recordarla');
-  const requestSignature = JSON.stringify({ ...value, ...(options.skipMerchantPlace ? { skipMerchantPlace: true } : {}), ...(options.investmentProduct ? { investmentProduct: options.investmentProduct } : {}) });
+  const requestSignature = JSON.stringify({ ...value, ...(options.skipMerchantPlace ? { skipMerchantPlace: true } : {}), ...(options.investmentProduct ? { investmentProduct: options.investmentProduct } : {}), ...(options.loanProduct ? { loanProduct: options.loanProduct } : {}) });
   if (value.date > bogotaDate(new Date(at))) throw new DomainError('Registra movimientos realizados, no ingresos o gastos futuros');
   const existing = state.transactions.find(t => t.id === value.id);
   if (existing) {
@@ -73,7 +76,12 @@ export function addTransaction(state: State, input: unknown, at: string, observa
     return existing;
   }
   const product = newInvestmentForMovement(state, value, input);
-  const prospective = product ? { ...state, accounts: [...state.accounts, product] } : state;
+  const prospective = product || options.loanProduct ? { ...state, accounts: [...state.accounts] } : state;
+  if (product) prospective.accounts.push(product);
+  if (options.loanProduct) {
+    if (value.kind !== 'loan_payment' || value.counterAccountId !== options.loanProduct.id) throw new DomainError('El crédito nuevo debe ser el destino del pago');
+    createLoanForMovement(prospective, options.loanProduct, value.date);
+  }
   const rule = applyMerchantDefaults ? state.aliases.find(a => a.merchant === merchantKey(value.merchant)) : undefined;
   const category = state.categories.find(item => item.id === rule?.categoryId);
   if (value.categoryId === 'uncategorized' && rule && category && (category.scope === 'both' || category.scope === (value.kind === 'income' ? 'income' : 'expense'))) value.categoryId = category.id;
@@ -81,7 +89,7 @@ export function addTransaction(state: State, input: unknown, at: string, observa
   if (!value.place && !options.skipMerchantPlace && rule?.place) value.place = clone(rule.place);
   const t: Transaction = { ...value, entries: entries(prospective, value), observationIds: observationId ? [observationId] : [], revision: 1, requestSignature };
   linkBill(state, t);
-  if (product) state.accounts.push(product);
+  if (product || options.loanProduct) state.accounts = prospective.accounts;
   state.transactions.push(t);
   if (options.rememberMerchant) rememberMerchant(state, t);
   if (options.rememberMerchantPlace) rememberMerchantPlace(state, t);
@@ -118,7 +126,7 @@ export function configure(state: State, kind: string, input: unknown) {
     const aliasKey = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const aliases = (item.captureAliases ?? []).map(aliasKey);
     if (new Set(aliases).size !== aliases.length || aliases.some(alias => state.accounts.some(account => account.id !== item.id && account.captureAliases?.some(value => aliasKey(value) === alias)) || state.instruments.some(instrument => instrument.accountId !== item.id && instrument.aliases.some(value => aliasKey(value) === alias)))) throw new DomainError('Este alias ya identifica otro producto');
-    if (item.kind === 'pocket' || item.kind === 'investment') item.eligible = false;
+    if (item.kind === 'pocket' || item.kind === 'investment' || item.kind === 'loan') item.eligible = false;
     if (old && (state.transactions.some(t => t.accountId === old.id || t.counterAccountId === old.id) || (state.valuations ?? []).some(v => v.accountId === old.id))
       && ['kind', 'openingMinor', 'openingDate'].some(k => old[k as keyof Account] !== item[k as keyof Account]))
       throw new DomainError('No cambies el saldo inicial de una cuenta con movimientos; registra y documenta una corrección');
@@ -143,6 +151,7 @@ export function configure(state: State, kind: string, input: unknown) {
   if (kind === 'bills') {
     const item = billSchema.omit({ paidTransactionId: true }).parse(input);
     const old = state.bills.find(b => b.id === item.id);
+    if (item.loanId && !state.accounts.some(a => a.id === item.loanId && a.kind === 'loan')) throw new DomainError('Crédito desconocido');
     if (old?.paidTransactionId) throw new DomainError('No se puede editar una factura pagada');
     upsert(state.bills, item); return;
   }
@@ -188,7 +197,7 @@ export function recordStatement(state: State, input: Observation, at: string): O
     accountId: requireValue(input.accountId, 'El extracto no identifica la cuenta'),
     counterAccountId: input.counterAccountId, date: requireValue(input.date, 'El extracto no contiene una fecha'),
     amountMinor: requireValue(input.amountMinor, 'El extracto no contiene un valor'), kind: input.kind,
-    merchant: input.merchant, reference: input.reference, categoryId: input.categoryId ?? 'uncategorized', note: input.note ?? '', place: input.place, status: 'posted' }, at, input.id, false);
+    merchant: input.merchant, reference: input.reference, categoryId: input.categoryId ?? 'uncategorized', note: input.note ?? '', loanPayment: input.loanPayment, place: input.place, status: 'posted' }, at, input.id, false);
   const observation = clone(input);
   observation.status = 'linked'; observation.candidates = []; observation.transactionId = transaction.id;
   state.observations.push(observation);
@@ -235,6 +244,11 @@ export function editTransaction(state: State, transactionId: string, input: unkn
   if (expectedRevision !== undefined && t.revision !== expectedRevision) throw new DomainError('El movimiento cambió; actualiza antes de editar', 409);
   const changes = Object.fromEntries(Object.entries(input && typeof input === 'object' ? input : {}).map(([k, v]) => [k, v === null ? undefined : v]));
   const value = transactionInput.parse({ ...t, ...changes, id: t.id });
+  const loanProduct = movementOptionsSchema.parse(input).loanProduct;
+  if (loanProduct) {
+    if (value.kind !== 'loan_payment' || value.counterAccountId !== loanProduct.id) throw new DomainError('El crédito nuevo debe ser el destino del pago');
+    createLoanForMovement(state, loanProduct, value.date);
+  }
   if (rememberPlace && (!value.merchant.trim() || !value.place)) throw new DomainError('Elige un comercio y una ubicación antes de recordarla');
   if (value.date > bogotaDate(new Date(at))) throw new DomainError('No se pueden registrar movimientos futuros');
   const product = newInvestmentForMovement(state, value, input);
@@ -256,7 +270,12 @@ export function deleteTransaction(state: State, transactionId: string, at: strin
 }
 export function undo(state: State, auditId: string, at: string) {
   const a = requireValue(state.audit.find(a => a.id === auditId), 'Cambio desconocido');
-  if (a.undone || (!a.beforeObservation && !a.beforeTransaction && !a.valuationId)) throw new DomainError('Este cambio no puede deshacerse');
+  if (a.undone || (!a.beforeObservation && !a.beforeTransaction && !a.valuationId && !a.loanSnapshotId)) throw new DomainError('Este cambio no puede deshacerse');
+  if (a.loanSnapshotId) {
+    const snapshot = requireValue(state.loanSnapshots.find(s => s.id === a.loanSnapshotId), 'Ajuste desconocido');
+    if (state.loanSnapshots.some(s => s.loanId === snapshot.loanId && !s.voided && s.sequence > snapshot.sequence)) throw new DomainError('Deshaz primero el ajuste más reciente', 409);
+    snapshot.voided = true;
+  }
   if (a.valuationId) {
     const valuation = requireValue(state.valuations.find(v => v.id === a.valuationId), 'Valoración desconocida');
     const active = state.valuations.filter(v => v.accountId === valuation.accountId && !v.voided).sort((a, b) => a.sequence - b.sequence);
@@ -288,16 +307,27 @@ export function dashboard(state: State, today: string) {
     // historical ones. Funded snapshots still exclude already represented history.
     if (t.date < a.openingDate && !(a.kind === 'investment' && BigInt(a.openingMinor) === 0n)) continue;
     const delta = BigInt(e.debitMinor) - BigInt(e.creditMinor);
-    balances[a.id] += a.kind === 'credit' ? -delta : delta;
+    balances[a.id] += a.kind === 'credit' || a.kind === 'loan' ? -delta : delta;
   }
   for (const value of state.valuations ?? []) {
     if (!value.voided && value.date <= today && balances[value.accountId] !== undefined) balances[value.accountId] += BigInt(value.adjustmentMinor);
   }
+  for (const account of state.accounts.filter(a => a.kind === 'loan')) balances[account.id] = BigInt(loanBalance(state, account.id, today).balanceMinor ?? '0');
   const productTotal = (kind: Account['kind']) => state.accounts.filter(a => a.kind === kind).reduce((sum, a) => sum + balances[a.id], 0n).toString();
   const liquid = state.accounts.filter(a => (a.kind === 'bank' || a.kind === 'cash') && a.eligible).reduce((sum, a) => sum + balances[a.id], 0n);
   const cardDebt = state.accounts.filter(a => a.kind === 'credit').reduce((sum, a) => sum + (balances[a.id] > 0n ? balances[a.id] : 0n), 0n);
   const payday = nextPayday(today, state.settings.payday);
   const dueBills = state.bills.filter(b => !b.paidTransactionId && b.dueDate < payday);
+  for (const loan of state.loans) {
+    const latest = loanBalance(state, loan.id, today).snapshot;
+    const dueDate = latest?.nextPaymentDate ?? loan.nextPaymentDate;
+    const dueMinor = latest?.nextDueMinor ?? loan.nextDueMinor;
+    if (!dueDate || dueDate >= payday || !dueMinor || BigInt(dueMinor) === 0n) continue;
+    if (state.bills.some(b => b.loanId === loan.id && b.dueDate === dueDate)) continue;
+    const paid = active.filter(t => t.kind === 'loan_payment' && t.counterAccountId === loan.id && t.loanPayment?.dueDate === dueDate && ['ordinary', 'advance'].includes(t.loanPayment.purpose)).reduce((s, t) => s + BigInt(t.amountMinor), 0n);
+    const remaining = BigInt(dueMinor) - paid;
+    if (remaining > 0n) dueBills.push({ id: `loan-due:${loan.id}:${dueDate}`, loanId: loan.id, name: state.accounts.find(a => a.id === loan.id)?.name ?? 'Cuota hipotecaria', dueDate, amountMinor: remaining.toString() });
+  }
   const bills = dueBills.reduce((sum, b) => sum + BigInt(b.amountMinor), 0n);
   const pending = state.observations.filter(o => o.status === 'review');
   const uncertain = pending.filter(o => {
@@ -305,7 +335,7 @@ export function dashboard(state: State, today: string) {
     const account = o.accountId ? state.accounts.find(a => a.id === o.accountId) : undefined;
     return !account || !o.date || o.date >= account.openingDate;
   }).reduce((sum, o) => sum + BigInt(o.amountMinor!), 0n);
-  const month = active.filter(t => t.date.startsWith(today.slice(0, 7)));
+  const month = expenseMovements(active).filter(t => t.date.startsWith(today.slice(0, 7)));
   const spending = month.filter(t => ['expense', 'refund'].includes(t.kind)).reduce((sum, t) => sum + (t.kind === 'refund' ? -1n : 1n) * BigInt(t.amountMinor), 0n);
   const income = month.filter(t => t.kind === 'income').reduce((sum, t) => sum + BigInt(t.amountMinor), 0n);
   const categorySpending = state.categories.map(c => ({ ...c, amountMinor: month.filter(t => t.categoryId === c.id && ['expense', 'refund'].includes(t.kind)).reduce((sum, t) => sum + (t.kind === 'refund' ? -1n : 1n) * BigInt(t.amountMinor), 0n).toString() }));
