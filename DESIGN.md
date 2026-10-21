@@ -349,3 +349,9 @@ Merchant location reuse is opt-in and independent from category/note memory. Wit
 
 
 Configured movement locations default to a compact view: place name, persistent map, “Ver en Google Maps” and “Editar ubicación”. Hide raw URL, latitude, longitude, removal and merchant-memory options until editing; show the full editor immediately when no location exists. “Listo” returns to the compact view and the movement save persists changes. Verified Google links retain the extracted place label in transaction.place.name without renaming the financial merchant. Keep the Google Maps CTA available when map rendering fails. Preserve remembered-location choices across disclosure changes and keep original Shortcut evidence in its separate disclosure.
+
+### Movement and report filters
+
+Movement filters retain the desktop popover and mobile bottom sheet. Both include an explicit 44px close target, Escape dismissal and outside-pointer dismissal. Category selects only parent categories; an optional child selector appears for the chosen parent and resets when the parent changes.
+
+Reports optionally scope every total and chart to one parent category, including its children. Two pie distributions show subcategories and merchants, with matching color keys and exact amounts in the adjacent detail. Negative net refunds remain textual values outside the positive pie denominator. Keep both charts stacked on phones.

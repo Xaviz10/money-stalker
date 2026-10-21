@@ -5403,3 +5403,47 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 .place-edit-fields[hidden] { display: none; }
 .place-edit-fields > .text-button, .place-edit-fields > .button, .place-map-cta { justify-self: start; max-width: 100%; white-space: normal; }
 @media (max-width: 360px) { .place-summary { align-items: start; flex-direction: column; gap: var(--space-1); } }
+
+.filter-panel-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+.filter-panel-heading .button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+}
+.report-pie-wrap {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  margin-block: var(--space-4);
+}
+.report-pie {
+  width: min(100%, 220px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+.report-legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.report-filters {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 760px) {
+  .report-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .report-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

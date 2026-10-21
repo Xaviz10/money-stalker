@@ -889,6 +889,26 @@ function Movements({
 }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [subcategoryFilter, setSubcategoryFilter] = useState("");
+  const filtersRef = useRef<HTMLDetailsElement>(null);
+  const closeFilters = () => {
+    if (filtersRef.current) {
+      filtersRef.current.open = false;
+      filtersRef.current.querySelector("summary")?.focus();
+    }
+  };
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (
+        filtersRef.current?.open &&
+        !filtersRef.current.contains(event.target as Node)
+      )
+        filtersRef.current.open = false;
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, []);
+
   const [directionFilter, setDirectionFilter] = useState("");
   const account = state.accounts.find((a) => a.id === selectedAccount);
   const accountTransactions = useMemo(
@@ -909,8 +929,11 @@ function Movements({
         const matchesSearch = `${t.merchant ?? ""} ${t.note ?? ""} ${t.date}`
           .toLowerCase()
           .includes(search.toLowerCase());
-        const matchesCategory =
-          categoryMatches(state, t.categoryId, categoryFilter);
+        const matchesCategory = categoryMatches(
+          state,
+          t.categoryId,
+          subcategoryFilter || categoryFilter,
+        );
         const matchesDirection =
           !directionFilter ||
           (directionFilter === "incoming"
@@ -918,7 +941,15 @@ function Movements({
             : !isIncoming(t, selectedAccount!));
         return matchesSearch && matchesCategory && matchesDirection;
       }),
-    [accountTransactions, categoryFilter, directionFilter, search, selectedAccount],
+    [
+      accountTransactions,
+      categoryFilter,
+      subcategoryFilter,
+      directionFilter,
+      search,
+      selectedAccount,
+      state.categories,
+    ],
   );
   if (!account)
     return (
@@ -974,24 +1005,72 @@ function Movements({
             onChange={(e) => setSearch(e.target.value)}
           />
         </Field>
-        <details className="register-more">
+        <details
+          className="register-more"
+          ref={filtersRef}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") closeFilters();
+          }}
+        >
           <summary>
             <Icon name="search" size={16} /> Filtros y acciones
           </summary>
           <div className="register-more-panel">
+            <div className="filter-panel-heading">
+              <strong>Filtros y acciones</strong>
+              <button
+                type="button"
+                className="button quiet"
+                onClick={closeFilters}
+                aria-label="Cerrar filtros"
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
             <Field label="Categoría">
               <select
+                aria-label="Categoría"
                 value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
+                onChange={(event) => {
+                  setCategoryFilter(event.target.value);
+                  setSubcategoryFilter("");
+                }}
               >
                 <option value="">Todas</option>
-                {state.categories.map((category) => (
-                  <option value={category.id} key={category.id}>
-                    {category.parentId ? `↳ ${categoryLabel(state, category.id)}` : category.name}
-                  </option>
-                ))}
+                {state.categories
+                  .filter((category) => !category.parentId)
+                  .map((category) => (
+                    <option value={category.id} key={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
               </select>
             </Field>
+            {categoryFilter &&
+              state.categories.some(
+                (category) => category.parentId === categoryFilter,
+              ) && (
+                <Field label="Subcategoría (opcional)">
+                  <select
+                    aria-label="Subcategoría (opcional)"
+                    value={subcategoryFilter}
+                    onChange={(event) =>
+                      setSubcategoryFilter(event.target.value)
+                    }
+                  >
+                    <option value="">Todas las subcategorías</option>
+                    {state.categories
+                      .filter(
+                        (category) => category.parentId === categoryFilter,
+                      )
+                      .map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+              )}
             <Field label="Dirección">
               <select
                 value={directionFilter}

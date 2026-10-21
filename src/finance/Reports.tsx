@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import type { State, Transaction } from "../../domain/model";
 import { bogotaDate, formatCOP } from "../../domain/money";
-import { CategoryIcon } from "./CategoryIcon";
 import { EmptyState, Icon } from "../design-system/ui";
 
 const colors = [
@@ -252,6 +251,41 @@ function SpendingTrend({
 }
 
 type CategoryTotal = { id: string; name: string; amount: bigint };
+function SpendingPie({
+  items,
+  label,
+}: {
+  items: CategoryTotal[];
+  label: string;
+}) {
+  const positive = items.filter((item) => item.amount > 0n);
+  const total = positive.reduce((sum, item) => sum + item.amount, 0n);
+  let angle = 0;
+  const stops = positive.map((item) => {
+    const start = angle;
+    angle += Number((item.amount * 1000000n) / total) / 10000;
+    return `${colors[items.indexOf(item) % colors.length]} ${start}% ${angle}%`;
+  });
+  return total > 0n ? (
+    <div className="report-pie-wrap">
+      <div
+        className="report-pie"
+        role="img"
+        aria-label={label}
+        style={{ background: `conic-gradient(${stops.join(", ")})` }}
+      />
+      <p className="report-chart-help">
+        Distribución del gasto neto positivo. Las devoluciones reducen cada
+        total; los valores negativos se muestran en el detalle.
+      </p>
+    </div>
+  ) : (
+    <p className="report-chart-help">
+      No hay gasto neto positivo para representar.
+    </p>
+  );
+}
+
 function CategoryChart({
   categories,
   rows,
@@ -271,6 +305,7 @@ function CategoryChart({
     .reduce((sum, category) => sum + category.amount, 0n);
   return (
     <>
+      <SpendingPie items={categories} label="Distribución por subcategoría" />
       <p className="report-chart-help">
         Selecciona una categoría para ver sus movimientos. Las devoluciones
         reducen cada total.
@@ -299,7 +334,11 @@ function CategoryChart({
               }
             >
               <span className="report-category-label">
-                <CategoryIcon categoryId={category.id} size={18} />
+                <span
+                  className="report-legend-dot"
+                  style={{ background: colors[index % colors.length] }}
+                  aria-hidden="true"
+                />
                 <span>{category.name}</span>
               </span>
               <strong>{formatCOP(category.amount.toString())}</strong>
@@ -386,6 +425,7 @@ export function Reports({
   const [from, setFrom] = useState(monthStart(today));
   const [to, setTo] = useState(today);
   const [preset, setPreset] = useState("month");
+  const [categoryId, setCategoryId] = useState("");
   const choosePreset = (next: string) => {
     setPreset(next);
     if (next === "month") {
@@ -410,9 +450,22 @@ export function Reports({
           transaction.date <= to &&
           transaction.date <= today &&
           ["expense", "refund"].includes(transaction.kind) &&
-          (!accountId || transaction.accountId === accountId),
+          (!accountId || transaction.accountId === accountId) &&
+          (!categoryId ||
+            transaction.categoryId === categoryId ||
+            state.categories.find(
+              (category) => category.id === transaction.categoryId,
+            )?.parentId === categoryId),
       ),
-    [state.transactions, from, to, accountId, today],
+    [
+      state.transactions,
+      state.categories,
+      from,
+      to,
+      accountId,
+      categoryId,
+      today,
+    ],
   );
   const spending = rows
     .filter((row) => row.kind === "expense")
@@ -445,14 +498,10 @@ export function Reports({
       totals.set(name, (totals.get(name) ?? 0n) + signedExpense(row));
     }
     return [...totals]
-      .filter(([, amount]) => amount > 0n)
-      .map(([name, amount]) => ({ name, amount }))
-      .sort((a, b) => (a.amount > b.amount ? -1 : 1))
-      .slice(0, 6);
+      .filter(([, amount]) => amount !== 0n)
+      .map(([name, amount]) => ({ id: name, name, amount }))
+      .sort((a, b) => (a.amount > b.amount ? -1 : 1));
   }, [rows]);
-  const categoryTotal = categories
-    .filter((item) => item.amount > 0n)
-    .reduce((sum, item) => sum + item.amount, 0n);
   const validRange = Boolean(from && to && from <= to);
   return (
     <section className="reports" aria-label="Reportes de gastos">
@@ -515,6 +564,26 @@ export function Reports({
               ))}
             </select>
           </label>
+          <label>
+            <span>Categoría</span>
+            <select
+              aria-label="Categoría"
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+            >
+              <option value="">Todas las categorías</option>
+              {state.categories
+                .filter(
+                  (category) =>
+                    !category.parentId && category.scope !== "income",
+                )
+                .map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+            </select>
+          </label>
         </div>
       </div>
       {!validRange ? (
@@ -565,11 +634,11 @@ export function Reports({
                 <article className="panel report-category-panel">
                   <div className="report-panel-heading">
                     <div>
-                      <h2>En qué gastaste</h2>
+                      <h2>Gasto por subcategoría</h2>
                     </div>
                   </div>
                   <CategoryChart
-                    key={`${from}:${to}:${accountId ?? "all"}`}
+                    key={`${from}:${to}:${accountId ?? "all"}:${categoryId}`}
                     categories={categories}
                     rows={rows}
                   />
@@ -577,32 +646,33 @@ export function Reports({
                 <article className="panel report-merchants">
                   <div className="report-panel-heading">
                     <div>
-                      <span className="eyebrow">Detalle</span>
-                      <h2>Comercios principales</h2>
+                      <h2>Gasto por comercio</h2>
                     </div>
                   </div>
+                  <SpendingPie
+                    items={merchants}
+                    label="Distribución por comercio"
+                  />
                   <ol>
                     {merchants.map((merchant, index) => (
                       <li key={merchant.name}>
-                        <span>{index + 1}</span>
+                        <span
+                          className="report-legend-dot"
+                          style={{ background: colors[index % colors.length] }}
+                          aria-hidden="true"
+                        />
                         <div>
                           <strong>{merchant.name}</strong>
                           <small>
-                            {categoryTotal
-                              ? Number((merchant.amount * 100n) / categoryTotal)
-                              : 0}
-                            % del gasto positivo
+                            {merchant.amount < 0n
+                              ? "Devolución neta"
+                              : "Gasto neto"}
                           </small>
                         </div>
                         <b>{formatCOP(merchant.amount.toString())}</b>
                       </li>
                     ))}
                   </ol>
-                  {!merchants.length && (
-                    <p className="report-chart-help">
-                      No hay comercios con gasto neto positivo en este período.
-                    </p>
-                  )}
                 </article>
               </div>
             </>

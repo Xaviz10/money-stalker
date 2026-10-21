@@ -199,3 +199,55 @@ test("weekly trend includes the last partial week and filters future and deleted
   await page.getByLabel("Desde").fill("");
   await expect(page.getByRole("alert")).toBeVisible();
 });
+
+test("category filter scopes totals and both pies", async ({ page }) => {
+  await page.goto("./#/reportes");
+  await page.getByLabel("Desde").fill("2026-09-01");
+  await page.getByLabel("Categoría", { exact: true }).selectOption("car");
+  await expect(page.locator(".report-primary-stat")).toContainText("$ 90.000");
+  await expect(
+    page.getByRole("img", {
+      name: "Distribución por subcategoría",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Distribución por comercio", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".report-merchants")).not.toContainText(
+    "Restaurante central",
+  );
+  await page.screenshot({
+    path: test.info().outputPath("filtered-reports.png"),
+    fullPage: true,
+  });
+});
+
+test("movement filters close directly and separate category from subcategory", async ({
+  page,
+}) => {
+  await page.goto("./#/movimientos");
+  await page.getByText("Filtros y acciones", { exact: true }).first().click();
+  const panel = page.locator(".register-more-panel");
+  await panel.getByLabel("Categoría", { exact: true }).selectOption("car");
+  await expect(panel.getByLabel("Subcategoría (opcional)")).toBeVisible();
+  await expect(page.locator(".movement-table")).not.toContainText(
+    "Restaurante central",
+  );
+  await panel.getByLabel("Subcategoría (opcional)").selectOption("car-tolls");
+  await page
+    .getByRole("button", { name: "Cerrar filtros", exact: true })
+    .click();
+  await expect(panel).not.toBeVisible();
+  await page.locator(".register-more summary").click();
+  await page.keyboard.press("Escape");
+  await expect(panel).not.toBeVisible();
+  await page.locator(".register-more summary").click();
+  await page.getByRole("banner").click({ position: { x: 2, y: 2 } });
+  await expect(panel).not.toBeVisible();
+  await page.locator(".register-more summary").click();
+  await page.screenshot({
+    path: test.info().outputPath("movement-filters.png"),
+    fullPage: true,
+  });
+});
