@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { State, Transaction } from "../../domain/model";
 import { bogotaDate, formatCOP } from "../../domain/money";
+import { CategoryIcon } from "./CategoryIcon";
 import { EmptyState, Icon } from "../design-system/ui";
 
 const colors = [
@@ -258,22 +259,72 @@ function SpendingPie({
   items: CategoryTotal[];
   label: string;
 }) {
+  const [selectedId, setSelectedId] = useState<string>();
   const positive = items.filter((item) => item.amount > 0n);
+  const selected = positive.find((item) => item.id === selectedId);
   const total = positive.reduce((sum, item) => sum + item.amount, 0n);
-  let angle = 0;
-  const stops = positive.map((item) => {
-    const start = angle;
-    angle += Number((item.amount * 1000000n) / total) / 10000;
-    return `${colors[items.indexOf(item) % colors.length]} ${start}% ${angle}%`;
-  });
+  let angle = -Math.PI / 2;
+  const point = (value: number) =>
+    `${120 + 104 * Math.cos(value)},${120 + 104 * Math.sin(value)}`;
   return total > 0n ? (
     <div className="report-pie-wrap">
-      <div
+      <svg
         className="report-pie"
-        role="img"
+        viewBox="0 0 240 240"
+        role="group"
         aria-label={label}
-        style={{ background: `conic-gradient(${stops.join(", ")})` }}
-      />
+      >
+        {positive.map((item) => {
+          const start = angle;
+          const sweep =
+            (Number((item.amount * 1000000000n) / total) / 1000000000) *
+            Math.PI *
+            2;
+          angle += sweep;
+          const d = `M120,120 L${point(start)} A104,104 0 0 1 ${point(start + sweep / 2)} A104,104 0 0 1 ${point(angle)} Z`;
+          return (
+            <path
+              key={item.id}
+              d={d}
+              fill={colors[items.indexOf(item) % colors.length]}
+              className="report-pie-slice"
+              role="button"
+              tabIndex={0}
+              aria-label={`${item.name}: ${formatCOP(item.amount.toString())}`}
+              aria-pressed={selected?.id === item.id}
+              onClick={() => setSelectedId(item.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedId(item.id);
+                }
+              }}
+            >
+              <title>
+                {item.name}: {formatCOP(item.amount.toString())}
+              </title>
+            </path>
+          );
+        })}
+      </svg>
+      <div
+        className="report-pie-selection"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {selected ? (
+          <>
+            <strong>{selected.name}</strong>
+            <span>
+              {formatCOP(selected.amount.toString())} ·{" "}
+              {Number((selected.amount * 1000n) / total) / 10}% del gasto
+              positivo
+            </span>
+          </>
+        ) : (
+          <span>Toca una porción para ver su nombre y valor.</span>
+        )}
+      </div>
       <p className="report-chart-help">
         Distribución del gasto neto positivo. Las devoluciones reducen cada
         total; los valores negativos se muestran en el detalle.
@@ -322,48 +373,88 @@ function CategoryChart({
               ((negative ? -category.amount : category.amount) * 10000n) / max,
             ) / 100;
           return (
-            <button
-              type="button"
-              className="report-category"
-              key={category.id}
-              aria-pressed={selected?.id === category.id}
-              onClick={() =>
-                setSelectedId(
-                  selected?.id === category.id ? undefined : category.id,
-                )
-              }
-            >
-              <span className="report-category-label">
-                <span
-                  className="report-legend-dot"
-                  style={{ background: colors[index % colors.length] }}
-                  aria-hidden="true"
-                />
-                <span>{category.name}</span>
-              </span>
-              <strong>{formatCOP(category.amount.toString())}</strong>
-              <span
-                className={`report-category-track${hasNegative ? " signed" : ""}`}
-                aria-hidden="true"
+            <div className="report-category-item" key={category.id}>
+              <button
+                type="button"
+                className="report-category"
+                aria-expanded={selected?.id === category.id}
+                aria-controls={`report-category-${category.id}`}
+                aria-pressed={selected?.id === category.id}
+                onClick={() =>
+                  setSelectedId(
+                    selected?.id === category.id ? undefined : category.id,
+                  )
+                }
               >
+                <span className="report-category-label">
+                  <span
+                    className="report-legend-dot"
+                    style={{ background: colors[index % colors.length] }}
+                    aria-hidden="true"
+                  />
+                  <CategoryIcon categoryId={category.id} size={18} />
+                  <span>{category.name}</span>
+                  <Icon name="chevron" size={14} />
+                </span>
+                <strong>{formatCOP(category.amount.toString())}</strong>
                 <span
-                  style={{
-                    width: `${width / (hasNegative ? 2 : 1)}%`,
-                    left: `${hasNegative ? (negative ? 50 - width / 2 : 50) : 0}%`,
-                    background: negative
-                      ? "var(--color-success)"
-                      : colors[index % colors.length],
-                  }}
-                />
-              </span>
-              <small>
-                {negative
-                  ? "Devolución neta"
-                  : total
-                    ? `${Number((category.amount * 1000n) / total) / 10}% del gasto positivo`
-                    : "Sin gasto neto"}
-              </small>
-            </button>
+                  className={`report-category-track${hasNegative ? " signed" : ""}`}
+                  aria-hidden="true"
+                >
+                  <span
+                    style={{
+                      width: `${width / (hasNegative ? 2 : 1)}%`,
+                      left: `${hasNegative ? (negative ? 50 - width / 2 : 50) : 0}%`,
+                      background: negative
+                        ? "var(--color-success)"
+                        : colors[index % colors.length],
+                    }}
+                  />
+                </span>
+                <small>
+                  {negative
+                    ? "Devolución neta"
+                    : total
+                      ? `${Number((category.amount * 1000n) / total) / 10}% del gasto positivo`
+                      : "Sin gasto neto"}
+                </small>
+              </button>
+              {selected?.id === category.id && (
+                <div
+                  className="report-category-detail"
+                  id={`report-category-${category.id}`}
+                  role="region"
+                  aria-label={`Movimientos de ${category.name}`}
+                >
+                  <div className="report-category-detail-heading">
+                    <h3>{category.name}</h3>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(undefined)}
+                      aria-label="Cerrar detalle de categoría"
+                    >
+                      <Icon name="close" size={16} />
+                    </button>
+                  </div>
+                  <ul>
+                    {rows
+                      .filter((row) => row.categoryId === category.id)
+                      .map((row) => (
+                        <li key={row.id}>
+                          <span>
+                            <strong>{row.merchant || "Sin descripción"}</strong>
+                            <small>
+                              {bucketLabel(row.date, 1)} ·{" "}
+                              {row.kind === "refund" ? "Devolución" : "Gasto"}
+                            </small>
+                          </span>
+                          <b>{formatCOP(signedExpense(row).toString())}</b>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           );
         })}
         {!categories.length && (
@@ -377,36 +468,6 @@ function CategoryChart({
         <p className="report-chart-help">
           Izquierda: devolución neta · Derecha: gasto neto
         </p>
-      )}
-      {selected && (
-        <div className="report-category-detail">
-          <div className="report-category-detail-heading">
-            <h3>{selected.name}</h3>
-            <button
-              type="button"
-              onClick={() => setSelectedId(undefined)}
-              aria-label="Cerrar detalle de categoría"
-            >
-              <Icon name="close" size={16} />
-            </button>
-          </div>
-          <ul>
-            {rows
-              .filter((row) => row.categoryId === selected.id)
-              .map((row) => (
-                <li key={row.id}>
-                  <span>
-                    <strong>{row.merchant || "Sin descripción"}</strong>
-                    <small>
-                      {bucketLabel(row.date, 1)} ·{" "}
-                      {row.kind === "refund" ? "Devolución" : "Gasto"}
-                    </small>
-                  </span>
-                  <b>{formatCOP(signedExpense(row).toString())}</b>
-                </li>
-              ))}
-          </ul>
-        </div>
       )}
     </>
   );
@@ -650,6 +711,7 @@ export function Reports({
                     </div>
                   </div>
                   <SpendingPie
+                    key={`${from}:${to}:${accountId ?? "all"}:${categoryId}`}
                     items={merchants}
                     label="Distribución por comercio"
                   />

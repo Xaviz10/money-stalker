@@ -355,3 +355,5 @@ Configured movement locations default to a compact view: place name, persistent 
 Movement filters retain the desktop popover and mobile bottom sheet. Both include an explicit 44px close target, Escape dismissal and outside-pointer dismissal. Category selects only parent categories; an optional child selector appears for the chosen parent and resets when the parent changes.
 
 Reports optionally scope every total and chart to one parent category, including its children. Two pie distributions show subcategories and merchants, with matching color keys and exact amounts in the adjacent detail. Negative net refunds remain textual values outside the positive pie denominator. Keep both charts stacked on phones.
+
+Pie slices respond to click, tap, Enter and Space, with a visible selected outline and a live name, COP amount and percentage below each chart. Category rows retain the shared category icon alongside their color key. Expand movements as a single-open accordion immediately beneath the selected row, with an expanded state, chevron and accessible region; never append the selected category's movements after the whole list.

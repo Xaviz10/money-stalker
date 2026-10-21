@@ -126,7 +126,12 @@ test("category chart opens movements and retains negative category totals", asyn
   const refunds = categories.getByRole("button", { name: /Carro › Peajes/ });
   await expect(refunds).toContainText("−$ 10.000");
   await refunds.click();
-  await expect(refunds).toHaveAttribute("aria-pressed", "true");
+  await expect(refunds).toHaveAttribute("aria-expanded", "true");
+  await expect(refunds.locator(".report-category-label svg")).toHaveCount(2);
+  const refundItem = refunds.locator("..");
+  await expect(
+    refundItem.locator(":scope > .report-category-detail"),
+  ).toContainText("Peaje del norte");
   await expect(page.locator(".report-category-detail")).toContainText(
     "Peaje del norte",
   );
@@ -206,13 +211,13 @@ test("category filter scopes totals and both pies", async ({ page }) => {
   await page.getByLabel("Categoría", { exact: true }).selectOption("car");
   await expect(page.locator(".report-primary-stat")).toContainText("$ 90.000");
   await expect(
-    page.getByRole("img", {
+    page.getByRole("group", {
       name: "Distribución por subcategoría",
       exact: true,
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("img", { name: "Distribución por comercio", exact: true }),
+    page.getByRole("group", { name: "Distribución por comercio", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".report-merchants")).not.toContainText(
     "Restaurante central",
@@ -250,4 +255,54 @@ test("movement filters close directly and separate category from subcategory", a
     path: test.info().outputPath("movement-filters.png"),
     fullPage: true,
   });
+});
+
+test("pie slices reveal names and values with pointer, touch and keyboard", async ({
+  page,
+  isMobile,
+}) => {
+  await page.goto("./#/reportes");
+  await page.getByLabel("Desde").fill("2026-09-01");
+  for (const [label, first, second] of [
+    ["Distribución por subcategoría", "Carro › Peajes", "Restaurantes"],
+    ["Distribución por comercio", "Peaje del norte", "Restaurante central"],
+  ]) {
+    const pie = page.getByRole("group", { name: label, exact: true });
+    const selection = pie.locator("..").locator(".report-pie-selection");
+    const bounds = (await pie.boundingBox())!;
+    const firstPosition = { x: bounds.width * 0.75, y: bounds.height * 0.5 };
+    if (isMobile) await pie.tap({ position: firstPosition });
+    else await pie.click({ position: firstPosition });
+    await expect(selection).toContainText(first);
+    await expect(selection).toContainText("$ 90.000");
+    const secondPosition = { x: bounds.width * 0.25, y: bounds.height * 0.25 };
+    if (isMobile) await pie.tap({ position: secondPosition });
+    else await pie.click({ position: secondPosition });
+    await expect(selection).toContainText(second);
+    await expect(selection).toContainText("$ 50.000");
+    const firstSlice = pie.getByRole("button", { name: new RegExp(first) });
+    await firstSlice.focus();
+    await firstSlice.press("Enter");
+    await expect(firstSlice).toHaveAttribute("aria-pressed", "true");
+    await expect(selection).toContainText(first);
+  }
+  const categories = page.getByRole("group", {
+    name: "Gráfico de gasto neto por categoría",
+  });
+  const firstCategory = categories.getByRole("button", {
+    name: /Carro › Peajes/,
+  });
+  await firstCategory.click();
+  await expect(firstCategory).toHaveAttribute("aria-expanded", "true");
+  const item = firstCategory.locator("..");
+  await expect(item.locator(":scope > .report-category-detail")).toContainText(
+    "Peaje del norte",
+  );
+  await page.screenshot({
+    path: test.info().outputPath("interactive-reports.png"),
+    fullPage: true,
+  });
+  await firstCategory.click();
+  await expect(firstCategory).toHaveAttribute("aria-expanded", "false");
+  await expect(item.locator(".report-category-detail")).toHaveCount(0);
 });
