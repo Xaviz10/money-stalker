@@ -252,61 +252,123 @@ function SpendingTrend({
 }
 
 type CategoryTotal = { id: string; name: string; amount: bigint };
+const othersSelection = Symbol("others");
+type ChartSelection = string | typeof othersSelection | undefined;
+type PieSegment = {
+  id: string | typeof othersSelection;
+  name: string;
+  amount: bigint;
+  members: string[];
+};
+
+function distribution(items: CategoryTotal[]) {
+  const positive = items.filter((item) => item.amount > 0n);
+  const main = positive.slice(
+    0,
+    positive.length > colors.length ? colors.length - 1 : colors.length,
+  );
+  const rest = positive.slice(main.length);
+  const segments: PieSegment[] = main.map((item) => ({
+    ...item,
+    members: [item.id],
+  }));
+  if (rest.length)
+    segments.push({
+      id: othersSelection,
+      name: "Otros",
+      amount: rest.reduce((sum, item) => sum + item.amount, 0n),
+      members: rest.map((item) => item.id),
+    });
+  const color = (id: string) => {
+    const index = segments.findIndex((segment) => segment.members.includes(id));
+    return index < 0 ? "var(--color-success)" : colors[index];
+  };
+  return {
+    main: [...main, ...items.filter((item) => item.amount < 0n)],
+    rest,
+    segments,
+    color,
+  };
+}
+
+function spendingShare(amount: bigint, total: bigint) {
+  if (amount <= 0n || total <= 0n) return "0%";
+  if (amount * 1000n < total) return "<0,1%";
+  const tenths = Number((amount * 1000n + total / 2n) / total) / 10;
+  return `${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(tenths)}%`;
+}
+
 function SpendingPie({
   items,
   label,
+  selectedId,
+  onSelect,
 }: {
   items: CategoryTotal[];
   label: string;
+  selectedId: ChartSelection;
+  onSelect: (id: ChartSelection) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string>();
-  const positive = items.filter((item) => item.amount > 0n);
-  const selected = positive.find((item) => item.id === selectedId);
-  const total = positive.reduce((sum, item) => sum + item.amount, 0n);
+  const { segments } = distribution(items);
+  const total = segments.reduce((sum, item) => sum + item.amount, 0n);
+  const selected =
+    selectedId === othersSelection
+      ? segments.find((item) => item.id === othersSelection)
+      : items.find((item) => item.id === selectedId);
   let angle = -Math.PI / 2;
   const point = (value: number) =>
     `${120 + 104 * Math.cos(value)},${120 + 104 * Math.sin(value)}`;
-  return total > 0n ? (
+  return (
     <div className="report-pie-wrap">
-      <svg
-        className="report-pie"
-        viewBox="0 0 240 240"
-        role="group"
-        aria-label={label}
-      >
-        {positive.map((item) => {
-          const start = angle;
-          const sweep =
-            (Number((item.amount * 1000000000n) / total) / 1000000000) *
-            Math.PI *
-            2;
-          angle += sweep;
-          const d = `M120,120 L${point(start)} A104,104 0 0 1 ${point(start + sweep / 2)} A104,104 0 0 1 ${point(angle)} Z`;
-          return (
-            <path
-              key={item.id}
-              d={d}
-              fill={colors[items.indexOf(item) % colors.length]}
-              className="report-pie-slice"
-              role="button"
-              tabIndex={0}
-              aria-label={`${item.name}: ${formatCOP(item.amount.toString())}`}
-              aria-pressed={selected?.id === item.id}
-              onClick={() => setSelectedId(item.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setSelectedId(item.id);
+      {total > 0n ? (
+        <svg
+          className="report-pie"
+          viewBox="0 0 240 240"
+          role="group"
+          aria-label={label}
+        >
+          {segments.map((item, index) => {
+            const start = angle;
+            const sweep =
+              (Number((item.amount * 1000000000n) / total) / 1000000000) *
+              Math.PI *
+              2;
+            angle += sweep;
+            const d = `M120,120 L${point(start)} A104,104 0 0 1 ${point(start + sweep / 2)} A104,104 0 0 1 ${point(angle)} Z`;
+            return (
+              <path
+                key={typeof item.id === "symbol" ? "others" : item.id}
+                d={d}
+                fill={colors[index]}
+                className="report-pie-slice"
+                role="button"
+                tabIndex={0}
+                aria-label={`${item.name}: ${formatCOP(item.amount.toString())}`}
+                aria-pressed={
+                  selectedId === item.id ||
+                  (typeof selectedId === "string" &&
+                    item.members.includes(selectedId))
                 }
-              }}
-            >
-              <title>
-                {item.name}: {formatCOP(item.amount.toString())}
-              </title>
-            </path>
-          );
-        })}
-      </svg>
+                onClick={() => onSelect(item.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(item.id);
+                  }
+                }}
+              >
+                <title>
+                  {item.name}: {formatCOP(item.amount.toString())}
+                </title>
+              </path>
+            );
+          })}
+        </svg>
+      ) : (
+        <p className="report-chart-help">
+          No hay gasto neto positivo para representar.
+        </p>
+      )}
       <div
         className="report-pie-selection"
         aria-live="polite"
@@ -317,23 +379,16 @@ function SpendingPie({
             <strong>{selected.name}</strong>
             <span>
               {formatCOP(selected.amount.toString())} ·{" "}
-              {Number((selected.amount * 1000n) / total) / 10}% del gasto
-              positivo
+              {selected.amount < 0n
+                ? "Devolución neta"
+                : `${spendingShare(selected.amount, total)} del gasto positivo`}
             </span>
           </>
-        ) : (
-          <span>Toca una porción para ver su nombre y valor.</span>
-        )}
+        ) : total > 0n ? (
+          <span>Selecciona una porción o una fila para ver el detalle.</span>
+        ) : null}
       </div>
-      <p className="report-chart-help">
-        Distribución del gasto neto positivo. Las devoluciones reducen cada
-        total; los valores negativos se muestran en el detalle.
-      </p>
     </div>
-  ) : (
-    <p className="report-chart-help">
-      No hay gasto neto positivo para representar.
-    </p>
   );
 }
 
@@ -344,119 +399,156 @@ function CategoryChart({
   categories: CategoryTotal[];
   rows: Transaction[];
 }) {
-  const [selectedId, setSelectedId] = useState<string>();
-  const selected = categories.find((category) => category.id === selectedId);
+  const [selectedId, setSelectedId] = useState<ChartSelection>();
+  const [showOthers, setShowOthers] = useState(false);
+  const grouped = distribution(categories);
+  const select = (id: ChartSelection) => {
+    setSelectedId(id);
+    if (id === othersSelection) setShowOthers(true);
+  };
+  const total = categories
+    .filter((item) => item.amount > 0n)
+    .reduce((sum, item) => sum + item.amount, 0n);
   const max = categories.reduce((value, category) => {
     const absolute = category.amount < 0n ? -category.amount : category.amount;
     return absolute > value ? absolute : value;
   }, 1n);
   const hasNegative = categories.some((category) => category.amount < 0n);
-  const total = categories
-    .filter((category) => category.amount > 0n)
-    .reduce((sum, category) => sum + category.amount, 0n);
+  const renderCategory = (category: CategoryTotal) => {
+    const negative = category.amount < 0n;
+    const expanded = selectedId === category.id;
+    const width =
+      Number(((negative ? -category.amount : category.amount) * 10000n) / max) /
+      100;
+    return (
+      <div className="report-category-item" key={category.id}>
+        <button
+          type="button"
+          className="report-category"
+          aria-expanded={expanded}
+          aria-controls={`report-category-${category.id}`}
+          aria-pressed={expanded}
+          onClick={() => select(expanded ? undefined : category.id)}
+        >
+          <span className="report-category-label">
+            <span
+              className="report-legend-dot"
+              style={{ background: grouped.color(category.id) }}
+              aria-hidden="true"
+            />
+            <CategoryIcon categoryId={category.id} size={18} />
+            <span>{category.name}</span>
+            <Icon name="chevron" size={14} />
+          </span>
+          <strong>{formatCOP(category.amount.toString())}</strong>
+          <span
+            className={`report-category-track${hasNegative ? " signed" : ""}`}
+            aria-hidden="true"
+          >
+            <span
+              style={{
+                width: `${width / (hasNegative ? 2 : 1)}%`,
+                left: `${hasNegative ? (negative ? 50 - width / 2 : 50) : 0}%`,
+                background: grouped.color(category.id),
+              }}
+            />
+          </span>
+          <small>
+            {negative
+              ? "Devolución neta"
+              : `${spendingShare(category.amount, total)} del gasto positivo`}
+          </small>
+        </button>
+        {expanded && (
+          <div
+            className="report-category-detail"
+            id={`report-category-${category.id}`}
+            role="region"
+            aria-label={`Movimientos de ${category.name}`}
+          >
+            <div className="report-category-detail-heading">
+              <h3>{category.name}</h3>
+              <button
+                type="button"
+                aria-label="Cerrar detalle de categoría"
+                onClick={(event) => {
+                  event.currentTarget
+                    .closest(".report-category-item")
+                    ?.querySelector("button")
+                    ?.focus();
+                  select(undefined);
+                }}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <ul>
+              {rows
+                .filter((row) => row.categoryId === category.id)
+                .map((row) => (
+                  <li key={row.id}>
+                    <span>
+                      <strong>{row.merchant || "Sin descripción"}</strong>
+                      <small>
+                        {bucketLabel(row.date, 1)} ·{" "}
+                        {row.kind === "refund" ? "Devolución" : "Gasto"}
+                      </small>
+                    </span>
+                    <b>{formatCOP(signedExpense(row).toString())}</b>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  };
   return (
     <>
-      <SpendingPie items={categories} label="Distribución por subcategoría" />
-      <p className="report-chart-help">
-        Selecciona una categoría para ver sus movimientos. Las devoluciones
-        reducen cada total.
-      </p>
+      <SpendingPie
+        items={categories}
+        label="Distribución por subcategoría"
+        selectedId={selectedId}
+        onSelect={select}
+      />
       <div
         className="report-category-chart"
         role="group"
         aria-label="Gráfico de gasto neto por categoría"
       >
-        {categories.map((category, index) => {
-          const negative = category.amount < 0n;
-          const width =
-            Number(
-              ((negative ? -category.amount : category.amount) * 10000n) / max,
-            ) / 100;
-          return (
-            <div className="report-category-item" key={category.id}>
-              <button
-                type="button"
-                className="report-category"
-                aria-expanded={selected?.id === category.id}
-                aria-controls={`report-category-${category.id}`}
-                aria-pressed={selected?.id === category.id}
-                onClick={() =>
-                  setSelectedId(
-                    selected?.id === category.id ? undefined : category.id,
-                  )
-                }
-              >
-                <span className="report-category-label">
-                  <span
-                    className="report-legend-dot"
-                    style={{ background: colors[index % colors.length] }}
-                    aria-hidden="true"
-                  />
-                  <CategoryIcon categoryId={category.id} size={18} />
-                  <span>{category.name}</span>
-                  <Icon name="chevron" size={14} />
-                </span>
-                <strong>{formatCOP(category.amount.toString())}</strong>
-                <span
-                  className={`report-category-track${hasNegative ? " signed" : ""}`}
-                  aria-hidden="true"
-                >
-                  <span
-                    style={{
-                      width: `${width / (hasNegative ? 2 : 1)}%`,
-                      left: `${hasNegative ? (negative ? 50 - width / 2 : 50) : 0}%`,
-                      background: negative
-                        ? "var(--color-success)"
-                        : colors[index % colors.length],
-                    }}
-                  />
-                </span>
-                <small>
-                  {negative
-                    ? "Devolución neta"
-                    : total
-                      ? `${Number((category.amount * 1000n) / total) / 10}% del gasto positivo`
-                      : "Sin gasto neto"}
-                </small>
-              </button>
-              {selected?.id === category.id && (
-                <div
-                  className="report-category-detail"
-                  id={`report-category-${category.id}`}
-                  role="region"
-                  aria-label={`Movimientos de ${category.name}`}
-                >
-                  <div className="report-category-detail-heading">
-                    <h3>{category.name}</h3>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(undefined)}
-                      aria-label="Cerrar detalle de categoría"
-                    >
-                      <Icon name="close" size={16} />
-                    </button>
-                  </div>
-                  <ul>
-                    {rows
-                      .filter((row) => row.categoryId === category.id)
-                      .map((row) => (
-                        <li key={row.id}>
-                          <span>
-                            <strong>{row.merchant || "Sin descripción"}</strong>
-                            <small>
-                              {bucketLabel(row.date, 1)} ·{" "}
-                              {row.kind === "refund" ? "Devolución" : "Gasto"}
-                            </small>
-                          </span>
-                          <b>{formatCOP(signedExpense(row).toString())}</b>
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              )}
+        {grouped.main.map(renderCategory)}
+        {grouped.rest.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="report-more-toggle"
+              aria-expanded={showOthers}
+              aria-controls="other-categories"
+              onClick={() => {
+                setShowOthers(!showOthers);
+                if (
+                  showOthers &&
+                  (selectedId === othersSelection ||
+                    grouped.rest.some((item) => item.id === selectedId))
+                )
+                  select(undefined);
+              }}
+            >
+              <span
+                className="report-legend-dot"
+                style={{ background: colors[7] }}
+                aria-hidden="true"
+              />
+              {showOthers
+                ? "Ocultar otras categorías"
+                : `Ver otras ${grouped.rest.length} categorías`}
+              <Icon name="chevron" size={14} />
+            </button>
+            <div id="other-categories" hidden={!showOthers}>
+              {grouped.rest.map(renderCategory)}
             </div>
-          );
-        })}
+          </>
+        )}
         {!categories.length && (
           <p className="report-chart-help">
             Los gastos y las devoluciones se compensan: el neto por categoría es
@@ -468,6 +560,87 @@ function CategoryChart({
         <p className="report-chart-help">
           Izquierda: devolución neta · Derecha: gasto neto
         </p>
+      )}
+    </>
+  );
+}
+
+function MerchantChart({ merchants }: { merchants: CategoryTotal[] }) {
+  const [selectedId, setSelectedId] = useState<ChartSelection>();
+  const [showOthers, setShowOthers] = useState(false);
+  const grouped = distribution(merchants);
+  const total = merchants
+    .filter((item) => item.amount > 0n)
+    .reduce((sum, item) => sum + item.amount, 0n);
+  const select = (id: ChartSelection) => {
+    setSelectedId(id);
+    if (id === othersSelection) setShowOthers(true);
+  };
+  const renderMerchant = (merchant: CategoryTotal) => (
+    <li key={merchant.id}>
+      <button
+        type="button"
+        className="report-merchant-row"
+        aria-pressed={selectedId === merchant.id}
+        onClick={() => select(merchant.id)}
+      >
+        <span
+          className="report-legend-dot"
+          style={{ background: grouped.color(merchant.id) }}
+          aria-hidden="true"
+        />
+        <span>
+          <strong>{merchant.name}</strong>
+          <small>
+            {merchant.amount < 0n
+              ? "Devolución neta"
+              : `${spendingShare(merchant.amount, total)} del gasto positivo`}
+          </small>
+        </span>
+        <b>{formatCOP(merchant.amount.toString())}</b>
+      </button>
+    </li>
+  );
+  return (
+    <>
+      <SpendingPie
+        items={merchants}
+        label="Distribución por comercio"
+        selectedId={selectedId}
+        onSelect={select}
+      />
+      <ol>{grouped.main.map(renderMerchant)}</ol>
+      {grouped.rest.length > 0 && (
+        <>
+          <button
+            type="button"
+            className="report-more-toggle"
+            aria-expanded={showOthers}
+            aria-controls="other-merchants"
+            onClick={() => {
+              setShowOthers(!showOthers);
+              if (
+                showOthers &&
+                (selectedId === othersSelection ||
+                  grouped.rest.some((item) => item.id === selectedId))
+              )
+                select(undefined);
+            }}
+          >
+            <span
+              className="report-legend-dot"
+              style={{ background: colors[7] }}
+              aria-hidden="true"
+            />
+            {showOthers
+              ? "Ocultar otros comercios"
+              : `Ver otros ${grouped.rest.length} comercios`}
+            <Icon name="chevron" size={14} />
+          </button>
+          <ol id="other-merchants" hidden={!showOthers}>
+            {grouped.rest.map(renderMerchant)}
+          </ol>
+        </>
       )}
     </>
   );
@@ -649,7 +822,9 @@ export function Reports({
       </div>
       {!validRange ? (
         <p className="notice danger" role="alert">
-          La fecha inicial debe ser anterior a la fecha final.
+          {!from || !to
+            ? "Completa las fechas Desde y Hasta."
+            : "La fecha Desde debe ser anterior o igual a Hasta."}
         </p>
       ) : (
         <>
@@ -662,21 +837,23 @@ export function Reports({
                 en {days} {days === 1 ? "día" : "días"}
               </small>
             </article>
-            <article>
-              <span>Compras y gastos</span>
-              <strong>{formatCOP(spending.toString())}</strong>
-              <small>Antes de devoluciones</small>
-            </article>
-            <article>
-              <span>Devoluciones</span>
-              <strong>{formatCOP(refunds.toString())}</strong>
-              <small>Restadas del gasto</small>
-            </article>
-            <article>
-              <span>Promedio diario</span>
-              <strong>{formatCOP((net / BigInt(days)).toString())}</strong>
-              <small>Durante el período</small>
-            </article>
+            <div className="report-secondary-summary">
+              <article>
+                <span>Compras y gastos</span>
+                <strong>{formatCOP(spending.toString())}</strong>
+                <small>Antes de devoluciones</small>
+              </article>
+              <article>
+                <span>Devoluciones</span>
+                <strong>{formatCOP(refunds.toString())}</strong>
+                <small>Restadas del gasto</small>
+              </article>
+              <article>
+                <span>Promedio diario</span>
+                <strong>{formatCOP((net / BigInt(days)).toString())}</strong>
+                <small>Durante el período</small>
+              </article>
+            </div>
           </div>
           {rows.length ? (
             <>
@@ -691,11 +868,16 @@ export function Reports({
                 </div>
                 <SpendingTrend rows={rows} from={from} to={to} />
               </article>
+              <p className="report-chart-help report-distribution-note">
+                Las devoluciones reducen el gasto. Las tortas muestran solo los
+                totales positivos; los negativos se conservan en las listas.
+                Selecciona una categoría para ver sus movimientos.
+              </p>
               <div className="report-grid">
                 <article className="panel report-category-panel">
                   <div className="report-panel-heading">
                     <div>
-                      <h2>Gasto por subcategoría</h2>
+                      <h2>Gasto por categoría y subcategoría</h2>
                     </div>
                   </div>
                   <CategoryChart
@@ -710,38 +892,18 @@ export function Reports({
                       <h2>Gasto por comercio</h2>
                     </div>
                   </div>
-                  <SpendingPie
+                  <MerchantChart
                     key={`${from}:${to}:${accountId ?? "all"}:${categoryId}`}
-                    items={merchants}
-                    label="Distribución por comercio"
+                    merchants={merchants}
                   />
-                  <ol>
-                    {merchants.map((merchant, index) => (
-                      <li key={merchant.name}>
-                        <span
-                          className="report-legend-dot"
-                          style={{ background: colors[index % colors.length] }}
-                          aria-hidden="true"
-                        />
-                        <div>
-                          <strong>{merchant.name}</strong>
-                          <small>
-                            {merchant.amount < 0n
-                              ? "Devolución neta"
-                              : "Gasto neto"}
-                          </small>
-                        </div>
-                        <b>{formatCOP(merchant.amount.toString())}</b>
-                      </li>
-                    ))}
-                  </ol>
                 </article>
               </div>
             </>
           ) : (
             <div className="panel report-empty">
               <EmptyState title="No hay gastos en este período" icon="overview">
-                Prueba otro rango de fechas o selecciona todas las cuentas.
+                Prueba otro rango de fechas, todas las cuentas o todas las
+                categorías.
               </EmptyState>
               <a className="button secondary" href="#/movimientos">
                 <Icon name="arrows" size={16} /> Ver movimientos

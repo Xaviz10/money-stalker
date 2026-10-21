@@ -951,6 +951,21 @@ function Movements({
       state.categories,
     ],
   );
+  const hasFilters = Boolean(
+    search || categoryFilter || subcategoryFilter || directionFilter,
+  );
+  const clearFilters = () => {
+    setSearch("");
+    setCategoryFilter("");
+    setSubcategoryFilter("");
+    setDirectionFilter("");
+  };
+  const categoryName = state.categories.find(
+    (category) => category.id === categoryFilter,
+  )?.name;
+  const subcategoryName = state.categories.find(
+    (category) => category.id === subcategoryFilter,
+  )?.name;
   if (!account)
     return (
       <section className="panel movement-register no-products">
@@ -1014,6 +1029,12 @@ function Movements({
         >
           <summary>
             <Icon name="search" size={16} /> Filtros y acciones
+            {hasFilters && (
+              <span
+                className="filter-active-marker"
+                aria-label="Hay filtros activos"
+              />
+            )}
           </summary>
           <div className="register-more-panel">
             <div className="filter-panel-heading">
@@ -1081,6 +1102,10 @@ function Movements({
                 <option value="outgoing">Salidas</option>
               </select>
             </Field>
+            <p className="register-export-scope">
+              Las exportaciones incluyen todos los movimientos de {account.name}
+              , sin aplicar estos filtros.
+            </p>
             <div className="register-more-actions">
               <button className="button secondary" onClick={openImport}>
                 <Icon name="upload" size={16} /> Importar archivo
@@ -1094,7 +1119,8 @@ function Movements({
                   )
                 }
               >
-                <Icon name="download" size={16} /> Exportar CSV
+                <Icon name="download" size={16} /> Exportar CSV del producto
+                completo
               </button>
               <button
                 className="button secondary"
@@ -1105,28 +1131,100 @@ function Movements({
                   )
                 }
               >
-                <Icon name="download" size={16} /> Exportar Excel
+                <Icon name="download" size={16} /> Exportar Excel del producto
+                completo
               </button>
             </div>
           </div>
         </details>
       </div>
+      {hasFilters && (
+        <div className="register-filter-state">
+          <p role="status">
+            {transactions.length} de {accountTransactions.length} movimientos
+          </p>
+          <div className="register-filter-chips" aria-label="Filtros activos">
+            {search && (
+              <button
+                type="button"
+                className="filter-chip"
+                onClick={() => setSearch("")}
+                aria-label={`Quitar búsqueda: ${search}`}
+              >
+                Búsqueda: {search}
+                <Icon name="close" size={14} />
+              </button>
+            )}
+            {categoryFilter && (
+              <button
+                type="button"
+                className="filter-chip"
+                onClick={() => {
+                  setCategoryFilter("");
+                  setSubcategoryFilter("");
+                }}
+                aria-label={`Quitar categoría: ${categoryName}`}
+              >
+                {categoryName}
+                <Icon name="close" size={14} />
+              </button>
+            )}
+            {subcategoryFilter && (
+              <button
+                type="button"
+                className="filter-chip"
+                onClick={() => setSubcategoryFilter("")}
+                aria-label={`Quitar subcategoría: ${subcategoryName}`}
+              >
+                {subcategoryName}
+                <Icon name="close" size={14} />
+              </button>
+            )}
+            {directionFilter && (
+              <button
+                type="button"
+                className="filter-chip"
+                onClick={() => setDirectionFilter("")}
+                aria-label="Quitar filtro de dirección"
+              >
+                {directionFilter === "incoming" ? "Entradas" : "Salidas"}
+                <Icon name="close" size={14} />
+              </button>
+            )}
+            <button
+              type="button"
+              className="button quiet"
+              onClick={clearFilters}
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
+      )}
       <TransactionTable
         transactions={transactions}
         state={state}
         selectedAccount={account.id}
         emptyMessage={
-          search || categoryFilter || directionFilter
+          hasFilters
             ? "No hay resultados para esta búsqueda"
             : "Este producto todavía no tiene movimientos"
         }
         emptyDescription={
-          search || categoryFilter || directionFilter
-            ? "Prueba con otro comercio, nota o fecha."
+          hasFilters
+            ? "Cambia la búsqueda o limpia los filtros de categoría y dirección."
             : "Agrega el primero manualmente o importa un extracto de este producto."
         }
         emptyActions={
-          search || categoryFilter || directionFilter ? undefined : (
+          hasFilters ? (
+            <button
+              type="button"
+              className="button secondary"
+              onClick={clearFilters}
+            >
+              Limpiar búsqueda y filtros
+            </button>
+          ) : (
             <div className="register-empty-actions">
               <button className="button primary" onClick={() => open("new")}>
                 <Icon name="plus" size={16} />
