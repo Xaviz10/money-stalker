@@ -8,6 +8,7 @@ colors:
   rail: "#132d78"
   rail-muted: "#c4d2f4"
   rail-line: "#ffffff26"
+  rail-hover: "#ffffff18"
   ink: "#0c1730"
   text: "#304367"
   muted: "#596b89"
@@ -359,3 +360,11 @@ Reports optionally scope every total and chart to one parent category, including
 Pie slices and list rows share selection. Selecting a category slice opens its movement accordion. Slices respond to click, tap, Enter and Space, with a visible selected outline and a live name, COP amount and percentage below each chart. Positive shares below 0.1% display “<0,1%”, never zero. Distributions with more than eight positive entries show seven leading slices and “Otros”; its exact child rows expand on demand, with a common color matching the grouped slice. Negative net refunds remain individually visible outside that group. State the positive-net/refund explanation once above both charts. Category rows retain the shared category icon alongside their color key. Expand movements as a single-open accordion immediately beneath the selected row, with an expanded state, chevron and accessible region; never append the selected category's movements after the whole list.
 
 Closed movement filters retain removable search/category/subcategory/direction chips and a live “N de M movimientos” count. Removing a parent clears its child; provide clear-all actions in the filter summary and filtered empty state. The header's complete product count remains independent. Export buttons explicitly say “del producto completo” and explain that search and filters do not affect exported rows.
+
+### Product navigation scope
+
+The mobile product disclosure uses primary-blue emphasis, a wrapping selected product name and an explicit “Cambiar producto” action. Keep the selection visible when the disclosure closes, including in Movimientos; the all-account scope reads “Todas las cuentas”. The target is at least 44px tall and the header grows for long names.
+
+Above 850px, the account rail can collapse to an 80px icon column using its labeled expand/collapse control. Keep product selection highlights, accessible product names and hover/focus name/type tooltips. Compact mode omits debit aliases (which share their bank balance), group headings and net-worth details. Expanding restores the full hierarchy; mobile keeps the full disclosure independently.
+
+Compact product icons show the product name and type in a tooltip on hover or keyboard focus. Tooltips render outside the scrolling rail, remain hoverable, dismiss with Escape and use the rail palette. The collapse control uses `rail-hover` for its hover surface.

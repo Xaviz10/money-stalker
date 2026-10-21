@@ -1,3 +1,5 @@
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { accountKindLabels, type Account, type State } from "../../domain/model";
 import { groupAccounts, netWorthMinor } from "../../domain/account-groups";
 import { formatCOP } from "../../domain/money";
@@ -10,21 +12,60 @@ export function AccountRail({
   selected,
   onSelect,
   allowAll = true,
+  collapsed = false,
+  onToggleCollapsed,
 }: {
   state: State;
   balances?: Record<string, string>;
   selected?: string;
   onSelect: (id?: string) => void;
   allowAll?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }) {
   const groups = groupAccounts(state);
+  const tooltipId = useId();
+  const [tooltip, setTooltip] = useState<{ id: string; label: string; top: number }>();
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const keepTooltip = () => clearTimeout(hideTimer.current);
+  const hideTooltip = () => {
+    keepTooltip();
+    hideTimer.current = setTimeout(() => setTooltip(undefined), 120);
+  };
+  const showTooltip = (element: HTMLElement, account: Account) => {
+    keepTooltip();
+    if (!collapsed || window.innerWidth <= 850) return;
+    const rect = element.getBoundingClientRect();
+    setTooltip({ id: account.id, label: `${account.name} · ${accountKindLabels[account.kind]}`,
+      top: Math.max(80, Math.min(rect.top + rect.height / 2, window.innerHeight - 80)) });
+  };
+  useEffect(() => {
+    setTooltip(undefined);
+    return () => clearTimeout(hideTimer.current);
+  }, [collapsed]);
+  useEffect(() => {
+    const dismiss = () => setTooltip(undefined);
+    window.addEventListener("resize", dismiss);
+    window.addEventListener("scroll", dismiss, true);
+    return () => {
+      window.removeEventListener("resize", dismiss);
+      window.removeEventListener("scroll", dismiss, true);
+    };
+  }, []);
   const row = (a: Account, nested = false) => (
     <button
       type="button"
       className={`rail-account ${selected === a.id ? "selected" : ""} ${nested ? "nested" : ""}`}
+      title={collapsed ? undefined : `${a.name} · ${accountKindLabels[a.kind]}`}
+      aria-describedby={collapsed && tooltip?.id === a.id ? tooltipId : undefined}
+      onFocus={(event) => showTooltip(event.currentTarget, a)}
+      onBlur={hideTooltip}
+      onMouseEnter={(event) => showTooltip(event.currentTarget, a)}
+      onMouseLeave={(event) => { if (document.activeElement !== event.currentTarget) hideTooltip(); }}
+      aria-label={`${a.name} · ${accountKindLabels[a.kind]}`}
       aria-pressed={selected === a.id}
       key={a.id}
-      onClick={() => onSelect(a.id)}
+      onClick={() => { setTooltip(undefined); onSelect(a.id); }}
     >
       <span className={`rail-account-symbol ${a.kind}`}>
         <AccountArtwork account={a} size={nested ? 17 : 21} />
@@ -42,9 +83,21 @@ export function AccountRail({
     </button>
   );
   return (
-    <aside className="accounts-rail" aria-label="Tus cuentas y tarjetas">
+    <aside className="accounts-rail" aria-label="Tus cuentas y tarjetas"
+      onKeyDown={(event) => { if (event.key === "Escape") { keepTooltip(); setTooltip(undefined); } }}>
+      {collapsed && tooltip && createPortal(
+        <div className="rail-product-tooltip" style={{ top: tooltip.top }}
+          onMouseEnter={keepTooltip} onMouseLeave={hideTooltip}>
+          <span role="tooltip" id={tooltipId}>{tooltip.label}</span>
+        </div>, document.body)}
       <div className="rail-heading">
         <strong>Mis cuentas</strong>
+        <button type="button" className="rail-collapse-toggle" onClick={onToggleCollapsed}
+          aria-label={collapsed ? "Expandir menú de cuentas" : "Contraer menú de cuentas"}
+          title={collapsed ? "Expandir menú de cuentas" : "Contraer menú de cuentas"}
+          aria-expanded={!collapsed}>
+          <Icon name="chevron" size={18} />
+        </button>
         <a href="#/cuentas" className="rail-add">
           <Icon name="plus" size={15} />
           Agregar
@@ -54,15 +107,17 @@ export function AccountRail({
         <button
           className={`rail-all ${!selected ? "selected" : ""}`}
           onClick={() => onSelect()}
+          title="Todas las cuentas"
+          aria-label="Todas las cuentas"
           aria-pressed={!selected}
         >
           <Icon name="overview" size={17} />
-          Todas las cuentas
+          <span>Todas las cuentas</span>
         </button>
       )}
       <div className="rail-groups">
         {groups.institutions.map((g) => (
-          <details className="institution-group" key={g.id} open>
+          <details className="institution-group" key={`${g.id}-${collapsed}`} open>
             <summary>
               <span className="institution-monogram">
                 <AccountArtwork account={g.accounts[0].account} size={15} />

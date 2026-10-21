@@ -274,6 +274,7 @@ export function App() {
   const [selectedAccount, setSelectedAccount] = useState<string>();
   const [movementAccount, setMovementAccount] = useState<string>();
   const [accountsOpen, setAccountsOpen] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const [refreshedAt, setRefreshedAt] = useState<Date>();
   const [stale, setStale] = useState(false);
   const alive = useRef(true);
@@ -475,7 +476,7 @@ export function App() {
     location.hash = "#/resumen";
   };
   return (
-    <div className={`app-shell ${accountsOpen ? "accounts-open" : ""}`}>
+    <div className={`app-shell ${accountsOpen ? "accounts-open" : ""} ${railCollapsed ? "rail-collapsed" : ""}`}>
       <header className="app-header">
         <a
           className="app-brand"
@@ -559,7 +560,7 @@ export function App() {
         >
           <Icon name="wallet" size={17} />
           <span>
-            {(page === "movimientos" ? movementAccount : selectedAccount)
+            <strong>{(page === "movimientos" ? movementAccount : selectedAccount)
               ? state.accounts.find(
                   (a) =>
                     a.id ===
@@ -567,7 +568,8 @@ export function App() {
                       ? movementAccount
                       : selectedAccount),
                 )?.name
-              : "Mis cuentas y tarjetas"}
+              : "Todas las cuentas"}</strong>
+            <small>{accountsOpen ? "Cerrar productos" : "Cambiar producto"}</small>
           </span>
           <Icon name="chevron" size={15} />
         </button>
@@ -576,6 +578,8 @@ export function App() {
         <div id="accounts-panel" className="accounts-panel">
           <AccountRail
             state={state}
+            collapsed={railCollapsed}
+            onToggleCollapsed={() => setRailCollapsed(value => !value)}
             balances={summary?.balances}
             selected={
               page === "movimientos" ? movementAccount : selectedAccount
