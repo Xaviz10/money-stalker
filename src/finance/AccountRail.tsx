@@ -3,7 +3,7 @@ import { bogotaDate } from '../../domain/money';
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { accountKindLabels, type Account, type State } from "../../domain/model";
-import { groupAccounts, netWorthMinor } from "../../domain/account-groups";
+import { groupAccounts } from "../../domain/account-groups";
 import { formatCOP } from "../../domain/money";
 import { Icon, Eyes, EvidenceTrail } from "../design-system/ui";
 import { AccountArtwork } from "./AccountArtwork";
@@ -11,6 +11,9 @@ import { AccountArtwork } from "./AccountArtwork";
 export function AccountRail({
   state,
   balances,
+  availableMinor,
+  availableIncomplete = false,
+  stale = false,
   selected,
   onSelect,
   allowAll = true,
@@ -19,6 +22,9 @@ export function AccountRail({
 }: {
   state: State;
   balances?: Record<string, string>;
+  availableMinor?: string;
+  availableIncomplete?: boolean;
+  stale?: boolean;
   selected?: string;
   onSelect: (id?: string) => void;
   allowAll?: boolean;
@@ -176,13 +182,13 @@ export function AccountRail({
         )}
       </div>
       <div className="rail-companion" aria-hidden="true"><EvidenceTrail variant="holdings" /><Eyes /></div>
-      <div className="rail-worth">
-        <span>{state.accounts.some(a => a.kind === "loan" && !loanBalance(state, a.id, bogotaDate()).known) ? "Patrimonio parcial" : "Patrimonio neto"}</span>
+      <section className="rail-worth" aria-label="Disponible total de todas las cuentas">
+        <span>Disponible total</span>
         <strong>
-          {balances ? formatCOP(netWorthMinor(state.accounts, balances)) : "—"}
+          {availableMinor === undefined ? "—" : formatCOP(availableMinor)}
         </strong>
-        <small>Activos menos deudas.{state.loans.some(l => l.denomination === "UVR") ? " UVR con la última cotización confirmada." : ""}</small>
-      </div>
+        <small>{stale ? "Última consulta · datos sin actualizar." : availableIncomplete ? "Datos incompletos. Revisa tus pistas." : "Después de compromisos y reserva."}</small>
+      </section>
     </aside>
   );
 }

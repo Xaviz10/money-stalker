@@ -17,6 +17,7 @@ import {
   type TransactionPlace,
 } from "../domain/model";
 import { dashboard, duplicateTransactions } from "../domain/ledger";
+import { loanMerchantCandidates } from "../domain/merchant-rules";
 import { bogotaDate, decimalCOP, formatCOP, parseCOP } from "../domain/money";
 import { api, download, post } from "./api";
 import {
@@ -588,6 +589,9 @@ export function App() {
             collapsed={railCollapsed}
             onToggleCollapsed={() => setRailCollapsed(value => !value)}
             balances={summary?.balances}
+            availableMinor={summary?.availableMinor}
+            availableIncomplete={Boolean(summary?.incomplete)}
+            stale={stale}
             selected={
               page === "movimientos" ? movementAccount : selectedAccount
             }
@@ -1284,7 +1288,7 @@ function TransactionDialog({
   const [sourceAccountId, setSourceAccountId] = useState(initial?.accountId ?? preferredAccountId ?? "");
   const [investmentChoice, setInvestmentChoice] = useState<string | undefined>(initialInvestment ? initial?.counterAccountId : undefined);
   const [investmentName, setInvestmentName] = useState<string>();
-  const [loanChoice, setLoanChoice] = useState(initial?.kind === "loan_payment" ? initial.counterAccountId ?? "__new_loan__" : state.accounts.find(a => a.kind === "loan")?.id ?? "__new_loan__");
+  const [loanChoice, setLoanChoice] = useState<string | undefined>(initial?.kind === "loan_payment" ? initial.counterAccountId : undefined);
   const newLoanId = useRef(freshId());
   const newInvestmentId = useRef(freshId());
   const investmentProducts = state.accounts.filter(account => account.kind === "investment" && account.id !== sourceAccountId);
@@ -1293,8 +1297,16 @@ function TransactionDialog({
   const matchingInvestments = investmentProducts.filter(account => account.name.normalize("NFKC").trim().toLocaleLowerCase("es-CO").replace(/\s+/g, " ") === normalizedMerchant);
   const investmentDestination = investmentChoice ?? (investmentProducts.some(account => account.id === rememberedInvestment) ? rememberedInvestment : matchingInvestments.length === 1 ? matchingInvestments[0].id : "__new_investment__");
   const creatingInvestment = kind === "investment" && investmentDestination === "__new_investment__";
-  const [categoryId, setCategoryId] = useState(initialCategory.parentId ?? initialCategory.id);
-  const [subcategoryId, setSubcategoryId] = useState(initialCategory.parentId ? initialCategory.id : "");
+  const loanProducts = state.accounts.filter(account => account.kind === "loan");
+  const rememberedLoan = state.aliases.find(rule => rule.merchant === normalizedMerchant)?.loanAccountId;
+  const matchingLoans = loanProducts.filter(account => account.name.normalize("NFKC").trim().toLocaleLowerCase("es-CO").replace(/\s+/g, " ") === normalizedMerchant);
+  const loanDestination = loanChoice ?? (loanProducts.some(account => account.id === rememberedLoan) ? rememberedLoan! : matchingLoans.length === 1 ? matchingLoans[0].id : "__new_loan__");
+  const [categoryId, setCategoryId] = useState(initial?.kind === "loan_payment" && initialCategory.id === "uncategorized" ? "loans" : initialCategory.parentId ?? initialCategory.id);
+  const [subcategoryId, setSubcategoryId] = useState(initial?.kind === "loan_payment" && initialCategory.id === "uncategorized" ? "loans-housing" : initialCategory.parentId ? initialCategory.id : "");
+  const [applyLoanToSimilar, setApplyLoanToSimilar] = useState(false);
+  const [selectedLoanMovementIds, setSelectedLoanMovementIds] = useState<string[]>();
+  const loanCandidates = transaction && kind === "loan_payment" ? loanMerchantCandidates(state, transaction, loanDestination) : [];
+  const selectedLoanCandidates = selectedLoanMovementIds ? loanCandidates.filter(item => selectedLoanMovementIds.includes(item.id)) : loanCandidates.slice(0, 20);
   const [deleting, setDeleting] = useState(false);
   const [pendingDuplicate, setPendingDuplicate] = useState<{
     data: Record<string, unknown>;
@@ -1398,8 +1410,8 @@ function TransactionDialog({
             date: str(f, "date"),
             accountId: str(f, "accountId"),
             counterAccountId: kind === "investment" ? (creatingInvestment ? newInvestmentId.current : investmentDestination) :
-              kind === "loan_payment" ? (loanChoice === "__new_loan__" ? newLoanId.current : loanChoice) : kind === "transfer" ? str(f, "counterAccountId") : null,
-            ...(kind === "loan_payment" ? { loanPayment: { ...(transaction?.loanPayment?.documentId && f.get("unlinkLoanDocument") !== "on" ? { documentId: transaction.loanPayment.documentId, documentRowIds: transaction.loanPayment.documentRowIds } : {}), purpose: str(f, "loanPurpose"), ...(str(f, "loanDueDate") ? { dueDate: str(f, "loanDueDate") } : {}), ...(f.get("allocationConfirmed") === "on" ? { allocation: Object.fromEntries(["principalMinor", "interestMinor", "lateInterestMinor", "insuranceMinor", "feesMinor"].map(key => [key, amount(f, key)]).concat(str(f, "principalUnits") ? [["principalUnits", str(f, "principalUnits")], ["uvrValue", str(f, "paymentUvrValue")], ["uvrDate", str(f, "date")]] : [])) } : {}) }, ...(loanChoice === "__new_loan__" ? { loanProduct: { id: newLoanId.current, name: str(f, "loanName") } } : {}) } : { loanPayment: null }),
+              kind === "loan_payment" ? (loanDestination === "__new_loan__" ? newLoanId.current : loanDestination) : kind === "transfer" ? str(f, "counterAccountId") : null,
+            ...(kind === "loan_payment" ? { loanPayment: { ...(transaction?.loanPayment?.documentId && f.get("unlinkLoanDocument") !== "on" ? { documentId: transaction.loanPayment.documentId, documentRowIds: transaction.loanPayment.documentRowIds } : {}), purpose: str(f, "loanPurpose"), ...(str(f, "loanDueDate") ? { dueDate: str(f, "loanDueDate") } : {}), ...(f.get("allocationConfirmed") === "on" ? { allocation: Object.fromEntries(["principalMinor", "interestMinor", "lateInterestMinor", "insuranceMinor", "feesMinor"].map(key => [key, amount(f, key)]).concat(str(f, "principalUnits") ? [["principalUnits", str(f, "principalUnits")], ["uvrValue", str(f, "paymentUvrValue")], ["uvrDate", str(f, "date")]] : [])) } : {}) }, ...(loanDestination === "__new_loan__" ? { loanProduct: { id: newLoanId.current, name: str(f, "loanName") } } : {}) } : { loanPayment: null }),
             ...(creatingInvestment ? { investmentProduct: { id: newInvestmentId.current, name: (investmentName ?? merchant).trim() } } : {}),
             rememberMerchant: f.get("rememberMerchant") === "on",
             rememberMerchantPlace: Boolean(place && merchant.trim() && rememberPlaceChoice),
@@ -1408,7 +1420,7 @@ function TransactionDialog({
             merchant,
             categoryId: subcategoryId || categoryId || "uncategorized",
             note: str(f, "note"),
-            billId: str(f, "billId") || null,
+            billId: kind === "loan_payment" ? transaction?.billId ?? null : str(f, "billId") || null,
             place: place ?? null,
           };
           if (isObservation)
@@ -1420,7 +1432,7 @@ function TransactionDialog({
               ),
             });
           else if (transaction) {
-            const applyToSimilar = f.get("applyToSimilar") === "on";
+            const applyToSimilar = kind === "loan_payment" ? applyLoanToSimilar && selectedLoanCandidates.length > 0 : f.get("applyToSimilar") === "on";
             const applyPlaceToSimilar = Boolean(place && merchant.trim() && applyPlaceChoice);
             const result = await api<{ saved: true; updated: number }>(
               `/transactions/${transaction.id}`,
@@ -1429,6 +1441,7 @@ function TransactionDialog({
                 body: JSON.stringify({
                   changes: data,
                   applyToSimilar,
+                  ...(kind === "loan_payment" && applyToSimilar ? { loanAssociations: selectedLoanCandidates.map(item => ({ id: item.id, revision: item.revision })) } : {}),
                   applyPlaceToSimilar,
                   rememberMerchantPlace: Boolean(place && merchant.trim() && rememberPlaceChoice),
                   rememberMerchant: f.get("rememberMerchant") === "on",
@@ -1437,7 +1450,9 @@ function TransactionDialog({
               },
             );
             await saved(
-              applyPlaceToSimilar
+              kind === "loan_payment" && applyToSimilar
+                ? `Crédito asociado en ${selectedLoanCandidates.length + 1} movimientos. Los pagos históricos conservan su propio tipo y desglose, o quedan pendientes de confirmar.`
+                : applyPlaceToSimilar
                 ? `${applyToSimilar ? "Categoría, nota y ubicación guardadas" : "Ubicación guardada"} en ${result.updated} ${result.updated === 1 ? "movimiento" : "movimientos"} del mismo comercio.`
                 : applyToSimilar
                 ? `Categoría y nota guardadas en ${result.updated} ${result.updated === 1 ? "movimiento" : "movimientos"} del mismo comercio.`
@@ -1469,7 +1484,7 @@ function TransactionDialog({
               onChange={(e) => {
                 const next = e.target.value as typeof kind;
                 setKind(next);
-                if (next === "loan_payment") { setCategoryId("loans-housing"); setSubcategoryId(""); }
+                if (next === "loan_payment") { setCategoryId("loans"); setSubcategoryId("loans-housing"); }
                 const scope = next === "income" ? "income" : "expense";
                 const selected = state.categories.find((item) => item.id === (subcategoryId || categoryId));
                 if (next !== "transfer" && next !== "loan_payment" && selected?.scope !== "both" && selected?.scope !== scope) {
@@ -1544,16 +1559,16 @@ function TransactionDialog({
               onChange={(event) => setMerchant(event.target.value)}
             />
           </Field>
-          {kind !== "transfer" && kind !== "loan_payment" && (
+          {kind !== "transfer" && (
             <>
               <Field label={kind === "income" ? "Categoría de ingreso" : "Categoría de gasto"}>
                 <select name="categoryId" value={kind === "investment" ? "__investment__" : categoryId} onChange={(event) => {
-                  if (event.target.value === "__loan__") { setKind("loan_payment"); setCategoryId("loans-housing"); }
+                  if (event.target.value === "loans" && kind !== "income" && kind !== "refund") { setKind("loan_payment"); setCategoryId("loans"); setSubcategoryId("loans-housing"); return; }
                   else if (event.target.value === "__investment__") { setKind("investment"); setCategoryId(state.categories.find(category => !category.parentId && /^(inversión|inversion|inversiones)$/i.test(category.name.trim()) && category.scope !== "income")?.id ?? "uncategorized"); }
-                  else { if (kind === "investment") setKind("expense"); setCategoryId(event.target.value); }
+                  else { if (kind === "investment" || kind === "loan_payment") setKind("expense"); setCategoryId(event.target.value); }
                   setSubcategoryId("");
                 }}>
-                  {(kind === "expense" || kind === "investment") && <><option value="__investment__">Inversión</option><option value="__loan__">Pago de crédito hipotecario</option></>}
+                  {(kind === "expense" || kind === "investment" || kind === "loan_payment") && <option value="__investment__">Inversión</option>}
                   {state.categories
                     .filter((category) => !category.parentId && (kind === "income" || !/^(inversión|inversion|inversiones)$/i.test(category.name.trim())) && (category.scope === "both" || category.scope === (kind === "income" ? "income" : "expense")))
                     .map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
@@ -1561,7 +1576,10 @@ function TransactionDialog({
               </Field>
               {kind !== "investment" && state.categories.some((category) => category.parentId === categoryId) && (
                 <Field label="Subcategoría">
-                  <select value={subcategoryId} onChange={(event) => setSubcategoryId(event.target.value)}>
+                  <select value={subcategoryId} onChange={(event) => {
+                    setSubcategoryId(event.target.value);
+                    if (categoryId === "loans" && (kind === "expense" || kind === "loan_payment")) setKind(event.target.value === "loans-housing" ? "loan_payment" : "expense");
+                  }}>
                     <option value="">Sin subcategoría</option>
                     {state.categories.filter((category) => category.parentId === categoryId).map((category) => (
                       <option key={category.id} value={category.id}>{category.name}</option>
@@ -1571,7 +1589,8 @@ function TransactionDialog({
               )}
             </>
           )}
-          {kind === "loan_payment" && <LoanPaymentFields state={state} loanId={loanChoice} onLoanChange={setLoanChoice} initial={transaction?.loanPayment ?? (initial && "loanPayment" in initial ? initial.loanPayment : undefined)} />}
+          {kind === "expense" && categoryId === "loans" && subcategoryId === "loans-housing" && <button type="button" className="text-button" onClick={() => setKind("loan_payment")}>Asociar este pago a un crédito</button>}
+          {kind === "loan_payment" && <LoanPaymentFields state={state} loanId={loanDestination} onLoanChange={setLoanChoice} merchant={merchant} initial={transaction?.loanPayment ?? (transaction ? { purpose: "unconfirmed" } : initial && "loanPayment" in initial ? initial.loanPayment : undefined)} />}
           {kind === "investment" && <>
             <Field label="Producto de inversión"><select value={investmentDestination} onChange={(event) => setInvestmentChoice(event.target.value)} required>
               {investmentProducts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
@@ -1645,6 +1664,17 @@ function TransactionDialog({
           />
         </Field>
         {merchant.trim() && <label className="checkbox"><input type="checkbox" name="rememberMerchant" /> {kind === "loan_payment" ? "Recordar este comercio y el crédito para próximas importaciones (sin asumir tipo ni desglose)" : kind === "investment" ? "Recordar este comercio, su categoría y producto de inversión para próximas importaciones" : "Recordar la categoría y nota de este comercio para próximas importaciones"}</label>}
+        {transaction && kind === "loan_payment" && loanCandidates.length > 0 && <fieldset className="loan-payment-fields loan-merchant-preview">
+          <legend>Movimientos del mismo comercio</legend>
+          <label className="checkbox"><input type="checkbox" checked={applyLoanToSimilar} onChange={event => setApplyLoanToSimilar(event.target.checked)} /> Aplicar este crédito, categoría y nota a movimientos del mismo comercio</label>
+          {applyLoanToSimilar && <>
+            <p className="small-note">Revisa hasta 20 movimientos por guardado. Cada gasto asociado queda pendiente de confirmar tipo y desglose; los pagos ya vinculados conservan sus datos. Se mantienen el efectivo, la evidencia y la ubicación.</p>
+            <div className="loan-candidates">{loanCandidates.map(item => <label className="checkbox" key={item.id}>
+              <input type="checkbox" checked={selectedLoanCandidates.some(selected => selected.id === item.id)} disabled={!selectedLoanCandidates.some(selected => selected.id === item.id) && selectedLoanCandidates.length >= 20} onChange={event => setSelectedLoanMovementIds(ids => { const current = ids ?? loanCandidates.slice(0, 20).map(item => item.id); return event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id); })} />
+              {item.date} · {formatCOP(item.amountMinor)} · {state.accounts.find(account => account.id === item.accountId)?.name} · {item.kind === "loan_payment" ? "Conserva su aplicación" : "Pendiente de confirmar aplicación"}
+            </label>)}</div>
+          </>}
+        </fieldset>}
         {transaction && kind !== "loan_payment" && merchant.trim() && (
           <label className="checkbox">
             <input type="checkbox" name="applyToSimilar" /> Aplicar esta
@@ -1938,6 +1968,7 @@ function ImportDialog({
                       <td>{row.row}</td>
                       <td>{row.observation?.merchant ?? "—"}
                         {row.observation?.counterAccountId && state.accounts.find(account => account.id === row.observation?.counterAccountId)?.kind === "investment" && <small className="import-rule-detail">Inversión: {state.accounts.find(account => account.id === row.observation?.counterAccountId)?.name}</small>}
+                        {row.observation?.kind === "loan_payment" && <small className="import-rule-detail">Crédito: {state.accounts.find(account => account.id === row.observation?.counterAccountId)?.name} · Tipo y desglose pendientes de confirmar</small>}
                         {row.observation?.categoryId && row.observation.categoryId !== "uncategorized" && <small className="import-rule-detail">{categoryLabel(state, row.observation.categoryId)}</small>}
                       </td>
                       <td>{row.observation?.date ?? "—"}</td>

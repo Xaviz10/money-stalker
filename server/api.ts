@@ -1,5 +1,5 @@
 import { resolveGoogleMapsLink } from "./places";
-import { classifyImportedMerchant } from "../domain/merchant-rules";
+import { classifyImportedMerchant, loanMerchantCandidates } from "../domain/merchant-rules";
 import { randomUUID } from "node:crypto";
 import { loanAPI } from './loan-api';
 import { z } from "zod";
@@ -175,6 +175,7 @@ export function createAPI(repo: Repository, files: Files) {
             rememberMerchantPlace: z.boolean().default(false),
             rememberMerchant: z.boolean().default(false),
             expectedRevision: z.number().int().min(1),
+            loanAssociations: z.array(z.object({ id, revision: z.number().int().min(1) })).max(20).optional(),
           })
           .parse(body);
         const applyToSimilar = b.applyToSimilar || b.remember;
@@ -208,9 +209,26 @@ export function createAPI(repo: Repository, files: Files) {
         const destinationId = b.changes.counterAccountId ?? selected.counterAccountId;
         const investmentTransfer = (b.changes.kind ?? selected.kind) === 'transfer' && typeof destinationId === 'string'
           && (snapshot.accounts.some(account => account.id === destinationId && account.kind === 'investment') || investmentProduct?.id === destinationId);
+        const loanProduct = movementOptionsSchema.parse(b.changes).loanProduct;
+        const loanPayment = (b.changes.kind ?? selected.kind) === 'loan_payment' && typeof destinationId === 'string'
+          && (snapshot.accounts.some(account => account.id === destinationId && account.kind === 'loan') || loanProduct?.id === destinationId);
+        const loanCandidates = loanPayment ? loanMerchantCandidates(snapshot, selected, destinationId as string) : [];
+        if (loanPayment && applyToSimilar && !b.loanAssociations?.length)
+          throw new DomainError('Revisa y selecciona los movimientos antes de asociarlos al crédito');
+        if (b.loanAssociations?.length && (!loanPayment || !applyToSimilar))
+          throw new DomainError('La selección histórica requiere una asociación de crédito');
+        if (new Set(b.loanAssociations?.map(item => item.id)).size !== (b.loanAssociations?.length ?? 0))
+          throw new DomainError('La selección contiene movimientos repetidos');
+        for (const item of b.loanAssociations ?? []) {
+          const candidate = loanCandidates.find(candidate => candidate.id === item.id);
+          if (!candidate) throw new DomainError('Un movimiento seleccionado no corresponde a este comercio y crédito');
+          if (candidate.revision !== item.revision) throw new DomainError('Un movimiento histórico cambió; actualiza la vista previa', 409);
+        }
         // An investment choice changes the financial event, not just its label.
         // Do not redirect income, refunds, withdrawals or transfers to other products.
-        const compatible = (item: typeof selected) => investmentTransfer
+        const compatible = (item: typeof selected) => loanPayment
+          ? loanCandidates.some(candidate => candidate.id === item.id)
+          : investmentTransfer
           ? item.accountId !== destinationId && (item.kind === 'expense' || (item.kind === 'transfer' && item.counterAccountId === destinationId))
           : item.kind === selected.kind;
         const key = merchantKey(selected.merchant);
@@ -228,7 +246,7 @@ export function createAPI(repo: Repository, files: Files) {
               (item) =>
                 item.id !== selected.id &&
                 !item.voided &&
-                (b.applyPlaceToSimilar || compatible(item)) &&
+                (b.applyPlaceToSimilar || (loanPayment ? b.loanAssociations?.some(selected => selected.id === item.id) : compatible(item))) &&
                 merchantKey(item.merchant) === key,
             )
             .map((item) => item.id),
@@ -245,7 +263,7 @@ export function createAPI(repo: Repository, files: Files) {
         let updated = 0;
         // Investment conversion can also unlink a bill per movement, in addition
         // to its transaction and audit row. Leave room for product/rule creation.
-        const chunkSize = investmentTransfer && applyToSimilar ? 25 : 35;
+        const chunkSize = loanPayment && applyToSimilar ? 20 : investmentTransfer && applyToSimilar ? 25 : 35;
         for (let offset = 0; offset < matchingIds.length; offset += chunkSize) {
           const chunk = matchingIds.slice(offset, offset + chunkSize);
           updated += await repo.mutate(h, (s) => {
@@ -256,7 +274,14 @@ export function createAPI(repo: Repository, files: Files) {
               );
               if (!current) continue;
               const propagated = {
-                ...(applyToSimilar && compatible(current) ? sharedChanges : {}),
+                ...(applyToSimilar && compatible(current) && (!loanPayment || b.loanAssociations?.some(item => item.id === current.id)) ? {
+                  ...sharedChanges,
+                  ...(loanPayment ? {
+                    kind: 'loan_payment', counterAccountId: destinationId,
+                    // Never copy the selected payment's allocation, due date or document.
+                    loanPayment: current.kind === 'loan_payment' ? current.loanPayment : { purpose: 'unconfirmed' },
+                  } : {}),
+                } : {}),
                 ...(sharedPlace ? { place: sharedPlace } : {}),
               };
               const changes = id === selected.id ? b.changes : propagated;

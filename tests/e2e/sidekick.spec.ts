@@ -113,6 +113,7 @@ test("loading and failed refresh never pretend to be empty or current balances",
     page.getByRole("heading", { name: "Buscando tus pistas…" }),
   ).toBeVisible();
   await expect(page.locator(".first-account")).toHaveCount(0);
+  await expect(page.locator(".rail-worth > strong")).toHaveText("—");
   control.holdReads = false;
   await expect(page.locator(".balance-status")).toContainText(
     "El disponible está incompleto",
@@ -122,12 +123,16 @@ test("loading and failed refresh never pretend to be empty or current balances",
     "Por revisar",
   );
   const balance = await page.locator(".available-total > strong").textContent();
+  await expect(page.locator(".rail-worth > strong")).toHaveText(balance!);
+  await expect(page.locator(".rail-worth > small")).toContainText("Datos incompletos");
   control.failRead = true;
   await page.getByRole("button", { name: "Actualizar datos" }).click();
   await expect(page.locator(".balance-status")).toContainText(
     "Datos sin actualizar",
   );
   await expect(page.locator(".available-total > strong")).toHaveText(balance!);
+  await expect(page.locator(".rail-worth > strong")).toHaveText(balance!);
+  await expect(page.locator(".rail-worth > small")).toContainText("datos sin actualizar");
   await page.getByRole("link", { name: "Revisar coincidencia" }).click();
   await expect(
     page.getByRole("button", { name: "Unir de todos modos" }),

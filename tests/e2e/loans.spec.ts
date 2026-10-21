@@ -53,6 +53,8 @@ test("creates a mortgage, compares strategies, saves a scenario and corrects deb
   await expect(
     page.getByRole("heading", { name: "Vivienda de prueba" }),
   ).toBeVisible();
+  await expect(page.locator(".rail-worth")).toContainText("Disponible total");
+  await expect(page.locator(".rail-worth > strong")).toHaveText("$ 20.000.000");
   await page
     .getByLabel("Capital inicial confirmado (COP)", { exact: true })
     .fill("10000000");
@@ -134,9 +136,9 @@ test("one split payment affects principal and expense reports and survives movem
     name: "Nuevo movimiento",
     exact: true,
   });
-  await dialog
-    .getByRole("combobox", { name: "Tipo", exact: true })
-    .selectOption("loan_payment");
+  await dialog.getByLabel("Categoría de gasto").selectOption("loans");
+  await expect(dialog.getByRole("combobox", { name: "Subcategoría", exact: true })).toHaveValue("loans-housing");
+  await dialog.getByRole("combobox", { name: "Crédito destino", exact: true }).selectOption("loan");
   await dialog
     .getByRole("combobox", { name: "Cuenta de origen", exact: true })
     .selectOption("bank");
@@ -171,6 +173,9 @@ test("one split payment affects principal and expense reports and survives movem
   );
   await page.getByRole("button", { name: "Editar pago", exact: true }).click();
   const editor = page.getByRole("dialog");
+  await expect(editor.getByLabel("Categoría de gasto")).toHaveValue("loans");
+  await expect(editor.getByRole("combobox", { name: "Subcategoría", exact: true })).toHaveValue("loans-housing");
+  await expect(editor.getByRole("combobox", { name: "Crédito destino", exact: true })).toHaveValue("loan");
   await editor.getByLabel("Tipo de pago al crédito").selectOption("term");
   await editor
     .getByRole("button", { name: "Guardar cambios", exact: true })
@@ -275,4 +280,60 @@ test("previews and confirms a mortgage XLSX without generating another bank paym
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("editing a merchant assigns a mortgage through category and subcategory with historical preview and a remembered import", async ({ page, request }, testInfo) => {
+  await seed(request);
+  for (const [id, date, amountMinor] of [["latest", "2026-10-18", "11000000"], ["history", "2026-10-17", "12000000"], ["omitted", "2026-10-16", "13000000"]])
+    expect((await request.post(`${apiBase}/transactions`, { data: { id, date, amountMinor, accountId: "bank", kind: "expense", merchant: "PAGO VIVIENDA" } })).ok()).toBe(true);
+  const before = await (await request.get(`${apiBase}/dashboard`)).json();
+  await page.goto("./#/movimientos");
+  await expect(page.locator(".rail-worth")).toContainText("Disponible total");
+  await expect(page.locator(".rail-worth > strong")).toHaveText("$ 19.640.000");
+  await expect(page.locator(".rail-worth")).not.toContainText("Patrimonio");
+  await page.getByRole("button", { name: "PAGO VIVIENDA", exact: true }).first().click();
+  let editor = page.getByRole("dialog", { name: "Editar movimiento", exact: true });
+  await editor.getByLabel("Categoría de gasto").selectOption("loans");
+  await expect(editor.getByLabel("Categoría de gasto")).toHaveValue("loans");
+  await expect(editor.getByRole("combobox", { name: "Subcategoría", exact: true })).toHaveValue("loans-housing");
+  await editor.getByRole("combobox", { name: "Subcategoría", exact: true }).selectOption("loans-car");
+  await expect(editor.getByRole("combobox", { name: "Crédito destino", exact: true })).toHaveCount(0);
+  await editor.getByRole("combobox", { name: "Subcategoría", exact: true }).selectOption("loans-housing");
+  await editor.getByRole("combobox", { name: "Crédito destino", exact: true }).selectOption("loan");
+  await expect(editor.getByLabel("Tipo de pago al crédito")).toHaveValue("unconfirmed");
+  await editor.getByLabel("Recordar este comercio y el crédito para próximas importaciones (sin asumir tipo ni desglose)").check();
+  await editor.getByLabel("Aplicar este crédito, categoría y nota a movimientos del mismo comercio").check();
+  await expect(editor.locator(".loan-merchant-preview")).toContainText("2026-10-17");
+  await editor.locator(".loan-candidates label").filter({ hasText: "2026-10-16" }).getByRole("checkbox").uncheck();
+  await editor.screenshot({ path: testInfo.outputPath("loan-merchant-editor.png") });
+  await editor.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  let state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.transactions.find((t: { id: string }) => t.id === "latest")).toMatchObject({ kind: "loan_payment", counterAccountId: "loan", categoryId: "loans-housing", loanPayment: { purpose: "unconfirmed" } });
+  expect(state.transactions.find((t: { id: string }) => t.id === "history")).toMatchObject({ kind: "loan_payment", counterAccountId: "loan", loanPayment: { purpose: "unconfirmed" } });
+  expect(state.transactions.find((t: { id: string }) => t.id === "omitted")).toMatchObject({ kind: "expense" });
+  expect((await (await request.get(`${apiBase}/dashboard`)).json()).balances).toEqual(before.balances);
+  await page.getByRole("button", { name: "PAGO VIVIENDA", exact: true }).first().click();
+  editor = page.getByRole("dialog", { name: "Editar movimiento", exact: true });
+  await expect(editor.getByRole("combobox", { name: "Subcategoría", exact: true })).toHaveValue("loans-housing");
+  await expect(editor.getByRole("combobox", { name: "Crédito destino", exact: true })).toHaveValue("loan");
+  await editor.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await page.getByRole("button", { name: "Nuevo movimiento", exact: true }).click();
+  editor = page.getByRole("dialog", { name: "Nuevo movimiento", exact: true });
+  await editor.getByLabel("Categoría de gasto").selectOption("loans");
+  await editor.getByLabel("Comercio o descripción").fill("PAGO VIVIENDA");
+  await expect(editor.getByRole("combobox", { name: "Crédito destino", exact: true })).toHaveValue("loan");
+  await editor.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await page.locator(".register-more > summary").click();
+  await page.locator(".register-more").getByRole("button", { name: "Importar archivo" }).click();
+  const importDialog = page.getByRole("dialog", { name: "Importar movimientos" });
+  await importDialog.getByLabel("Archivo CSV o Excel").setInputFiles({ name: "loan-payments.csv", mimeType: "text/csv", buffer: Buffer.from("Fecha;Descripcion;Valor;Moneda;Tipo\n2026-10-19;PAGO VIVIENDA;115.000,00;COP;gasto") });
+  await importDialog.getByRole("button", { name: "Subir y previsualizar" }).click();
+  await expect(importDialog.locator("tbody tr").first()).toContainText("Crédito: Hipoteca de prueba");
+  await expect(importDialog.locator("tbody tr").first()).toContainText("Tipo y desglose pendientes de confirmar");
+  await importDialog.getByRole("button", { name: "Confirmar 1 movimientos" }).click();
+  await expect(importDialog.getByText("Completado", { exact: true }).first()).toBeVisible();
+  state = await (await request.get(`${apiBase}/state`)).json();
+  expect(state.transactions.find((t: { date: string }) => t.date === "2026-10-19")).toMatchObject({ kind: "loan_payment", counterAccountId: "loan", categoryId: "loans-housing", loanPayment: { purpose: "unconfirmed" } });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

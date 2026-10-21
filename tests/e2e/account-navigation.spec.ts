@@ -7,6 +7,12 @@ test('product selection stays clear in the mobile selector and compact desktop r
     await request.post(`${api}/accounts`, { data: { id, name, kind: 'bank', institution: 'Banco de prueba', openingMinor: '10000000', openingDate: '2026-01-01' } });
   }
   await request.post(`${api}/accounts`, { data: { id: 'mortgage', name: 'Crédito vivienda de prueba', kind: 'loan', openingMinor: '0', openingDate: '2026-01-01' } });
+  await request.post(`${api}/loans/terms`, { data: { id: 'mortgage', denomination: 'COP', principal: '300000000', balanceDate: '2026-10-01' } });
+  await page.goto('./#/resumen');
+  const available = page.locator('.available-total > strong');
+  await expect(available).toHaveText('$ 200.000');
+  await expect(page.locator('.rail-worth > strong')).toHaveText(await available.textContent() ?? '');
+  await expect(page.locator('.rail-worth > span')).toHaveText('Disponible total');
   await page.goto('./#/movimientos');
   const mobile = (page.viewportSize()?.width ?? 1280) <= 850;
   if (mobile) {
@@ -18,6 +24,7 @@ test('product selection stays clear in the mobile selector and compact desktop r
   }
   await page.getByRole('button', { name: 'Ahorros para proyectos personales · Cuenta bancaria', exact: true }).click();
   await expect(page.locator('.register-product-name h1')).toHaveText('Ahorros para proyectos personales');
+  await expect(page.locator('.rail-worth > strong')).toHaveText('$ 200.000');
   if (mobile) {
     await expect(page.locator('.mobile-account-toggle')).toContainText('Ahorros para proyectos personales');
     await expect(page.locator('.mobile-account-toggle')).toHaveAttribute('aria-expanded', 'false');

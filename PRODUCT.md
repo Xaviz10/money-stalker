@@ -61,6 +61,10 @@ Manual investment contributions offer existing investment products or inline pro
 
 Investment entry is hierarchical: choose Inversión in the expense-category selector, then select an existing investment product or create one inline. It is stored as a transfer, without requiring a separate investment movement type.
 
+Mortgage payments use Créditos → Vivienda in the same category/subcategory editor, followed by an existing or inline-created mortgage destination. Categories stay visible when editing an associated payment. A remembered merchant retains the destination and category, never the previous payment purpose or allocation. Applying the association to history requires a selectable preview; only compatible bank/cash expenses or payments already linked to that mortgage qualify. Cash, location and evidence are preserved. New associations remain pending application/distribution; existing confirmed applications stay intact.
+
+The product rail footer shows Disponible total: exactly the global available-money value from Resumen, independent of the selected product. It excludes the full mortgage principal and does not display a net-worth aggregate. Debt remains visible in Créditos. Only upcoming obligations affect available money; stale and incomplete-data states remain explicit.
+
 The approved visual identity extends the tilted eye companion with faint coins, receipts, pockets and financial evidence trails across the frontend. These are decorative brand details; they do not imply extra transactions, analysis or evidence.
 
 Initial product setup includes the SMS alias on each non-cash product. A bank may include its debit card in the same atomic save, sharing one balance; debit cards can also be added later from the product editor or capture setup. Product identity and shared iPhone connection remain distinct. Optional institution/artwork/organization settings are collapsed to keep the opening setup short.

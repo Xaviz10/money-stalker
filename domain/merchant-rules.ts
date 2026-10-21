@@ -1,6 +1,15 @@
-import { DomainError, type MerchantRule, type Observation, type State, type TransactionInput } from "./model";
+import { DomainError, type MerchantRule, type Observation, type State, type TransactionInput, type Transaction } from "./model";
 
 export const merchantKey = (value: string) => value.normalize("NFKC").trim().toLocaleLowerCase("es-CO").replace(/\s+/g, " ");
+/** Preview and write use the same boundary; a merchant never redirects another loan. */
+export function loanMerchantCandidates(state: State, selected: Transaction, loanId: string) {
+  const key = merchantKey(selected.merchant);
+  return state.transactions.filter(item => key && item.id !== selected.id && !item.voided
+    && merchantKey(item.merchant) === key
+    && state.accounts.some(account => account.id === item.accountId && ['bank', 'cash'].includes(account.kind))
+    && (item.kind === 'expense' || (item.kind === 'loan_payment' && item.counterAccountId === loanId))
+    && !state.observations.some(observation => item.observationIds.includes(observation.id) && observation.cashWithdrawal));
+}
 export function rememberMerchant(state: State, transaction: TransactionInput, originalMerchant?: string) {
   if (!transaction.merchant.trim()) throw new DomainError("Agrega el comercio antes de guardar una regla");
   const destination = state.accounts.find(account => account.id === transaction.counterAccountId && account.kind === "investment");

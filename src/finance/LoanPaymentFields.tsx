@@ -10,14 +10,17 @@ export function LoanPaymentFields({
   state,
   loanId,
   onLoanChange,
+  merchant,
   initial,
 }: {
   state: State;
   loanId: string;
   onLoanChange: (id: string) => void;
+  merchant: string;
   initial?: TransactionInput["loanPayment"];
 }) {
   const [distributed, setDistributed] = useState(!!initial?.allocation);
+  const [newName, setNewName] = useState<string>();
   const terms = state.loans.find((l) => l.id === loanId);
   return (
     <fieldset className="loan-payment-fields">
@@ -52,7 +55,7 @@ export function LoanPaymentFields({
       </Field>
       {loanId === "__new_loan__" && (
         <Field label="Nombre del nuevo crédito">
-          <input name="loanName" required maxLength={200} />
+          <input name="loanName" value={newName ?? merchant} onChange={event => setNewName(event.target.value)} required maxLength={200} />
           <small>
             Se creará con el pago. Completa denominación y saldo confirmado en
             Créditos antes de distribuir capital.
@@ -62,14 +65,11 @@ export function LoanPaymentFields({
       <Field label="Tipo de pago al crédito">
         <select
           name="loanPurpose"
-          defaultValue={
-            initial?.purpose === "unconfirmed" ? "" : (initial?.purpose ?? "")
-          }
+          defaultValue={initial?.purpose ?? ""}
           required
         >
           <option value="">Selecciona cómo se aplicó el pago</option>
           {Object.entries(loanPurposes)
-            .filter(([key]) => key !== "unconfirmed")
             .map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
