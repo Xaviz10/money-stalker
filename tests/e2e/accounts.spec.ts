@@ -124,12 +124,21 @@ test("credit-only setup, bank/debit grouping, account filtering and unlinking pr
   await expect(page.locator(".available-total > strong")).toHaveText(
     "$ 885.000",
   );
-  if (isMobile)
-    await page.getByRole("button", { name: "Mis cuentas y tarjetas" }).click();
+  // Product text changes with selection; the disclosure relationship is stable.
+  const accountToggle = page.locator('button[aria-controls="accounts-panel"]');
+  if (isMobile) {
+    await expect(accountToggle).toContainText("Todas las cuentas");
+    await accountToggle.click();
+    await expect(accountToggle).toHaveAttribute("aria-expanded", "true");
+  }
   await page
     .locator(".rail-account")
     .filter({ hasText: "Nu independiente" })
     .click();
+  if (isMobile) {
+    await expect(accountToggle).toContainText("Nu independiente");
+    await expect(accountToggle).toHaveAttribute("aria-expanded", "false");
+  }
   await expect(page.locator(".activity-scope")).toContainText(
     "Nu independiente",
   );

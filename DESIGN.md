@@ -192,7 +192,7 @@ Use the spacing steps in frontmatter. Shared panels use the sixth step, controls
 - **1500px and wider:** grow the rail, headline, main figures, and main-area breathing room.
 - **1390px and below:** compact the rail, header, equation, and ledger; hide lower-priority ledger columns where required.
 - **1100px and below:** move insights beneath the ledger, keeping evidence/category panels in two columns until the phone layout. General paired panels stack.
-- **850px and below:** use a three-row header of (154px). Top navigation remains visible; “Mis cuentas y tarjetas” opens an in-flow account disclosure, scrollable up to (60dvh), which closes after selection. Account groups may use two columns here.
+- **850px and below:** use a three-row header with a (154px) baseline that grows for wrapping product names. Top navigation remains visible; the selected product name (or “Todas las cuentas”) with “Cambiar producto” opens an in-flow account disclosure, scrollable up to (60dvh), which closes after selection. Account groups may use two columns here.
 - **600px and below:** stack the funds equation, insights, forms, and source/candidate review. Keep transaction merchant and amount together; put account/date beneath the merchant. The new-movement label remains accessible when its visible control becomes icon-only.
 - **360px and below:** stack funds and commitments, keep currency totals intact, stack preview comparisons, and wrap the ledger toolbar.
 

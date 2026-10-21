@@ -10,6 +10,7 @@ Current import support includes the verified Bancolombia quarterly savings-accou
 
 - [Initial product and implementation plan](docs/INITIAL_PLAN.md)
 - [Architecture, diagrams and service cost projections](ARCHITECTURE.md)
+- [Local verification and E2E regression workflow](docs/TESTING.md)
 - [iPhone capture feasibility test](docs/IOS_CAPTURE_SPIKE.md)
 - [iPhone Shortcut capture contract](docs/SHORTCUT_CAPTURE.md)
 - [Google Maps setup](docs/GOOGLE_MAPS.md)

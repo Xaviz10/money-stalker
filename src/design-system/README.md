@@ -64,7 +64,7 @@ Every ledger and import-preview row states its direction independently from its 
 
 ## Responsive behavior and accessibility
 
-Desktop has top navigation, an account rail, main ledger, and right insights workspace. Below 1100px the insights move below the ledger. At 850px and below the rail is an in-flow, scrollable disclosure opened by “Mis cuentas y tarjetas.” It closes after selection. Narrow transactions keep merchant and amount together and move account/date beneath the name.
+Desktop has top navigation, an account rail, main ledger, and right insights workspace. Below 1100px the insights move below the ledger. At 850px and below the rail is an in-flow, scrollable disclosure opened by the selected product name (or “Todas las cuentas”) and “Cambiar producto”. It closes after selection. Narrow transactions keep merchant and amount together and move account/date beneath the name.
 
 Use visible focus, native keyboard behavior, labeled controls, `aria-current` for navigation, and `aria-pressed` for account/filter selection. Restrict motion to clear state changes; respect reduced motion. Keep localized COP formatting and America/Bogota dates. Do not ship screenshot text, example balances, bank logos, or generated analytics as real data.
 

@@ -55,3 +55,9 @@ Money Stalker is a Spanish, COP, America/Bogota personal-finance app for Colombi
 - Preserve offline/retry idempotency, locked-phone behavior, location-denied behavior and statement reconciliation tests when changing capture.
 - The device experiment in `docs/IOS_CAPTURE_SPIKE.md` remains required before claiming hands-free capture reliability. Parser tests do not prove that iOS runs every automation reliably.
 
+## UI regression verification
+
+- For shared UI, navigation, labels, accessible names, forms or responsive changes, search and update affected existing E2E flows in the same change; do not validate only newly added tests.
+- Run the full `npm run test:e2e` desktop/mobile suite before reporting these changes verified. `npm run check` does not include E2E tests. For iPhone layout changes also run `npm run test:e2e:iphone`; report any unavailable checks explicitly.
+- Dynamic account-selector text is not a stable locator contract. Use its `button[aria-controls="accounts-panel"]` relationship and assert selected text plus `aria-expanded`. Preserve role/name locators for controls with stable names.
+- Never mask stale-selector failures with longer timeouts, retries, skipped projects or removed financial assertions. See `docs/TESTING.md` for the mobile-navigation incident and local verification workflow.
