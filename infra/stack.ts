@@ -18,9 +18,10 @@ import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as actions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as kms from 'aws-cdk-lib/aws-kms';
 
 export class MoneyStalkerStack extends Stack {
-  constructor(scope: Construct, name: string, props: StackProps & { frontendUrl: string; budgetEmail?: string }) {
+  constructor(scope: Construct, name: string, props: StackProps & { frontendUrl: string; budgetEmail?: string; mcpInspectorCallbackUrl?: string }) {
     super(scope, name, props);
     const url = new URL(props.frontendUrl);
     if (url.protocol !== 'https:' || !url.pathname.endsWith('/') || url.hash || url.search) throw new Error('frontendUrl must be the exact HTTPS app root with trailing slash');
@@ -34,6 +35,11 @@ export class MoneyStalkerStack extends Stack {
       partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING }, sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, removalPolicy: RemovalPolicy.RETAIN,
       stream: dynamodb.StreamViewType.NEW_IMAGE, timeToLiveAttribute: 'expiresAt',
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true, recoveryPeriodInDays: 7 },
+    });
+    const oauthState = new dynamodb.Table(this, 'OAuthState', {
+      partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING }, sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, removalPolicy: RemovalPolicy.RETAIN, timeToLiveAttribute: 'expiresAt',
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true, recoveryPeriodInDays: 7 },
     });
     intake.addGlobalSecondaryIndex({ indexName: 'pending', partitionKey: { name: 'workPk', type: dynamodb.AttributeType.STRING }, sortKey: { name: 'workSk', type: dynamodb.AttributeType.STRING }, projectionType: dynamodb.ProjectionType.ALL });
@@ -53,6 +59,7 @@ export class MoneyStalkerStack extends Stack {
       oAuth: { flows: { authorizationCodeGrant: true }, scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE], callbackUrls: [props.frontendUrl], logoutUrls: [props.frontendUrl] },
     });
     const domain = pool.addDomain('Login', { cognitoDomain: { domainPrefix: `money-stalker-${this.account}-${this.region}` } });
+    const signingKey = new kms.Key(this, 'MCPSigningKey', { keySpec: kms.KeySpec.RSA_2048, keyUsage: kms.KeyUsage.SIGN_VERIFY, removalPolicy: RemovalPolicy.RETAIN, description: 'Signs short-lived Money Stalker MCP access tokens' });
     const dlq = new sqs.Queue(this, 'DeadLetters', { retentionPeriod: Duration.days(14), encryption: sqs.QueueEncryption.SQS_MANAGED });
     const queue = new sqs.Queue(this, 'Work', { visibilityTimeout: Duration.minutes(6), retentionPeriod: Duration.days(4), encryption: sqs.QueueEncryption.SQS_MANAGED, deadLetterQueue: { queue: dlq, maxReceiveCount: 3 } });
     const make = (id: string, handler: string, seconds: number) => new NodejsFunction(this, id, {
@@ -72,9 +79,31 @@ export class MoneyStalkerStack extends Stack {
     const api = new apigw.HttpApi(this, 'HttpAPI', {
       corsPreflight: { allowOrigins: [url.origin], allowHeaders: ['authorization', 'content-type'], allowMethods: [apigw.CorsHttpMethod.OPTIONS, apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.PATCH, apigw.CorsHttpMethod.DELETE], exposeHeaders: ['content-disposition'], maxAge: Duration.minutes(5) },
     });
+    const oauthClient = pool.addClient('MCPLogin', { generateSecret: false, preventUserExistenceErrors: true, enableTokenRevocation: true,
+      accessTokenValidity: Duration.minutes(10), idTokenValidity: Duration.minutes(10), refreshTokenValidity: Duration.days(1),
+      oAuth: { flows: { authorizationCodeGrant: true }, scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE], callbackUrls: [`${api.apiEndpoint}/oauth/callback`] },
+    });
+    const mcpEnvironment = { OAUTH_TABLE: oauthState.tableName, SIGNING_KEY_ID: signingKey.keyId, OAUTH_ISSUER: api.apiEndpoint,
+      MCP_RESOURCE: `${api.apiEndpoint}/mcp`, USER_POOL_ID: pool.userPoolId, COGNITO_CLIENT_ID: oauthClient.userPoolClientId,
+      COGNITO_DOMAIN: domain.baseUrl(), INSPECTOR_CALLBACK_URL: props.mcpInspectorCallbackUrl ?? 'http://127.0.0.1:6274/oauth/callback' };
+    const oauth = new NodejsFunction(this, 'OAuth', { entry: 'server/oauth-handler.ts', handler: 'oauth', runtime: lambda.Runtime.NODEJS_22_X, architecture: lambda.Architecture.ARM_64,
+      memorySize: 256, timeout: Duration.seconds(15), environment: mcpEnvironment,
+      logGroup: new logs.LogGroup(this, 'OAuthLogs', { retention: logs.RetentionDays.ONE_WEEK, removalPolicy: RemovalPolicy.DESTROY }),
+      bundling: { minify: true, sourceMap: false, externalModules: [], target: 'node22' } });
+    const mcp = new NodejsFunction(this, 'MCP', { entry: 'server/mcp-handler.ts', handler: 'mcp', runtime: lambda.Runtime.NODEJS_22_X, architecture: lambda.Architecture.ARM_64,
+      memorySize: 256, timeout: Duration.seconds(15), environment: { OAUTH_TABLE: oauthState.tableName, SIGNING_KEY_ID: signingKey.keyId, OAUTH_ISSUER: api.apiEndpoint, MCP_RESOURCE: `${api.apiEndpoint}/mcp`, LEDGER_TABLE: ledger.tableName },
+      logGroup: new logs.LogGroup(this, 'MCPLogs', { retention: logs.RetentionDays.ONE_WEEK, removalPolicy: RemovalPolicy.DESTROY }),
+      bundling: { minify: true, sourceMap: false, externalModules: [], target: 'node22' } });
+    oauthState.grantReadWriteData(oauth); oauthState.grantReadData(mcp); ledger.grantReadData(mcp);
+    signingKey.grant(oauth, 'kms:Sign', 'kms:GetPublicKey'); signingKey.grant(mcp, 'kms:GetPublicKey');
     const stage = api.defaultStage!.node.defaultChild as apigw.CfnStage;
     stage.defaultRouteSettings = { throttlingBurstLimit: 10, throttlingRateLimit: 2 };
     const integration = new HttpLambdaIntegration('APIIntegration', http);
+    const oauthIntegration = new HttpLambdaIntegration('OAuthIntegration', oauth), mcpIntegration = new HttpLambdaIntegration('MCPIntegration', mcp);
+    for (const path of ['/.well-known/oauth-authorization-server', '/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp', '/.well-known/jwks.json', '/oauth/authorize', '/oauth/callback'])
+      api.addRoutes({ path, methods: [apigw.HttpMethod.GET], integration: oauthIntegration });
+    for (const path of ['/oauth/token', '/oauth/revoke']) api.addRoutes({ path, methods: [apigw.HttpMethod.POST], integration: oauthIntegration });
+    api.addRoutes({ path: '/mcp', methods: [apigw.HttpMethod.ANY], integration: mcpIntegration });
     api.addRoutes({ path: '/capture-events', methods: [apigw.HttpMethod.POST], integration });
     const authorizer = new HttpUserPoolAuthorizer('UserAuthorizer', pool, { userPoolClients: [client] });
     api.addRoutes({ path: '/{proxy+}', methods: [apigw.HttpMethod.OPTIONS], integration });
@@ -98,5 +127,8 @@ export class MoneyStalkerStack extends Stack {
     new CfnOutput(this, 'LedgerTableName', { value: ledger.tableName });
     new CfnOutput(this, 'IntakeTableName', { value: intake.tableName });
     new CfnOutput(this, 'DeadLetterQueueURL', { value: dlq.queueUrl });
+    new CfnOutput(this, 'MCPURL', { value: `${api.apiEndpoint}/mcp` });
+    new CfnOutput(this, 'MCPOAuthIssuer', { value: api.apiEndpoint });
+    new CfnOutput(this, 'MCPInspectorClientID', { value: 'money-stalker-inspector' });
   }
 }

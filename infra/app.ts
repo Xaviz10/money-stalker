@@ -7,4 +7,5 @@ new MoneyStalkerStack(app, 'MoneyStalker', {
   env: { region: 'us-east-1', account: process.env.CDK_DEFAULT_ACCOUNT },
   frontendUrl: app.node.tryGetContext('frontendUrl') ?? 'https://example.github.io/money-stalker/',
   budgetEmail: app.node.tryGetContext('budgetEmail'),
+  mcpInspectorCallbackUrl: app.node.tryGetContext('mcpInspectorCallbackUrl'),
 });

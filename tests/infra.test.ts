@@ -6,7 +6,7 @@ describe('infrastructure safeguards', () => {
   it('keeps the frontend off AWS and provisions private data, scoped auth, recovery, and cost alerts', () => {
     const app = new App(), stack = new MoneyStalkerStack(app, 'Test', { env: { account: '111111111111', region: 'us-east-1' }, frontendUrl: 'https://example.github.io/money-stalker/', budgetEmail: 'alerts@example.invalid' });
     const t = Template.fromStack(stack);
-    t.resourceCountIs('AWS::CloudFront::Distribution', 0); t.resourceCountIs('AWS::S3::Bucket', 1); t.resourceCountIs('AWS::EC2::NatGateway', 0);
+    t.resourceCountIs('AWS::CloudFront::Distribution', 0); t.resourceCountIs('AWS::S3::Bucket', 1); t.resourceCountIs('AWS::EC2::NatGateway', 0); t.resourceCountIs('AWS::SecretsManager::Secret', 0);
     t.hasResourceProperties('AWS::S3::Bucket', { PublicAccessBlockConfiguration: { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true } });
     t.hasResourceProperties('AWS::Cognito::UserPool', { AdminCreateUserConfig: { AllowAdminCreateUserOnly: true }, UserPoolTier: 'ESSENTIALS' });
     t.hasResourceProperties('AWS::Cognito::UserPoolClient', { GenerateSecret: false, AllowedOAuthFlows: ['code'], CallbackURLs: ['https://example.github.io/money-stalker/'] });
@@ -14,7 +14,18 @@ describe('infrastructure safeguards', () => {
     t.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'OPTIONS /{proxy+}', AuthorizationType: 'NONE' });
     t.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'ANY /{proxy+}', AuthorizationType: 'JWT', AuthorizationScopes: ['openid'] });
     t.hasResourceProperties('AWS::DynamoDB::Table', { BillingMode: 'PAY_PER_REQUEST', PointInTimeRecoverySpecification: Match.objectLike({ PointInTimeRecoveryEnabled: true }) });
+    t.hasResourceProperties('AWS::DynamoDB::Table', { BillingMode: 'PAY_PER_REQUEST', TimeToLiveSpecification: { AttributeName: 'expiresAt', Enabled: true } });
+    t.hasResourceProperties('AWS::KMS::Key', { KeySpec: 'RSA_2048', KeyUsage: 'SIGN_VERIFY', Description: Match.stringLikeRegexp('MCP') });
+    t.hasResourceProperties('AWS::Cognito::UserPoolClient', { GenerateSecret: false, AllowedOAuthFlows: ['code'], AccessTokenValidity: 10, RefreshTokenValidity: 1440 });
+    t.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'GET /.well-known/oauth-authorization-server', AuthorizationType: 'NONE' });
+    t.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'GET /.well-known/oauth-protected-resource/mcp', AuthorizationType: 'NONE' });
+    t.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'POST /oauth/token', AuthorizationType: 'NONE' });
+    t.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'ANY /mcp', AuthorizationType: 'NONE' });
+    t.hasResourceProperties('AWS::Lambda::Function', { Handler: 'index.oauth', Environment: { Variables: Match.objectLike({ OAUTH_TABLE: Match.anyValue(), SIGNING_KEY_ID: Match.anyValue(), MCP_RESOURCE: Match.anyValue() }) } });
+    t.hasResourceProperties('AWS::Lambda::Function', { Handler: 'index.mcp', Environment: { Variables: Match.objectLike({ LEDGER_TABLE: Match.anyValue(), OAUTH_TABLE: Match.anyValue(), MCP_RESOURCE: Match.anyValue() }) } });
     t.hasResourceProperties('AWS::Budgets::Budget', { Budget: Match.objectLike({ BudgetLimit: { Amount: 5, Unit: 'USD' } }), NotificationsWithSubscribers: Match.arrayWith([Match.objectLike({ Notification: Match.objectLike({ Threshold: 4 }) })]) });
     expect(Object.values(t.findResources('AWS::Lambda::Function')).every((r: any) => r.Properties.ReservedConcurrentExecutions === undefined)).toBe(true);
+    const mcpPolicy = Object.entries(t.findResources('AWS::IAM::Policy')).find(([id]) => id.startsWith('MCPServiceRoleDefaultPolicy'))?.[1] as any;
+    expect(JSON.stringify(mcpPolicy)).not.toMatch(/dynamodb:(?:PutItem|UpdateItem|DeleteItem|BatchWriteItem)/);
   });
 });

@@ -1,6 +1,6 @@
 # Money Stalker architecture
 
-Last reviewed: **2026-10-20**. This describes the implementation in this repository, not a verified inventory of deployed resources. No cloud account or deployment was inspected. Costs are monthly planning estimates in USD for AWS **us-east-1**, the region configured in `infra/app.ts`.
+Last reviewed: **2026-11-02**. This describes the implementation in this repository, not a verified inventory of deployed resources. No cloud account or deployment was inspected. Costs are monthly planning estimates in USD for AWS **us-east-1**, the region configured in `infra/app.ts`.
 
 ## 1. What the system does
 
@@ -15,6 +15,7 @@ Solid arrows show request, data, or job flow. The dotted link represents JWT ver
 ```mermaid
 flowchart TB
   Person[Owner in browser or installed web app]
+  LLM[ChatGPT or MCP Inspector]
   Host[Static frontend host / CDN]
   Web[React app]
   Phone[iPhone SMS and Wallet Shortcuts]
@@ -35,11 +36,24 @@ flowchart TB
     DLQ[SQS dead-letter queue]
     Schedule[EventBridge daily schedule]
     Recover[Recovery Lambda]
+    OAuth[OAuth compatibility Lambda]
+    MCP[MCP read-only Lambda]
+    OAuthState[(DynamoDB OAuth state / grants)]
+    Signing[KMS RSA signing key]
     Ops[CloudWatch logs; optional alarm / SNS and budget]
   end
 
   Person --> Host --> Web
   Web -->|Authorization code login| Cognito
+  LLM -->|OAuth authorization + MCP JSON-RPC| Gateway
+  Gateway --> OAuth
+  OAuth -->|Upstream authorization code + PKCE| Cognito
+  OAuth --> OAuthState
+  OAuth --> Signing
+  Gateway --> MCP
+  MCP -->|Verify token + active grant| OAuthState
+  MCP -->|Read H#Cognito-sub only| Ledger
+  MCP --> Signing
   Cognito -.->|JWT authorizer| Gateway
   Web -->|Bearer access token| Gateway
   Phone -->|POST /capture-events with device token| Gateway
@@ -60,6 +74,8 @@ flowchart TB
   Worker --> Ops
   Dispatch --> Ops
   Recover --> Ops
+  OAuth --> Ops
+  MCP --> Ops
   DLQ --> Ops
   Web --> Maps
   API -->|Allowlisted link resolution| Google
@@ -76,6 +92,7 @@ The frontend host sits outside the CDK stack. `vercel.json` configures Vercel to
 | Financial rules | `domain/model.ts`, `domain/ledger.ts`, `domain/money.ts`, `domain/cash.ts`, `domain/merchant-rules.ts` | Validation, journal entries, reconciliation, balances and categorization; `domain/loans.ts` owns precise monthly COP/UVR scenarios and dated loan balances |
 | API use cases | `server/api.ts` | Ownership checks, movements, review, devices, import preview/commit and exports; `server/loan-api.ts` owns `/loans` workflows |
 | AWS adapters | `server/handlers.ts`, `server/repository.ts`, `server/storage.ts` | HTTP/stream/queue handlers, persistence and file access |
+| OAuth and MCP | `server/oauth-handler.ts`, `server/mcp-handler.ts`, `server/mcp-auth.ts` | Cognito login bridge, OAuth discovery/grants, KMS access tokens and read-only MCP tools |
 | Processing | `server/processing.ts`, `server/sms.ts`, `server/imports.ts` | Capture parsing and classification; statement parsing and chunked commits. `server/loan-imports.ts` parses mortgage XLSX; `server/uvr.ts` reads official public UVR on demand |
 | Location | `domain/location.ts`, `server/places.ts`, `src/finance/CaptureMap.tsx` | Optional location evidence, link verification and map rendering |
 | Infrastructure | `infra/stack.ts`, `infra/app.ts` | Resources, permissions, retention, triggers, throttles and optional alerts |
@@ -207,9 +224,10 @@ This is a logical model, not SQL tables. In the personal release each verified C
 | --- | --- | --- |
 | Ledger table | Partition `H#<subject>`; separate items for settings and domain records, plus `META` revision. Reads query the full partition with pagination. Mutations write only changed items in an atomic transaction guarded by the household revision; up to four attempts. | Retained on stack removal; 7-day point-in-time recovery (PITR). Movements use audited reversible soft deletion. |
 | Intake table | Household jobs, device records and import batches; separate token-hash lookup and daily rate-counter items. `pending` index uses `workPk=PENDING` and a creation-time sort key. | Retained; 7-day PITR. Job TTL is 30 days from creation; rate-counter TTL is two days. Devices and batches have no TTL. DynamoDB TTL deletion is asynchronous. |
+| OAuth State table | Hashed one-use login state, authorization codes and rotating refresh tokens; grant rows carry the Cognito subject, client, scope, resource, expiry and revocation status. No raw access token is stored. | Retained; 7-day PITR. TTL ranges from 5 minutes for codes to 30 days for refresh/grant records. MCP checks the grant row on every call for immediate cutoff. |
 | S3 `original/` | Original statement files, private, TLS enforced, S3-managed encryption. Browser upload policies constrain size and encryption. | Expires after 30 days; incomplete multipart uploads aborted after one day. Bucket retained on stack removal. |
 | S3 `normalized/` | Comparison IDs and parsed previews. | No expiration rule currently defined: storage accumulates. |
-| Lambda logs | Four log groups. Application processing failures use safe error codes rather than raw financial payloads. | Seven-day retention; log groups destroyed on stack removal. |
+| Lambda logs | Six log groups. Application, OAuth and MCP failures use safe error names/codes rather than tokens or raw financial payloads. | Seven-day retention; log groups destroyed on stack removal. |
 
 COP amounts are integer minor-unit strings, calculated with integer arithmetic. Date-only financial dates remain separate from received timestamps and location timestamps. A credit purchase adds expense and card debt; paying the card reduces cash and debt as a transfer. Refunds reduce reported expense. Income, transfers, future dates and deleted movements are excluded from expense reports.
 
@@ -230,15 +248,17 @@ The calculator uses `decimal.js` at 40 significant digits and half-up rounding; 
 | Component | Configuration in `infra/stack.ts` |
 | --- | --- |
 | API / Worker / Dispatcher / Recovery | Node.js 22, ARM64, 512 MiB each; timeouts 29 / 60 / 30 / 60 seconds respectively |
+| OAuth / MCP | Node.js 22, ARM64, 256 MiB, 15-second timeout; OAuth has read/write OAuth State and KMS sign/public-key permissions; MCP has read-only Ledger/OAuth State and KMS public-key permissions |
 | HTTP API | Exact frontend-origin CORS; global stage throttle 2 requests/second, burst 10; browser proxy routes require Cognito JWT and `openid` scope |
-| Cognito | Essentials; owner-created users only, email login, optional TOTP MFA, no SMS MFA; public client with authorization code flow; 15-minute access/ID tokens and 7-day refresh token |
+| Cognito | Essentials; owner-created users only, email login, optional TOTP MFA, no SMS MFA; browser public client has 15-minute access/ID and 7-day refresh tokens; separate MCP upstream-login public client has 10-minute access/ID and 1-day refresh tokens |
+| MCP authorization | ChatGPT CIMD public client plus Inspector public client; authorization code + S256, exact resource/scope/metadata-declared redirect binding, 10-minute KMS-signed access token, rotating 30-day refresh token and revocable grant; no ChatGPT client secret or callback configuration |
 | SQS | Standard work queue, 6-minute visibility timeout, 4-day retention, DLQ after 3 receives; DLQ retention 14 days; managed encryption |
 | Stream mapping | New pending INSERT records only; batch size 10, 3 retries, bisect on error and partial failure reporting |
 | Worker mapping | SQS batch size 1 with partial failure reporting |
 | Recovery | EventBridge once daily; query up to 100 pending jobs and resend them |
 | Optional operations | If `budgetEmail` is supplied: account-wide USD 5 monthly budget with actual-spend alerts above USD 1 / 3 / 4; one DLQ alarm, SNS topic and email subscription |
 
-The API and worker have read/write access to both tables and the file bucket. Dispatcher can send queue messages; Recovery can read Intake and send queue messages. There is no VPC, NAT gateway, dedicated server, RDS database, AWS-hosted frontend or provisioned Lambda concurrency in the stack.
+The API and worker have read/write access to Ledger, Intake and the file bucket. Dispatcher can send queue messages; Recovery can read Intake and send queue messages. OAuth cannot read the financial Ledger. MCP can read Ledger and OAuth State but cannot write either one or access Intake/S3. Lambda execution roles, not an Identity Pool, grant those service permissions. There is no VPC, NAT gateway, dedicated server, RDS database, AWS-hosted frontend or provisioned Lambda concurrency in the stack.
 
 Browser tokens live in `sessionStorage`. The PWA service worker caches selected static assets only; it does not cache navigations, OAuth callbacks, API responses or financial data. It is not an offline financial mutation queue. Phone automation retries depend on the configured Shortcut retaining the same event ID and payload. Hands-free reliability still requires the owner's [iOS device experiment](docs/IOS_CAPTURE_SPIKE.md).
 
@@ -247,6 +267,10 @@ Recovery is a fallback, not immediate redrive: it does not consume the DLQ, and 
 Maps use MapLibre with public OpenStreetMap raster tiles by default, or `VITE_MAP_STYLE_URL`. Google Maps links are resolved with an allowlisted, bounded server fetch; current code does not call paid Places/geocoding APIs. The legacy Google key configuration does not imply current billable usage. Tile requests reveal the viewed area to the tile provider. OSM public tiles have a [usage policy](https://operations.osmfoundation.org/policies/tiles/) and no guaranteed capacity for product growth; budget for a suitable provider when needed.
 
 ## 8. Local development and verification
+
+### MCP implementation (2026-11-02)
+
+CDK now defines a Lambda OAuth compatibility issuer in front of the existing Cognito login, a read-only MCP Lambda, OAuth State table, asymmetric signing key and exact unauthenticated routes. It implements protected-resource/authorization-server discovery, ChatGPT CIMD validation, PKCE S256, authorization code, rotating refresh, revocation and JWKS. Five stateless read-only tools expose profile, dashboard, account directory, cursor-paginated full movement history and movement detail. The verified Cognito subject remains the only household selector. No deployment or live interoperability check was performed. See [MCP setup and acceptance](docs/MCP.md). `npm run check:mcp-auth` remains a diagnostic for direct Cognito discovery and is no longer the runtime compatibility gate.
 
 `npm run dev` runs the loopback API on port 8787 with `MemoryRepository` and `MemoryFiles`; it persists data to ignored `.local/state.json` unless `LOCAL_EPHEMERAL=1`. A local timer drains jobs every second instead of using AWS streams/SQS. `npm run dev:web` starts Vite, which proxies `/api` to the local server. Development uses a fixed local identity and must never be exposed as a production API.
 
@@ -258,7 +282,7 @@ The CI workflow runs the secret scan, typecheck, unit tests, build, offline CDK 
 
 ### Scope and rates
 
-Pricing references reviewed on **2026-10-20**; the affected API, Lambda, DynamoDB and S3 inputs and mortgage workload were reviewed again on **2026-10-21** for **us-east-1, USD**. These are rounded public list-rate planning inputs, not billing measurements or a quote. No promotional credits or general AWS free allowances are deducted in the tables below, **except Cognito's direct-sign-in allowance**, which is explicitly modeled. Allowances can be shared with other workloads. Actual invoices depend on account eligibility, region, usage, tax and current rates.
+Pricing references reviewed on **2026-11-02** for **us-east-1, USD**. The workload includes the mortgage and read-only MCP paths. These are rounded public list-rate planning inputs, not billing measurements or a quote. No promotional credits or general AWS free allowances are deducted in the tables below, **except Cognito's direct-sign-in allowance**, which is explicitly modeled. Allowances can be shared with other workloads. Actual invoices depend on account eligibility, region, usage, tax and current rates.
 
 | Service | Planning rate / cost driver | Official reference |
 | --- | --- | --- |
@@ -270,6 +294,7 @@ Pricing references reviewed on **2026-10-20**; the affected API, Lambda, DynamoD
 | SQS Standard | USD 0.40 per million request units, including sends, receives, deletes, empty polls and retries | [SQS pricing](https://aws.amazon.com/sqs/pricing/) |
 | CloudWatch | USD 0.50 per GB log ingestion, USD 0.03 per GB-month stored logs, USD 0.10 for one standard alarm | [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) |
 | Cognito Essentials | USD 0.015 per active direct-sign-in user above 10,000 MAU; modeled allowance must be available to this app | [Cognito pricing](https://aws.amazon.com/cognito/pricing/) |
+| KMS asymmetric signing | USD 1 per customer-managed key-month plus USD 0.03 per 10,000 RSA-2048 requests; asymmetric requests are not included in the KMS request free tier | [KMS pricing](https://aws.amazon.com/kms/pricing/) |
 | Internet transfer | USD 0.09 per GB placeholder before applicable allowances; exclude frontend CDN bytes from this AWS line | [AWS transfer pricing](https://aws.amazon.com/ec2/pricing/on-demand/#Data_Transfer) |
 | EventBridge, SNS, Budgets | Daily schedule and occasional email alerts: negligible in this model; reserve USD 0–1/month for routine control-plane usage | [EventBridge](https://aws.amazon.com/eventbridge/pricing/), [SNS](https://aws.amazon.com/sns/pricing/), [Budgets](https://aws.amazon.com/aws-cost-management/aws-budgets/pricing/) |
 
@@ -281,11 +306,11 @@ Let `N` be monthly active users, each with a separate household. This is an illu
 
 | Monthly usage | Per active user unless stated otherwise |
 | --- | --- |
-| Activity context | Roughly 200 captures, 2 baseline statements plus 1 monthly mortgage statement and an annual projection; 20 monthly simulations and regular UI sessions |
-| HTTP API requests | 1,040, including capture, UI reads, polling, imports and 40 additional mortgage-related requests |
-| Lambda | 1,540 invocations across existing functions; baseline 150 GB-seconds plus 10 GB-seconds for mortgage calculation/parsing/reads, at 0.5 GB; add 30 recovery invocations / 3 GB-seconds globally |
-| DynamoDB requests | 4,200 billed WRU and 105,000 billed RRU, including ledger snapshots, transactions and pending-index work |
-| DynamoDB storage / PITR | 0.0101 GB combined table/index storage and 0.0101 GB protected table data; representative retained footprint, not new data each month |
+| Activity context | Roughly 200 captures, 2 baseline statements plus 1 monthly mortgage statement and an annual projection; 20 monthly simulations, regular UI sessions, 40 MCP calls and 4 MCP access-token issuances |
+| HTTP API requests | 1,090, including capture, UI reads, polling, imports, mortgage-related requests, OAuth and MCP |
+| Lambda | 1,590 invocations; 162.5 GB-seconds across existing and MCP functions; add 30 recovery invocations / 3 GB-seconds globally |
+| DynamoDB requests | 4,220 billed WRU and 109,000 billed RRU, including ledger snapshots, OAuth grant checks and state rotation |
+| DynamoDB storage / PITR | 0.0102 GB combined table/index storage and protected data; representative retained footprint, not new data each month |
 | S3 | 0.0205 GB average retained footprint; 15 PUT/POST and 110 GET requests; includes normalized files |
 | SQS | 1,000 request units; add 300,000 globally as an illustrative allowance for idle polling |
 | Logs | 0.005 GB ingested and 0.001 GB average stored; one global alarm |
@@ -299,21 +324,22 @@ USD/month, rounded independently; `<0.01` means a positive amount below one cent
 
 | Service | 1 user | 100 users | 1,000 users | 10,000 users | 100,000 users |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| HTTP API | <0.01 | 0.10 | 1.04 | 10.40 | 104.00 |
-| Lambda | <0.01 | 0.24 | 2.44 | 24.41 | 244.13 |
-| DynamoDB requests | 0.02 | 1.58 | 15.75 | 157.50 | 1,575.00 |
-| DynamoDB storage + PITR | <0.01 | 0.45 | 4.55 | 45.45 | 454.50 |
+| HTTP API | <0.01 | 0.11 | 1.09 | 10.90 | 109.00 |
+| Lambda | <0.01 | 0.25 | 2.48 | 24.85 | 248.47 |
+| DynamoDB requests | 0.02 | 1.63 | 16.26 | 162.63 | 1,626.25 |
+| DynamoDB storage + PITR | <0.01 | 0.46 | 4.59 | 45.90 | 459.00 |
 | S3 | <0.01 | 0.06 | 0.59 | 5.91 | 59.05 |
 | SQS, including polling allowance | 0.12 | 0.16 | 0.52 | 4.12 | 40.12 |
 | CloudWatch logs + alarm | 0.10 | 0.35 | 2.63 | 25.40 | 253.10 |
 | AWS transfer placeholder | <0.01 | 0.18 | 1.85 | 18.45 | 184.50 |
 | Cognito Essentials | 0.00 | 0.00 | 0.00 | 0.00 | 1,350.00 |
-| **AWS modeled subtotal** | **0.25** | **3.13** | **29.36** | **291.64** | **4,264.40** |
+| KMS signing | 1.00 | 1.00 | 1.01 | 1.12 | 2.20 |
+| **AWS modeled subtotal** | **1.25** | **4.20** | **31.02** | **299.27** | **4,331.69** |
 
 Run `npm run cost` to reproduce all service rows and subtotals. With these inputs:
 
 ```text
-AWS(N) = 0.2200460002 + 0.0291418442 × N + 0.015 × max(0, N - 10000)
+AWS(N) = 1.2200460002 + 0.0298046775 × N + 0.015 × max(0, N - 10000)
 Planning reserve = AWS(N) × 1.5 + USD 1 for routine control-plane usage
 ```
 
@@ -325,16 +351,16 @@ The 50% reserve covers ordinary estimation uncertainty, not outages, abuse, majo
 
 | Monthly budget | 1 user | 100 users | 1,000 users | 10,000 users | 100,000 users |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| AWS subtotal | 0.25 | 3.13 | 29.36 | 291.64 | 4,264.40 |
+| AWS subtotal | 1.25 | 4.20 | 31.02 | 299.27 | 4,331.69 |
 | Assumed frontend base | 0.00 | 20.00 | 20.00 | 20.00 | 20.00 |
-| **Base estimate before tax and extras** | **0.25** | **23.13** | **49.36** | **311.64** | **4,284.40** |
-| **Planning budget: AWS × 1.5 + USD 1 + frontend base** | **1.37** | **25.70** | **65.04** | **458.46** | **6,417.61** |
+| **Base estimate before tax and extras** | **1.25** | **24.20** | **51.02** | **319.27** | **4,351.69** |
+| **Planning budget: AWS × 1.5 + USD 1 + frontend base** | **2.87** | **27.30** | **67.54** | **469.90** | **6,518.53** |
 
 Maps cost USD 0 in the small default public-tile scenario, subject to provider policy and availability. A paid tile provider is an **unpriced addition** for growth, not assumed free at 100,000 users. Estimate it as `map sessions × average tile requests per session × provider unit rate`, plus any plan minimum. Frontend CDN traffic/requests, build usage, extra seats, domains, DNS, support, email delivery beyond included service behavior, backup restores and retained CDK bootstrap artifacts are also excluded or unmeasured additions. Thus the large-user totals are a baseline, not an all-inclusive production quote.
 
 Prices are USD before tax. To budget COP, multiply by the exchange rate used by the payment provider and applicable taxes/fees; no fixed FX rate or tax treatment is assumed. The household target of less than USD 5/month is plausible for the pilot under these assumptions, not guaranteed.
 
-`scripts/cost.ts` / `npm run cost` is an older independent pilot illustration: it assumes GitHub Pages, different usage and a generic Lambda compute rate. Its output does not reproduce these tables. Use the explicit model above for this document until that script is deliberately aligned.
+`npm run cost` reproduces the service rows and totals above from the stated workload. It is a planning calculator, not a billing query.
 
 ## 10. What must change before larger-scale use
 
