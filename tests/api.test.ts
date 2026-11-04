@@ -462,14 +462,15 @@ it('keeps historical place propagation separate from future memory and respects 
 
 it('converts matching historical expenses into contributions to one new investment across chunks', async () => {
   const { repo, send } = await setup();
+  const activeMonthDate = `${((await send('GET', '/dashboard')).body as { today: string }).today.slice(0, 7)}-01`;
   await send('POST', '/accounts', { id: 'cash', name: 'Efectivo', kind: 'cash', openingMinor: '0', openingDate: '2026-01-01' });
   await send('POST', '/accounts', { id: 'other-fund', name: 'Otro fondo', kind: 'investment', openingMinor: '0', openingDate: '2026-01-01' });
   for (let i = 0; i < 40; i++) expect((await send('POST', '/transactions', {
-    id: `contribution-${i}`, accountId: i % 2 ? 'cash' : 'bank', date: i ? '2025-12-01' : '2026-10-10',
+    id: `contribution-${i}`, accountId: i % 2 ? 'cash' : 'bank', date: i ? '2025-12-01' : activeMonthDate,
     amountMinor: String(100000 + i), kind: 'expense', merchant: i % 2 ? ' FONDO COMÚN ' : 'Fondo común',
   })).status).toBe(201);
   for (const [id, kind, counterAccountId] of [['income', 'income', undefined], ['refund', 'refund', undefined], ['elsewhere', 'transfer', 'other-fund']] as const) {
-    expect((await send('POST', '/transactions', { id, kind, counterAccountId, accountId: 'bank', date: '2026-10-11', amountMinor: '200000', merchant: 'Fondo común', categoryId: kind === 'income' ? 'salary' : 'uncategorized' })).status).toBe(201);
+    expect((await send('POST', '/transactions', { id, kind, counterAccountId, accountId: 'bank', date: activeMonthDate, amountMinor: '200000', merchant: 'Fondo común', categoryId: kind === 'income' ? 'salary' : 'uncategorized' })).status).toBe(201);
   }
   const response = await send('PATCH', '/transactions/contribution-0', {
     expectedRevision: 1, applyToSimilar: true, rememberMerchant: true,
