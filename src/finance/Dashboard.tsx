@@ -33,7 +33,7 @@ export function SurfaceLoading({ failed }: { failed: boolean }) {
   return (
     <section className="surface-loading" role="status">
       <Eyes />
-      <h2>{failed ? "Nos falta una pieza." : "Buscando tus pistas…"}</h2>
+      <h2>{failed ? "Nos falta una pieza." : "Buscando tus capturas…"}</h2>
       <p>
         {failed
           ? "No pudimos cargar tus datos. Usa Actualizar datos para intentar de nuevo."
@@ -355,7 +355,7 @@ export function Dashboard({
                   title={
                     selected
                       ? "Esta cuenta todavía no tiene movimientos."
-                      : "Tu primera pista está por llegar."
+                      : "Tu primera captura está por llegar."
                   }
                   action={
                     <Button variant="secondary" onClick={() => open("new")}>
@@ -400,7 +400,7 @@ export function Dashboard({
       </div>
       <aside className="dashboard-insights">
         <Panel
-          title="Conecta las pistas"
+          title="Conecta las evidencias"
           action={
             <Badge tone={pending.length ? "danger" : "success"}>
               {pending.length ? `${pending.length} por revisar` : "Al día"}
@@ -459,7 +459,7 @@ export function Dashboard({
                   ? "Esta evidencia no tiene valor."
                   : candidate && candidate.amountMinor !== clue.amountMinor
                     ? `Diferencia de ${formatCOP((BigInt(clue.amountMinor) > BigInt(candidate.amountMinor) ? BigInt(clue.amountMinor) - BigInt(candidate.amountMinor) : BigInt(candidate.amountMinor) - BigInt(clue.amountMinor)).toString())}. ¿Es la misma compra?`
-                    : "Confirma si las pistas cuentan la misma compra."}
+                    : "Confirma si las evidencias corresponden a la misma compra."}
               </p>
               <a href="#/revisar" className="button primary">
                 Revisar coincidencia <Icon name="arrow" size={16} />

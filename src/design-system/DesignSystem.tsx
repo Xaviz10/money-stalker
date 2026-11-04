@@ -45,7 +45,7 @@ export function DesignSystem() {
         </a>
       </Panel>
       <Panel title="Rastro financiero">
-        <p>Monedas, recibos, bolsillos y pistas acompañan las cabeceras y los estados vacíos. Son decorativos; los datos y las acciones mantienen el protagonismo.</p>
+        <p>Monedas, recibos, bolsillos y evidencias acompañan las cabeceras y los estados vacíos. Son decorativos; los datos y las acciones mantienen el protagonismo.</p>
         <div className="catalog-trails">{(["funds", "evidence", "holdings"] as const).map(variant => <EvidenceTrail key={variant} variant={variant} />)}</div>
         <div className="catalog-row">{(["coin", "receipt", "pocket", "investment"] as const).map(name => <span key={name}><Icon name={name} /> {name}</span>)}</div>
       </Panel>
@@ -210,7 +210,7 @@ export function DesignSystem() {
       </Panel>
       <Panel title="Empty states">
         <EmptyState
-          title="Tu primera pista está por llegar."
+          title="Tu primera captura está por llegar."
           action={
             <a className="button secondary" href="#/cuentas">
               Agregar cuenta <Icon name="arrow" size={16} />

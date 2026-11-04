@@ -607,7 +607,7 @@ export function App() {
               <div>
                 <h1>
                   {page === "revisar"
-                    ? "Revisar pistas"
+                    ? "Capturas por revisar"
                     : page === "reportes"
                       ? "Entiende adónde se fue tu dinero."
                     : page === "design-system"
@@ -1259,6 +1259,24 @@ function Movements({
     </section>
   );
 }
+function OriginalSmsMessage({ observationId }: { observationId: string }) {
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let current = true;
+    void api<{ message?: string }>(`/observations/${observationId}/evidence`)
+      .then((result) => { if (current) setMessage(result.message ?? "No encontramos el mensaje original."); })
+      .catch(() => { if (current) setError("No pudimos cargar el mensaje original. Intenta abrir la revisión de nuevo."); });
+    return () => { current = false; };
+  }, [observationId]);
+
+  return <section className="original-sms" aria-label="Mensaje SMS original">
+    <span>Mensaje SMS original</span>
+    {error ? <p role="alert">{error}</p> : <p>{message || "Cargando mensaje…"}</p>}
+  </section>;
+}
+
 function TransactionDialog({
   value,
   state,
@@ -1339,13 +1357,13 @@ function TransactionDialog({
     <dialog
       ref={dialog}
       className="modal"
-      aria-label={isObservation ? "Editar antes de guardar" : transaction ? "Editar movimiento" : "Nuevo movimiento"}
+      aria-label={isObservation ? "Revisar captura" : transaction ? "Editar movimiento" : "Nuevo movimiento"}
       onCancel={close}
     >
       <div className="section-heading">
         <h2 id="transaction-dialog-title">
           {isObservation
-            ? "Editar antes de guardar"
+            ? "Revisar captura"
             : transaction
               ? "Editar movimiento"
               : "Nuevo movimiento"}
@@ -1354,7 +1372,8 @@ function TransactionDialog({
           <Icon name="close" />
         </button>
       </div>
-      {isObservation && <p className="small-note">Ajusta los datos de la captura. El movimiento se guardará cuando pulses Registrar movimiento.</p>}
+      {isObservation && (value as Observation).source === "sms" && <OriginalSmsMessage observationId={(value as Observation).id} />}
+      {isObservation && <p className="small-note">Confirma o ajusta los datos de la captura antes de guardar el movimiento.</p>}
       {pendingDuplicate && (
         <section
           className="duplicate-confirmation"
@@ -1402,7 +1421,7 @@ function TransactionDialog({
         </section>
       )}
       <AppForm
-        submit={transaction ? "Guardar cambios" : "Registrar movimiento"}
+        submit={transaction ? "Guardar cambios" : isObservation ? "Guardar movimiento" : "Registrar movimiento"}
         onSubmit={async (f) => {
           const data = {
             id: transaction?.id ?? operationId.current,
@@ -2836,7 +2855,7 @@ function Settings({
                   </li>
                 </ol>
                 <p className="shortcut-result">
-                  La ubicación es una pista opcional. Nunca uses coordenadas
+                  La ubicación es una evidencia opcional. Nunca uses coordenadas
                   cero ni dejes que una falla de Localización borre el
                   movimiento.
                 </p>
@@ -3082,7 +3101,7 @@ function Settings({
           <button type="button" className="button secondary" onClick={async () => { setCaptureChecking(true); setCaptureFeedback(""); try { const refreshed = await refresh(); setCaptureFeedback(refreshed ? "Datos actualizados. Revisa la última evidencia recibida." : "No se pudo actualizar. Intenta de nuevo."); } finally { setCaptureChecking(false); } }} disabled={captureChecking}>{captureChecking ? "Comprobando…" : "Comprobar llegada"}</button>
           <p role="status">{captureFeedback}</p>
           {latestCapture ? <p className="capture-arrival"><strong>Última evidencia recibida · {latestCapture.source === "sms" ? "SMS" : "Wallet"}</strong><br />{latestCapture.merchant || "Comercio por completar"} · {latestCapture.amountMinor ? formatCOP(latestCapture.amountMinor) : "Valor por completar"}<br /><time dateTime={latestCapture.receivedAt}>{new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }).format(new Date(latestCapture.receivedAt))}</time></p> : <p>Aún no hay evidencias de SMS o Wallet recibidas.</p>}
-          <a className="text-link" href="#/revisar">Abrir pistas para revisar</a>
+          <a className="text-link" href="#/revisar">Abrir capturas por revisar</a>
           <p className="small-note">
             Cuando el iPhone entrega el texto, Money Stalker reconoce SMS
             Bancolombia de compra con tarjeta, pago QR, pago desde cuenta y

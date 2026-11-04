@@ -106,8 +106,8 @@ test('verified shared place links update MapLibre and preserve the original evid
   let requests = 0;
   await page.route('**/api/places/resolve-link', route => { requests++; return route.fulfill({ json: { latitude: 4.65, longitude: -74.15, approximate: false, name: 'Restaurante sintético', url: 'https://maps.google.com/?q=Comercio+de+prueba&ftid=0x1:0x2' } }); });
   await page.goto('./#/revisar');
-  await page.getByRole('button', { name: 'Editar antes de guardar', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Editar antes de guardar', exact: true });
+  await page.getByRole('button', { name: 'Revisar', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Revisar captura', exact: true });
   await editLocation(dialog);
   const input = dialog.getByLabel('Enlace de Google Maps');
   // Pasting then blurring must not restart an already completed lookup.
@@ -141,7 +141,7 @@ test('verified shared place links update MapLibre and preserve the original evid
   await dialog.locator('.place-picker').scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('shared-map-preview.png') });
   expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await dialog.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Guardar movimiento', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const state = await (await request.get(`${api}/state`)).json();
   expect(state.transactions[0].merchant).toBe('COMERCIO DE PRUEBA');

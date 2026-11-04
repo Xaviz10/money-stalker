@@ -110,7 +110,7 @@ test("loading and failed refresh never pretend to be empty or current balances",
   control.holdReads = true;
   await page.goto("./");
   await expect(
-    page.getByRole("heading", { name: "Buscando tus pistas…" }),
+    page.getByRole("heading", { name: "Buscando tus capturas…" }),
   ).toBeVisible();
   await expect(page.locator(".first-account")).toHaveCount(0);
   await expect(page.locator(".rail-worth > strong")).toHaveText("—");
@@ -134,6 +134,8 @@ test("loading and failed refresh never pretend to be empty or current balances",
   await expect(page.locator(".rail-worth > strong")).toHaveText(balance!);
   await expect(page.locator(".rail-worth > small")).toContainText("datos sin actualizar");
   await page.getByRole("link", { name: "Revisar coincidencia" }).click();
+  await page.getByRole("complementary", { name: "Lista de capturas pendientes" })
+    .getByRole("button", { name: /Café de prueba/ }).click();
   await expect(
     page.getByRole("button", { name: "Unir de todos modos" }),
   ).toBeDisabled();
@@ -155,15 +157,15 @@ test("review explains amount changes, preserves a failed match, confirms success
   await expect(
     page.getByText("Al unir, el valor cambiará a $ 19.000 según el extracto."),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Registrar otro movimiento", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Editar antes de guardar", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registrar otro movimiento", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Revisar", exact: true })).toBeVisible();
   control.failMatch = true;
   await page.getByRole("button", { name: "Unir de todos modos" }).click();
   await expect(page.locator(".review-action-error")).toContainText(
     "No se pudo unir",
   );
   await expect(page.locator(".review-action-error")).toContainText(
-    "La pista continúa pendiente",
+    "La captura continúa pendiente",
   );
   await expect(page.locator(".clue")).toHaveCount(1);
   control.failMatch = false;
@@ -172,7 +174,7 @@ test("review explains amount changes, preserves a failed match, confirms success
     page.getByRole("heading", { name: "Todo en su lugar" }),
   ).toBeVisible();
   await expect(page.locator(".review-progress [role=status]")).toContainText(
-    "Pistas unidas",
+    "Evidencias unidas",
   );
   const correction = page.locator(".correction-history .audit-row").first();
   await expect(correction).toContainText("Café de prueba · $ 18.500 · Ahorros");
@@ -187,6 +189,30 @@ test("review explains amount changes, preserves a failed match, confirms success
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("review names account conflicts and prevents joining different accounts", async ({
+  page,
+}) => {
+  const state = fixture();
+  state.accounts.push({
+    id: "other",
+    name: "Otra cuenta",
+    kind: "bank",
+    openingMinor: "0",
+    openingDate: "2026-01-01",
+    eligible: true,
+  });
+  state.observations[0].accountId = "other";
+  const control = await mock(page, state);
+  await page.goto("./#/revisar");
+  await expect(page.getByText(/Valor diferente · Misma fecha · Cuenta diferente/)).toBeVisible();
+  const conflict = page.locator(".account-conflict");
+  await expect(conflict).toContainText("La captura pertenece a Otra cuenta");
+  await expect(conflict).toContainText("el movimiento a Ahorros");
+  await expect(page.getByRole("button", { name: /Unir/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Revisar", exact: true })).toBeVisible();
+  expect(control.writes).toBe(0);
 });
 
 test("first use offers a single account setup path, without zero-value dashboard noise", async ({

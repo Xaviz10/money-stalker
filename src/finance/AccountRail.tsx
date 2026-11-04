@@ -187,7 +187,7 @@ export function AccountRail({
         <strong>
           {availableMinor === undefined ? "—" : formatCOP(availableMinor)}
         </strong>
-        <small>{stale ? "Última consulta · datos sin actualizar." : availableIncomplete ? "Datos incompletos. Revisa tus pistas." : "Después de compromisos y reserva."}</small>
+        <small>{stale ? "Última consulta · datos sin actualizar." : availableIncomplete ? "Datos incompletos. Revisa tus capturas." : "Después de compromisos y reserva."}</small>
       </section>
     </aside>
   );

@@ -26,7 +26,7 @@ test("clears progress from a deleted review queue", async ({ page }) => {
     .toBe("[]");
 });
 
-test("review queue shows progress and registers repeated purchases individually or in a batch", async ({
+test("review queue shows every capture and requires reviewing before saving", async ({
   page,
   request,
   isMobile,
@@ -85,75 +85,69 @@ test("review queue shows progress and registers repeated purchases individually 
   await page.goto("./#/revisar");
   await expect(page.getByText("5 pendientes", { exact: true })).toBeVisible();
   await expect(page.getByText("0 resueltas", { exact: true })).toBeVisible();
-  if (isMobile) await page.getByRole("button", { name: /Cambiar grupo/ }).click();
-  const search = page.getByRole("searchbox", { name: "Buscar pistas" });
+  const captureList = page.getByRole("complementary", { name: "Lista de capturas pendientes" });
+  await expect(captureList.getByRole("button")).toHaveCount(5);
+  await expect(captureList.getByText("Peaje", { exact: true })).toHaveCount(3);
+  await expect(captureList.getByText("Parqueadero", { exact: true })).toHaveCount(2);
+  await expect(captureList.getByText(/Capturada 1:00 p\. m\./)).toBeVisible();
+  await expect(captureList.getByText(/Capturada 1:04 p\. m\./)).toBeVisible();
+  const search = page.getByRole("searchbox", { name: "Buscar capturas" });
   for (const value of ["15.000", "15000", "$ 15.000"]) {
     await search.fill(value);
-    await expect(page.getByText("3 visibles", { exact: true })).toBeVisible();
+    await expect(captureList.getByRole("button")).toHaveCount(3);
   }
   await search.fill("");
-  await page.getByRole("button", { name: /Parqueadero.*2 pistas/ }).click();
+  await captureList.getByRole("button", { name: /Parqueadero.*12\.000/ }).first().click();
   await page.reload();
-  await expect(page.locator(".review-focus h3")).toHaveText("Parqueadero");
-  await expect(page.getByRole("heading", { name: "Listo para registrar" })).toBeVisible();
-  await expect(page.getByText("Recibimos la captura, pero aún no está guardada como movimiento. Puedes registrarla ahora o editar sus datos antes de guardar.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Registrar como movimiento distinto" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Registrar movimiento", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Editar antes de guardar", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Editar antes de guardar" });
+  await expect(page.locator(".review-focus h2")).toHaveText("Parqueadero");
+  const selectedCapture = captureList.locator('[aria-current="true"]');
+  await expect(selectedCapture).toContainText("En revisión");
+  await expect.poll(() => selectedCapture.evaluate((row) => {
+    const list = row.closest("aside")!.getBoundingClientRect(), bounds = row.getBoundingClientRect();
+    return bounds.top >= list.top && bounds.bottom <= list.bottom;
+  })).toBe(true);
+  await page.locator(".review-filter-menu > summary").click();
+  await page.getByLabel("Origen").selectOption("wallet");
+  if (isMobile) await page.getByRole("button", { name: "Cerrar filtros", exact: true }).click();
+  else await page.locator(".review-filter-menu > summary").click();
+  await expect(page.getByRole("button", { name: "Quitar filtro Origen: Wallet" })).toBeVisible();
+  await expect(captureList.getByText("5 de 5 capturas", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Quitar filtro Origen: Wallet" }).click();
+  await expect(page.getByRole("heading", { name: "Lista para revisar" })).toBeVisible();
+  await expect(page.getByText("Recibimos la captura, pero aún no está guardada como movimiento. Revísala y confirma sus datos antes de guardar.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registrar movimiento", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Revisar", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Revisar", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Revisar captura" });
   await expect(editor.getByLabel("Comercio o descripción")).toHaveValue("Parqueadero");
   await editor.getByLabel("Comercio o descripción").fill("Parqueadero corregido");
   expect((await (await request.get(`${apiBase}/state`)).json()).transactions).toHaveLength(0);
   await editor.getByRole("button", { name: "Cerrar", exact: true }).click();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: testInfo.outputPath("review-ready.png"), fullPage: true });
-  if (isMobile) await page.getByRole("button", { name: /Cambiar grupo/ }).click();
-  await page.getByRole("button", { name: /Peaje.*3 pistas/ }).click();
-  await page.getByRole("button", { name: "Preparar 3 como distintos" }).click();
-  await expect(
-    page.getByText("Registrar 3 pistas como 3 movimientos distintos"),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Confirmar 3" }).click();
-  await expect(page.getByText("2 pendientes", { exact: true })).toBeVisible();
-  await expect(page.getByText("3 resueltas", { exact: true })).toBeVisible();
-  await expect(page.locator(".clue")).toHaveCount(1);
-  await expect(page.locator(".clue-state")).toHaveText("1 de 2 en este grupo");
-  await expect(page.locator(".review-progress [role=status]")).toContainText(
-    "3 pistas registradas como movimientos distintos",
-  );
-
-  await page.goto("./#/movimientos");
-  await page.goto("./#/revisar");
-  await expect(page.getByText("3 resueltas", { exact: true })).toBeVisible();
-  await expect(page.locator(".clue-state")).toHaveText("1 de 2 en este grupo");
-
-  await page
-    .getByRole("button", { name: "Registrar movimiento", exact: true })
-    .click();
-  await expect(page.getByText("1 pendientes", { exact: true })).toBeVisible();
-  await expect(page.getByText("4 resueltas", { exact: true })).toBeVisible();
-  await page
-    .getByRole("button", { name: "Registrar otro movimiento", exact: true })
-    .click();
+  for (let remaining = 5; remaining > 0; remaining--) {
+    await page.getByRole("button", { name: "Revisar", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Revisar captura" });
+    await dialog.getByRole("button", { name: "Guardar movimiento", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByText(`${remaining - 1} pendientes`, { exact: true })).toBeVisible();
+  }
   await expect(
     page.getByRole("heading", { name: "Todo en su lugar" }),
   ).toBeVisible();
   await expect(page.getByText("5 resueltas", { exact: true })).toBeVisible();
-  await expect(page.locator(".review-progress [role=status]")).toHaveText(
-    "Pista resuelta. La revisión quedó al día.",
-  );
 
   await page.goto("./#/movimientos");
   await page.goto("./#/revisar");
   await expect(page.getByText("5 resueltas", { exact: true })).toBeVisible();
   await expect(page.locator(".review-progress [role=status]")).toContainText(
-    "5 de 5 pistas resueltas",
+    "5 de 5 capturas resueltas",
   );
 
   await page.reload();
   await expect(page.getByText("5 resueltas", { exact: true })).toBeVisible();
   await expect(page.locator(".review-progress [role=status]")).toContainText(
-    "5 de 5 pistas resueltas",
+    "5 de 5 capturas resueltas",
   );
   const history = page.locator(".correction-history .audit-row");
   await expect(history.first()).toContainText("Parqueadero · $ 12.000 · Ahorros");
@@ -182,14 +176,15 @@ test("an unmatched SMS can be edited before it is registered", async ({ page, re
   } });
   await expect.poll(async () => (await (await request.get(`${apiBase}/state`)).json()).observations.length).toBe(1);
   await page.goto("./#/revisar");
-  await expect(page.getByRole("button", { name: "Registrar movimiento", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registrar movimiento", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Registrar otro movimiento", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Editar antes de guardar", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Editar antes de guardar" });
+  await page.getByRole("button", { name: "Revisar", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Revisar captura" });
+  await expect(editor.getByLabel("Mensaje SMS original")).toContainText("Bancolombia: Compraste $22.000,00");
   await editor.getByLabel("Comercio o descripción").fill("Comercio corregido");
   await editor.getByLabel("Valor (COP)").fill("23.000");
   expect((await (await request.get(`${apiBase}/state`)).json()).transactions).toHaveLength(0);
-  await editor.getByRole("button", { name: "Registrar movimiento", exact: true }).click();
+  await editor.getByRole("button", { name: "Guardar movimiento", exact: true }).click();
   await expect(editor).not.toBeVisible();
   const state = await (await request.get(`${apiBase}/state`)).json();
   expect(state.transactions).toHaveLength(1);
